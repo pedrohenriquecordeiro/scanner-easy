@@ -1,6 +1,6 @@
 # Digitalizadora
 
-App pessoal para o MacBook: aperte um botão (ou a tecla **Espaço**) numa página local do navegador e a **HP DeskJet Ink Advantage 2874** digitaliza **uma página do vidro** e grava um **PDF** ou um **JPG** com nome automático. Não usa driver nem software da HP: fala direto com a impressora pelo protocolo **eSCL (AirScan)**, pelo **cabo USB** (preferido) ou pelo **Wi-Fi**.
+App pessoal para o MacBook: aperte um botão (ou a tecla **Espaço**) numa página local do navegador e a **HP DeskJet Ink Advantage 2874** digitaliza **uma página do vidro** e grava um **PDF** ou um **JPG** com nome automático. No modo **Documento**, as páginas digitalizadas uma a uma vão para um único PDF, gravado quando você clica em **Finalizar PDF**. Não usa driver nem software da HP: fala direto com a impressora pelo protocolo **eSCL (AirScan)**, pelo **cabo USB** (preferido) ou pelo **Wi-Fi**.
 
 ## O que você precisa
 
@@ -8,6 +8,7 @@ App pessoal para o MacBook: aperte um botão (ou a tecla **Espaço**) numa pági
 - As ferramentas de linha de comando da Apple (Command Line Tools), que trazem o `make`.
 - A impressora **ligada** e conectada ao Mac pelo **cabo USB**, o jeito recomendado (não depende de nenhuma permissão do macOS). Sem o cabo, ela precisa estar na **mesma rede Wi-Fi do Mac** (a 2874 só usa 2,4 GHz), com a luz do Wi-Fi fixa e a VPN desligada.
 - Espaço livre na pasta de saída: o app recusa digitalizar com menos de 1 GiB livre. A pasta padrão, `~/Pictures/Digitalizadora`, fica no disco interno; para volumes muito grandes, um disco externo é recomendado. Na primeira gravação num disco externo, o macOS pede permissão para o programa que abriu o app (normalmente o Terminal) acessar Volumes Removíveis: clique em **Permitir**.
+- Espaço livre no disco interno do Mac para o modo Documento: as páginas de um documento em andamento ficam guardadas no Mac até você finalizar, e o app recusa uma página nova com menos de 1 GiB livre ali (mais o espaço de 3 páginas).
 
 A impressora já foi validada (Gate 0, aprovado em 2026-10-17, pelo USB e pelo Wi-Fi): veja [docs/gate-0-resultado-2026-10-17.md](docs/gate-0-resultado-2026-10-17.md).
 
@@ -39,17 +40,89 @@ O app procura a impressora pelas duas rotas e prefere o cabo USB. O cabeçalho d
 
 ## Como usar
 
+O seletor **Modo** no topo da página tem duas opções:
+
+- **Rápido** (o padrão): cada Espaço digitaliza uma folha e grava um arquivo PDF ou JPG.
+- **Documento**: cada Espaço acrescenta uma página a um documento, e no fim um clique em **Finalizar PDF** grava um único PDF com todas as páginas. Veja a seção [Documento de várias páginas](#documento-de-várias-páginas).
+
+No modo Rápido:
+
 1. Coloque a folha (ou a foto) no vidro, com a face para baixo, e feche a tampa.
-2. Aperte **Espaço** (ou clique em **Digitalizar**). Espere cerca de 15 s (no modo Foto, cerca de 75 s): o status mostra Preparando, Digitalizando, Salvando e por fim "Pronto! Salvo como AAAA-MM-DD_NNNNN.pdf".
+2. Aperte **Espaço** (ou clique em **Digitalizar**). Espere cerca de 15 s (na qualidade Foto, cerca de 75 s): o status mostra Preparando, Digitalizando, Salvando e por fim "Pronto! Salvo como AAAA-MM-DD_NNNNN.pdf".
 3. Levante a tampa, troque a folha e aperte Espaço de novo. Não precisa tocar no mouse.
 
 Ajustes (salvos na hora):
 
-- **Formato:** PDF ou JPG.
-- **Modo:** Documento (300 dpi, cor), Documento econômico (200 dpi, cinza) ou Foto (600 dpi, cor).
+- **Modo:** Rápido ou Documento.
+- **Formato:** PDF ou JPG (só no modo Rápido; o modo Documento sempre grava PDF).
+- **Qualidade:** Texto (300 dpi, cor), Texto econômico (200 dpi, cinza) ou Foto (600 dpi, cor).
 - **Pasta de saída:** digite o caminho completo (por exemplo `/Volumes/MeuDisco/Scans`) e clique em **Salvar**. O padrão é `~/Pictures/Digitalizadora`. A página mostra o espaço livre e quantas páginas ainda cabem; se a pasta sumir (por exemplo, um disco externo desconectado), mostra "Pasta de saída indisponível" no lugar do espaço livre.
 
 Os arquivos se chamam `AAAA-MM-DD_NNNNN.pdf` ou `.jpg`, com um contador de 5 dígitos por dia, e nunca sobrescrevem outro arquivo.
+
+## Documento de várias páginas
+
+Para juntar várias folhas num único PDF (um contrato, um caderno, uma pilha de notas fiscais):
+
+1. No seletor **Modo**, escolha **Documento**. O botão grande passa a se chamar **Adicionar página**, e o seletor PDF/JPG e o painel da última digitalização (miniatura, nome e tamanho do arquivo) somem (o documento é sempre PDF).
+2. Se quiser, digite um nome em **Nome do documento (opcional)**. Dá para trocar o nome até finalizar.
+3. Coloque a primeira folha no vidro e aperte **Espaço**. O status mostra "Preparando a página 1…", "Digitalizando a página 1… (cerca de 15 s)" e "Guardando a página 1…", e a miniatura aparece na grade.
+4. Troque a folha e aperte Espaço de novo, quantas vezes quiser. A barra abaixo da grade mostra quantas páginas o documento tem e o tamanho aproximado, por exemplo "3 páginas · ~2,4 MB".
+5. Aperte **Enter** (ou clique em **Finalizar PDF**) e confirme em **Finalizar**. O app grava o PDF na pasta de saída e mostra, por exemplo, "Pronto! Salvo como Contrato do apartamento.pdf (3 páginas)". O campo do nome fica vazio para o próximo documento.
+
+Na grade, cada miniatura tem o número da página e os seus botões:
+
+- **Reordenar:** arraste a miniatura e solte antes ou depois de outra. Pelo teclado, use os botões ◀ e ▶ da página, ou **Mover para…**, que pergunta a nova posição.
+- **Excluir uma página:** botão × da página.
+- **Descartar a última:** botão **Descartar última** (ou Backspace).
+- **Cancelar documento:** apaga as páginas guardadas sem gravar PDF. Sempre pede confirmação, com o foco começando em **Voltar**.
+
+As edições ficam desabilitadas enquanto uma página está sendo digitalizada.
+
+Teclado no modo Documento (com o foco fora do campo do nome):
+
+| Tecla | O que faz |
+|---|---|
+| Espaço | Adiciona uma página |
+| Backspace | Descarta a última página; segurar a tecla descarta só uma |
+| Enter | Abre a confirmação de finalizar; segurar a tecla abre a confirmação, mas nunca confirma |
+| Esc | Fecha a confirmação; fora dela, leva o foco de volta ao botão **Adicionar página** |
+
+Depois de "Descartar última", de fechar uma confirmação, de salvar o nome com Enter, de soltar uma miniatura arrastada ou de qualquer clique na grade, o foco volta ao botão **Adicionar página**: o próximo Espaço sempre adiciona uma página e nunca repete a ação. No campo do nome, Backspace apaga texto e Enter salva o nome. Os anúncios para o leitor de tela (VoiceOver) dizem o que mudou, por exemplo "Página 3 movida para a posição 2" ou "Página 12 descartada. O documento tem 11 páginas."
+
+**Nome do arquivo.** Sem nome, o PDF recebe o nome automático `AAAA-MM-DD_NNNNN.pdf`, na mesma sequência do modo Rápido. Com nome, vira `<nome>.pdf`, e o título do PDF é o nome. O app limpa o nome para ele servir em qualquer disco, inclusive os discos externos em exFAT: `/ \ : * ? " < > |` viram `-`, caracteres invisíveis saem, espaços repetidos viram um só, e saem os pontos do começo e do fim e um `.pdf` digitado no final (`Recibo: março` grava `Recibo- março.pdf`; `Relatório.PDF` grava `Relatório.pdf`). Acentos ficam. Um nome com mais de 120 caracteres (ou mais de 200 bytes) é recusado, nunca cortado. Se o arquivo já existir, o novo vira `<nome> (2).pdf`, depois `(3)`, e assim por diante: nunca sobrescreve, nem quando a diferença é só de maiúsculas.
+
+**Qualidade por página.** Cada página guarda a qualidade da hora em que foi digitalizada, então dá para trocar a qualidade no meio do documento (por exemplo, uma foto a 600 dpi entre páginas de texto). Todas saem no PDF com o tamanho real da folha.
+
+**Documento grande.** Não há limite de páginas. Acima de 300 páginas (ou de 1 GiB) a página avisa "Documento grande: finalizar pode levar alguns segundos e usar bastante memória."
+
+**Modo Rápido com um documento em andamento.** O documento continua guardado: a página mostra "Documento em andamento: N páginas" e o botão **Voltar ao modo Documento**. Digitalizar no modo Rápido não mexe no documento.
+
+### Onde ficam as páginas
+
+Até você finalizar, as páginas ficam no disco interno do Mac, não na pasta de saída: assim o documento não se perde se o disco externo sair.
+
+- Uso normal: `~/Library/Application Support/Digitalizadora/drafts/current`
+- Simulador (`make run-simulated`): `~/Digitalizadora-simulador/Library/Application Support/Digitalizadora/drafts/current`
+
+A pasta `current` tem o `manifest.json` (nome, ordem das páginas e marcas da finalização), um `page-<identificador>.jpg` por página (o JPEG que veio da impressora) e um `thumbnail-<identificador>.jpg` por página (a miniatura). **Não mexa nos arquivos de `current/`** nem no `.owner-lock` ao lado dela: o app confere cada página pelo tamanho registrado e põe de lado o que não bate. A linha "Espaço no Mac para as páginas" mostra o espaço livre desse disco; perto do limite aparece "Pouco espaço no disco do Mac para as páginas do documento. Libere espaço antes de continuar."
+
+### Se o app ou o Mac caírem
+
+O documento em andamento volta sozinho na próxima abertura, com todas as páginas que já estavam guardadas, e a página diz o que a retomada fez, por exemplo "Documento em andamento recuperado: 41 páginas." ou "Documento em andamento recuperado: 41 páginas. A página 37 não pôde ser recuperada; digitalize-a de novo." Se o modo salvo era Rápido, a página troca para Documento nesse momento (só na retomada). A folha que estava sendo digitalizada na hora da queda não entra: digitalize-a de novo.
+
+Dois avisos pedem para conferir a pasta de saída antes de finalizar de novo:
+
+- "Uma finalização deste documento foi interrompida às HH:MM. Confira na pasta de saída se o PDF já existe antes de finalizar de novo." A queda foi durante a gravação do PDF. Se o PDF está na pasta e abre com todas as páginas, clique em **Cancelar documento**; se não está, finalize de novo.
+- "Este documento talvez já tenha sido salvo como <caminho>. Confira antes de finalizar de novo." O PDF foi gravado, mas o app não conseguiu confirmar que ele existe (por exemplo, o disco externo estava desconectado na abertura). Reconecte o disco e clique em **Finalizar PDF**: se o arquivo existir, o app só encerra o documento, sem gravar uma cópia.
+
+### Pasta `set-aside-…`
+
+Quando o app encontra na pasta do documento algo que não consegue usar com segurança (um `manifest.json` ilegível, uma página com tamanho diferente do registrado, ou as páginas de um documento antigo que ficaram para trás), ele não apaga nada: move os arquivos para uma pasta como `set-aside-20261017-101500-a1b2c3d4`, ao lado de `current` dentro de `drafts/`, e a página diz onde ela ficou ("Não consegui ler o documento em andamento. As páginas foram guardadas em <pasta>." ou "Os arquivos danificados foram guardados em <pasta>."). O app nunca apaga essas pastas. Para aproveitar o que está dentro, abra os `page-<identificador>.jpg` no Preview; a lista `pages` do `manifest.json` (quando ele é legível) dá a ordem em que as páginas estavam. Digitalize de novo o que faltar e, depois de conferir, apague a pasta pelo Finder.
+
+### Uma cópia do app por vez
+
+Só um Digitalizadora pode usar a pasta do documento. Uma segunda cópia, mesmo em outra porta (`DIGITALIZADORA_PORT=8766 make run`), para na partida com "O Digitalizadora já está aberto em outra janela do Terminal. Use aquela janela, ou feche-a antes de abrir de novo." Duas abas do navegador abertas na mesma cópia funcionam: o que muda numa aparece na outra em instantes.
 
 ## Testar sem a impressora (simulador)
 
@@ -103,10 +176,23 @@ A faixa vermelha da página mostra a mensagem. O registro fica em `~/Library/Log
 | `unexpected_error` | Algo inesperado aconteceu... | Veja o registro em `~/Library/Logs/Digitalizadora` e avise. |
 | `forbidden_host` | Acesso recusado... | Abra a página pelo endereço `http://127.0.0.1:8765` (ou `http://localhost:8765`), não por outro nome ou porta. |
 | `missing_request_header` | Requisição recusada... | Use a página do app; chamadas feitas à mão precisam do cabeçalho `X-Requested-With: digitalizadora`. |
+| `no_open_document` | Não há documento em andamento... | Adicione uma página para começar. Outra aba pode ter finalizado ou cancelado o documento. |
+| `page_not_found` | Essa página não está mais no documento... | A grade já foi atualizada (outra aba pode ter excluído a página); repita a ação se ainda quiser. |
+| `invalid_page_order` | A nova ordem das páginas não confere com o documento... | A grade já foi atualizada com a ordem atual; arraste ou mova a página de novo. |
+| `invalid_document_name` | Nome de documento inválido... | Use até 120 caracteres, com letras ou números. Deixe o campo vazio para o nome automático. |
+| `empty_document` | O documento não tem páginas... | Adicione pelo menos uma página antes de finalizar. |
+| `document_busy` | O documento está sendo finalizado ou alterado... | Espere a finalização (ou a outra mudança) terminar e aperte Espaço de novo; a folha no vidro não foi digitalizada. |
+| `draft_folder_in_use` | O Digitalizadora já está aberto em outra janela do Terminal... | Aparece no Terminal, na partida. Use a janela que já está aberta, ou feche-a antes de abrir de novo (também vale para uma cópia em outra porta). |
+| `draft_storage_unavailable` | Não consigo guardar as páginas do documento no disco do Mac... | Veja o registro em `~/Library/Logs/Digitalizadora`. Se o aviso apareceu ao abrir o app, nada foi apagado: feche o Digitalizadora e abra de novo. |
+| `insufficient_draft_storage` | Pouco espaço livre no disco do Mac para guardar as páginas do documento... | Libere espaço no disco interno (as páginas ficam no Mac, não na pasta de saída); o app exige 1 GiB livre mais o espaço de 3 páginas. |
+| `document_assembly_failed` | Não consegui montar o PDF porque uma página guardada não pôde ser lida como imagem... | Veja o registro em `~/Library/Logs/Digitalizadora`; o documento continua guardado. |
+| `damaged_document_page` | Uma página guardada do documento está danificada ou sumiu do disco do Mac... | A página fica marcada na grade: exclua-a (×), digitalize a folha de novo, mova a página nova para o lugar e finalize. |
+| `document_too_large` | O documento é grande demais para montar com a memória livre do Mac... | Feche outros programas e finalize de novo; o documento continua guardado. |
 
 Outros sintomas:
 
-- **"A porta 8765 já está em uso"**: o app já está aberto em outra janela do Terminal. Feche-a ou rode `DIGITALIZADORA_PORT=8766 make run`.
+- **"A porta 8765 já está em uso"**: provavelmente o app já está aberto em outra janela do Terminal; use aquela janela. Se a porta é de outro programa, rode `DIGITALIZADORA_PORT=8766 make run`.
+- **"O Digitalizadora já está aberto em outra janela do Terminal"** (na partida): outra cópia já usa a pasta do documento, mesmo que em outra porta. Use a janela dela, ou feche-a e abra de novo.
 - **"precisa do Python 3.12 ou mais novo"**: instale o Python 3.12 e rode uma vez `make setup PYTHON=python3.12`.
 - **O navegador não abre a página**: confira se a janela do Terminal ainda está aberta e se o endereço é `http://127.0.0.1:8765`.
 
@@ -136,18 +222,20 @@ digitalizadora/
 ├── src/digitalizadora/
 │   ├── __main__.py  configuration.py  composition_root.py  application_factory.py
 │   ├── domain/            modelos, erros e portas (Protocols)
-│   ├── services/          regras: digitalizar, codificar, guardar, conectar
-│   ├── repositories/      arquivos e JSON
+│   ├── services/          regras: digitalizar, codificar, guardar, conectar, documento de várias páginas
+│   ├── repositories/      arquivos, JSON e o rascunho do documento
 │   ├── infrastructure/    eSCL (httpx), DNS-SD nativo do macOS (ctypes), relógio
 │   ├── controllers/       HTTP em português
 │   ├── simulator/         impressora falsa
-│   └── web/static/        index.html, application.css, application.js
+│   └── web/static/        index.html, application.css e os scripts scan-trigger-policy.js, error-banner.js,
+│                          document-page-policy.js, document-panel.js e application.js
 └── tests/                 espelha o src; fakes/, fixtures/, integration/, hardware/
 ```
 
 ## Documentos
 
 - Design: [docs/superpowers/specs/2026-10-13-digitalizadora-design.md](docs/superpowers/specs/2026-10-13-digitalizadora-design.md)
+- Design do documento de várias páginas: [docs/superpowers/specs/2026-10-17-documento-de-varias-paginas.md](docs/superpowers/specs/2026-10-17-documento-de-varias-paginas.md)
 - Plano de implementação: [docs/superpowers/plans/2026-10-17-digitalizadora-plano-final.md](docs/superpowers/plans/2026-10-17-digitalizadora-plano-final.md)
 - Gate 0 (validação da impressora): [docs/gate-0-resultado-2026-10-17.md](docs/gate-0-resultado-2026-10-17.md) e [docs/gate-0-capturas/](docs/gate-0-capturas/)
 - Checklist de aceitação: [docs/acceptance-checklist.md](docs/acceptance-checklist.md)
