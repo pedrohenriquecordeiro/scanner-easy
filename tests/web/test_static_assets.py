@@ -529,3 +529,8 @@ def test_the_crop_margin_checkbox_comes_right_after_the_auto_crop_one_with_its_l
     assert page.index('id="auto-crop-checkbox"') < page.index('id="crop-margin-checkbox"')
     assert "Margem de segurança no corte" in page
     assert "Deixa uma pequena folga em volta da moldura; desmarque para cortar rente." in page
+
+
+def test_the_last_scan_thumbnail_spans_both_rows_so_it_leaves_no_blank_band_under_the_details() -> None:
+    stylesheet = " ".join(read_static_file("application.css").split())
+    assert ".last-scan-thumbnail-frame { grid-row: 1 / span 2; }" in stylesheet

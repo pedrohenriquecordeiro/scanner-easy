@@ -359,12 +359,18 @@ button:disabled {
 .last-scan-panel {
   display: grid;
   grid-template-columns: 8rem 1fr;
+  /* The thumbnail spans both rows and the last one takes whatever height it adds, so the buttons stay under the details. */
+  grid-template-rows: auto 1fr;
   gap: var(--size-gutter);
   align-items: start;
   padding: var(--size-gutter);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
+}
+
+.last-scan-thumbnail-frame {
+  grid-row: 1 / span 2;
 }
 
 .last-scan-details {
@@ -881,6 +887,11 @@ button:disabled {
 @media (max-width: 30rem) {
   .last-scan-panel {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .last-scan-thumbnail-frame {
+    grid-row: auto;
   }
 
   .last-scan-actions {
