@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -10,12 +10,16 @@ from digitalizadora.domain.document_draft import (
     DocumentFinalizationResult,
     DocumentPage,
     DocumentPageFiles,
+    DraftRecoveryReport,
     DraftSnapshot,
+    RecoveryOutcome,
 )
+from digitalizadora.domain.document_draft_reconciliation import DraftFileInventory, DraftReconciliation, reconcile_draft
 from digitalizadora.domain.document_name_policy import clean_document_name
 from digitalizadora.domain.errors import (
     DamagedDocumentPageError,
     DigitalizadoraError,
+    DraftStorageUnavailableError,
     InsufficientStorageError,
     NoOpenDocumentError,
     OutputFolderUnavailableError,
@@ -59,6 +63,9 @@ class DraftStorageState:
 
 
 UNAVAILABLE_DRAFT_STORAGE_STATE = DraftStorageState(free_space_in_bytes=0, estimated_pages_remaining=0, available=False)
+FAILED_RECOVERY_REPORT = DraftRecoveryReport(
+    outcome=RecoveryOutcome.FAILED, kept_page_count=0, dropped_page_positions=(), set_aside_folder=None
+)
 
 
 def _page_from_capture(page_identifier: str, captured_page: CapturedPage) -> DocumentPage:
@@ -92,6 +99,7 @@ class DocumentDraftStore:
         self._snapshot = DraftSnapshot(
             draft_session=identity_source.draft_session, revision=INITIAL_REVISION, draft=None
         )
+        self._recovery_failed = False
 
     def snapshot(self) -> DraftSnapshot:
         return self._snapshot
@@ -141,6 +149,10 @@ class DocumentDraftStore:
 
     def ensure_capacity_for_page(self, settings: ScanSettings) -> None:
         """Runs before the printer spends 15 to 75 s on the page (6.6.1, step 3)."""
+        if self._recovery_failed:
+            # current/ may hold a valid draft that only could not be read now: a new first page would set it
+            # aside, so new pages wait for the next start, which recovers again (R13).
+            raise DraftStorageUnavailableError("The draft folder could not be recovered at start-up")
         self._draft_repository.ensure_storage_folder_ready()
         storage_folder = self._draft_repository.storage_folder()
         try:
@@ -265,3 +277,113 @@ class DocumentDraftStore:
     def _set_leftover_aside(self) -> None:
         set_aside_folder = self._draft_repository.set_aside_draft_folder()
         LOGGER.warning("Set the leftover draft folder aside as %s", set_aside_folder)
+
+    def recover(self) -> None:
+        """Runs once at start-up, after claim_exclusive_access and before the server answers (6.6.2).
+
+        The revision stays at its initial value: recovering sets only the draft and the recovery report.
+        Never raises, so the server always starts. A failure leaves current/ as it was (nothing before
+        step 7 deletes anything), starts without a draft and blocks new pages until the next start (R13).
+        """
+        try:
+            self._recover_from_disk()
+        except Exception:  # any failure, even an unexpected one, must not keep the server from starting
+            LOGGER.exception("Could not recover the document draft; new pages wait for the next start")
+            self._recovery_failed = True
+            self._finish_recovery(None, FAILED_RECOVERY_REPORT)
+
+    def _recover_from_disk(self) -> None:
+        inventory = self._draft_repository.take_inventory()
+        try:
+            recorded_draft = self._draft_repository.load_manifest()
+        except UnreadableDraftError as error:
+            self._set_unreadable_draft_aside(error)
+            return
+        self._warn_about_unknown_files(inventory)
+        if recorded_draft is None:
+            self._delete_unconfirmed_files(inventory)
+        elif self.is_finished_document_present(recorded_draft):
+            self._delete_draft_already_saved(recorded_draft)
+        else:
+            # A finished mark whose PDF cannot be confirmed now stays: the draft comes back with it (R15).
+            self._resume(reconcile_draft(recorded_draft, inventory))
+
+    def _set_unreadable_draft_aside(self, error: UnreadableDraftError) -> None:
+        """Only an unreadable manifest sets the whole folder aside, with every file in it (R13)."""
+        set_aside_folder = self._draft_repository.set_aside_draft_folder()
+        LOGGER.warning(
+            "The draft manifest is unreadable (%s); set the draft folder aside as %s", error, set_aside_folder
+        )
+        self._finish_recovery(
+            None,
+            DraftRecoveryReport(
+                outcome=RecoveryOutcome.SET_ASIDE,
+                kept_page_count=0,
+                dropped_page_positions=(),
+                set_aside_folder=set_aside_folder,
+            ),
+        )
+
+    def _warn_about_unknown_files(self, inventory: DraftFileInventory) -> None:
+        if inventory.unknown_file_names:
+            LOGGER.warning(
+                "Left the unknown files of the draft folder alone: %s", ", ".join(sorted(inventory.unknown_file_names))
+            )
+
+    def _delete_unconfirmed_files(self, inventory: DraftFileInventory) -> None:
+        """Without a manifest, no page, thumbnail or temporary file was ever confirmed (R14)."""
+        known_file_names = inventory.known_file_names
+        if known_file_names:
+            LOGGER.warning("Deleting %d unconfirmed files left in the draft folder", len(known_file_names))
+            self._draft_repository.delete_files(known_file_names)
+
+    def _delete_draft_already_saved(self, recorded_draft: DocumentDraft) -> None:
+        """The finished mark points at a PDF that exists now: deleting the draft never duplicates it (R15)."""
+        self._draft_repository.delete_draft()
+        LOGGER.info("The draft was already saved as %s; deleted it", recorded_draft.finished_document.output_path)
+
+    def _finish_recovery(self, draft: DocumentDraft | None, recovery_report: DraftRecoveryReport | None) -> None:
+        self._snapshot = replace(self._snapshot, draft=draft, recovery_report=recovery_report)
+
+    def _resume(self, reconciliation: DraftReconciliation) -> None:
+        """Keeps the pages whose file has the recorded size, in the manifest order, with the name and both marks."""
+        dropped_page_positions = reconciliation.dropped_page_positions
+        for position in dropped_page_positions:
+            LOGGER.warning("Page %d of the recovered draft is missing or has an unexpected size; dropped it", position)
+        set_aside_folder = self._set_damaged_pages_aside(reconciliation.files_to_set_aside)
+        recovered_draft = reconciliation.draft
+        if recovered_draft.page_count == 0:
+            self._draft_repository.delete_draft()
+            if dropped_page_positions:  # a manifest that already listed no page has nothing to report
+                self._finish_recovery(
+                    None,
+                    DraftRecoveryReport(
+                        outcome=RecoveryOutcome.PAGES_LOST,
+                        kept_page_count=0,
+                        dropped_page_positions=dropped_page_positions,
+                        set_aside_folder=set_aside_folder,
+                    ),
+                )
+            return
+        if dropped_page_positions:
+            # Not fatal (R13): the manifest on disk keeps listing the dropped pages, and the next start
+            # reconciles it the same way.
+            self._save_manifest_best_effort(recovered_draft, "the recovered draft without its dropped pages")
+        self._draft_repository.delete_files(reconciliation.files_to_delete)
+        self._finish_recovery(
+            recovered_draft,
+            DraftRecoveryReport(
+                outcome=RecoveryOutcome.RESUMED,
+                kept_page_count=recovered_draft.page_count,
+                dropped_page_positions=dropped_page_positions,
+                set_aside_folder=set_aside_folder,
+            ),
+        )
+
+    def _set_damaged_pages_aside(self, file_names: Sequence[str]) -> Path | None:
+        """A confirmed page with an unexpected size is moved aside, never deleted (R14)."""
+        if not file_names:
+            return None
+        set_aside_folder = self._draft_repository.set_aside_files(file_names)
+        LOGGER.warning("Set the pages with an unexpected size aside in %s", set_aside_folder)
+        return set_aside_folder
