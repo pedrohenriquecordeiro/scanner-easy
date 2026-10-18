@@ -822,7 +822,8 @@ class ScanPage {
       this.is_output_folder_save_pending = false;
     }
     this.settings_feedback.finish_folder_save();
-    scan_button.focus();
+    // The page stays where it is: scrolling up to the scan button would hide the confirmation just shown.
+    scan_button.focus({ preventScroll: true });
   }
 }
 

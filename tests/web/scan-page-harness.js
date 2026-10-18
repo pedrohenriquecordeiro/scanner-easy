@@ -354,6 +354,7 @@ const SCENARIOS = {
     return {
       ...page.read_folder_feedback(),
       scan_button_focused: page.is_focused("scan-button"),
+      scan_button_focus_options: page.element("scan-button").last_focus_options,
       settings_request_body: page.settings_request_body(),
     };
   },

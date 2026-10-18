@@ -175,7 +175,8 @@ class FakeElement extends FakeEventTarget {
     return this.attributes[attribute_name] ?? null;
   }
 
-  focus() {
+  focus(options) {
+    this.last_focus_options = options ?? null;
     // Browsers never focus a disabled control.
     if (!this.disabled) {
       this.page_document.move_focus_to(this);

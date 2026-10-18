@@ -372,6 +372,10 @@ def test_folder_save_hands_the_focus_to_the_scan_button(scenario_results: dict) 
     assert scenario_results["folder_save_answered"]["scan_button_focused"] is True
 
 
+def test_folder_save_does_not_scroll_the_page_away_from_its_confirmation(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_answered"]["scan_button_focus_options"] == {"preventScroll": True}
+
+
 def test_folder_confirmation_waits_for_its_timer_to_end(scenario_results: dict) -> None:
     assert scenario_results["folder_save_answered"]["pending_confirmation_timers"] == 1
 
