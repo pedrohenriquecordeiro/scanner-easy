@@ -11,6 +11,7 @@ from digitalizadora.domain.errors import (
     ScanAlreadyRunningError,
 )
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult
@@ -28,6 +29,7 @@ SETTINGS = ScanPreset.DOCUMENT.settings
 QUICK_SCAN_REQUEST = ScanRequest(settings=SETTINGS, output_format=OutputFormat.PDF)
 FIRST_PAGE_IDENTIFIER = page_identifier_at(1)
 SECOND_PAGE_IDENTIFIER = page_identifier_at(2)
+JPEG_START_OF_IMAGE = b"\xff\xd8"
 # A finalization held by the reader then fails for lack of space, so the draft is still there afterwards.
 NO_FREE_SPACE_IN_BYTES = 0
 
@@ -202,6 +204,17 @@ async def test_snapshot_is_read_while_a_finalization_holds_the_lock(held_parts, 
 
     await finish_held_finalization(blocking_reader, finalization_task)
     assert page_count == 2
+
+
+async def test_thumbnail_and_preview_are_read_while_a_finalization_holds_the_lock(held_parts, blocking_reader):
+    service = held_parts.document_draft_service
+    finalization_task = await start_held_finalization(held_parts, blocking_reader)
+
+    thumbnail = service.read_thumbnail(FIRST_PAGE_IDENTIFIER, PageRotation.CLOCKWISE_90)
+    preview = service.read_preview(SECOND_PAGE_IDENTIFIER, PageRotation.NONE)
+
+    await finish_held_finalization(blocking_reader, finalization_task)
+    assert (thumbnail.startswith(JPEG_START_OF_IMAGE), preview.startswith(JPEG_START_OF_IMAGE)) == (True, True)
 
 
 async def test_edits_queued_behind_a_finalization_run_in_order_after_it(held_parts, blocking_reader):

@@ -4,6 +4,7 @@ from pathlib import Path
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentFinalizationResult, DocumentPage, DraftSnapshot
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.document_draft_store import DraftStorageState
@@ -46,6 +47,7 @@ class StubDocumentDraftService:
         self.failure: Exception | None = None
         self.finalization = STUB_FINALIZATION
         self.thumbnails: dict[str, bytes] = {}
+        self.previews: dict[str, bytes] = {}
         self.calls: list[str] = []
         self.received_arguments: dict[str, object] = {}
 
@@ -63,9 +65,15 @@ class StubDocumentDraftService:
         if self.add_page_refusal is not None:
             raise self.add_page_refusal
 
-    def read_thumbnail(self, page_identifier: str) -> bytes | None:
-        self.received_arguments["read_thumbnail"] = page_identifier
+    def read_thumbnail(self, page_identifier: str, rotation: PageRotation) -> bytes | None:
+        self.received_arguments["read_thumbnail"] = (page_identifier, rotation)
         return self.thumbnails.get(page_identifier)
+
+    def read_preview(self, page_identifier: str, rotation: PageRotation) -> bytes:
+        self.received_arguments["read_preview"] = (page_identifier, rotation)
+        if self.failure is not None:
+            raise self.failure
+        return self.previews[page_identifier]
 
     async def add_page(self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT) -> DocumentPage:
         self._record("add_page", (settings, adjustment))

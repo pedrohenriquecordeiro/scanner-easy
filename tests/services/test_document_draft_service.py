@@ -42,6 +42,7 @@ from tests.fakes.document_service_parts import (
 )
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sample_images import build_sample_jpeg
+from tests.fakes.synthetic_scans import read_jpeg_size
 
 SETTINGS = ScanPreset.DOCUMENT.settings
 PHOTO_SETTINGS = ScanPreset.PHOTO.settings
@@ -188,9 +189,45 @@ async def test_cancel_ends_the_draft(service):
 async def test_read_thumbnail_returns_the_thumbnail_of_the_page(service, parts):
     await add_pages(service, 1)
 
-    thumbnail_jpeg = service.read_thumbnail(FIRST_PAGE_IDENTIFIER)
+    thumbnail_jpeg = service.read_thumbnail(FIRST_PAGE_IDENTIFIER, PageRotation.NONE)
 
     assert thumbnail_jpeg == (parts.draft_folder / thumbnail_file_name(FIRST_PAGE_IDENTIFIER)).read_bytes()
+
+
+async def test_read_thumbnail_with_a_rotation_turns_the_thumbnail(service):
+    await add_pages(service, 1)
+    unturned_size = read_jpeg_size(service.read_thumbnail(FIRST_PAGE_IDENTIFIER, PageRotation.NONE))
+
+    turned_thumbnail = service.read_thumbnail(FIRST_PAGE_IDENTIFIER, PageRotation.CLOCKWISE_90)
+
+    assert read_jpeg_size(turned_thumbnail) == unturned_size[::-1]
+
+
+async def test_read_thumbnail_of_an_unknown_page_is_none(service):
+    await add_pages(service, 1)
+
+    assert service.read_thumbnail(UNKNOWN_PAGE_IDENTIFIER, PageRotation.NONE) is None
+
+
+async def test_read_preview_gives_the_stored_page_as_it_is_displayed(service, parts):
+    await add_pages(service, 1)
+    page_size = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
+
+    preview = service.read_preview(FIRST_PAGE_IDENTIFIER, PageRotation.HALF_TURN)
+
+    assert read_jpeg_size(preview) == page_size
+
+
+async def test_read_preview_of_an_unknown_page_raises_page_not_found(service):
+    await add_pages(service, 1)
+
+    with pytest.raises(PageNotFoundError):
+        service.read_preview(UNKNOWN_PAGE_IDENTIFIER, PageRotation.NONE)
+
+
+async def test_read_preview_without_a_draft_raises_no_open_document(service):
+    with pytest.raises(NoOpenDocumentError):
+        service.read_preview(FIRST_PAGE_IDENTIFIER, PageRotation.NONE)
 
 
 async def test_an_edit_saves_the_manifest_in_a_worker_thread(service, parts):

@@ -40,12 +40,14 @@ from digitalizadora.services.document_draft_store import DocumentDraftStore, Dra
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.document_page_renderer import DocumentPageRenderer
+from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.image_pixel_limit import raise_decompression_limit_to_scanner_size
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
 from digitalizadora.services.scan_encoder import ScanEncoder
@@ -106,6 +108,7 @@ class _SharedServices:
 
     clock: Clock
     crop_detection: PageCropDetectionService
+    image_view: PageImageViewService
     master_jpeg_service: MasterJpegService
     scan_encoder: ScanEncoder
     storage_guard: StorageGuardService
@@ -227,6 +230,7 @@ def _build_shared_services(clock: Clock, overrides: ContainerOverrides) -> _Shar
     return _SharedServices(
         clock=clock,
         crop_detection=crop_detection,
+        image_view=PageImageViewService(),
         master_jpeg_service=master_jpeg_service,
         scan_encoder=ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()),
         storage_guard=_build_storage_guard_service(overrides),
@@ -271,7 +275,9 @@ def _build_document_draft_service(
     page_scanner = functools.partial(scan_service.scan_document_page, page_capture=page_capture)
     return DocumentDraftService(
         scan_service,
-        DocumentDraftCollaborators(draft_store, page_scanner, finalizer),
+        DocumentDraftCollaborators(
+            draft_store, page_scanner, finalizer, DocumentPageViewService(draft_store, shared_services.image_view)
+        ),
         shared_services.clock,
     )
 

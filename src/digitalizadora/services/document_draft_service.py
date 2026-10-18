@@ -18,12 +18,14 @@ from digitalizadora.domain.errors import (
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftStorageState
 from digitalizadora.services.document_finalizer import DocumentFinalizer
+from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentAssemblyInput
 from digitalizadora.services.scan_service import ScanService
 
@@ -35,6 +37,7 @@ class DocumentDraftCollaborators:
     draft_store: DocumentDraftStore
     page_scanner: Callable[[ScanRequest], Awaitable[DocumentPage]]
     finalizer: DocumentFinalizer
+    page_views: DocumentPageViewService
 
 
 class DocumentDraftService:
@@ -49,6 +52,7 @@ class DocumentDraftService:
         self._draft_store = collaborators.draft_store
         self._page_scanner = collaborators.page_scanner
         self._finalizer = collaborators.finalizer
+        self._page_views = collaborators.page_views
         self._clock = clock
         self._lock = asyncio.Lock()
         # Edits waiting for the lock: right after a release, locked() is False while a woken waiter has
@@ -66,9 +70,13 @@ class DocumentDraftService:
     ) -> DraftStorageState:
         return self._draft_store.describe_storage(settings, adjustment)
 
-    def read_thumbnail(self, page_identifier: str) -> bytes | None:
+    def read_thumbnail(self, page_identifier: str, rotation: PageRotation) -> bytes | None:
         # No lock: a thumbnail file never changes after it is written.
-        return self._draft_store.read_thumbnail(page_identifier)
+        return self._page_views.read_thumbnail(page_identifier, rotation)
+
+    def read_preview(self, page_identifier: str, rotation: PageRotation) -> bytes:
+        # No lock either: the stored page never changes, and a deleted one fails like a missing file.
+        return self._page_views.read_preview(page_identifier, rotation)
 
     def ensure_can_add_page(self) -> None:
         self._ensure_no_scan_in_progress()

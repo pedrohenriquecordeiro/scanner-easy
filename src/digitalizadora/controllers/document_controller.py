@@ -12,6 +12,7 @@ from digitalizadora.controllers.document_body import build_document_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import DamagedDocumentPageError, DigitalizadoraError
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.document_draft_service import DocumentDraftService
 
@@ -98,7 +99,7 @@ class DocumentController:
         return await self._respond_to_edit(self._document_draft_service.rotate_page(page_identifier))
 
     def read_thumbnail(self, page_identifier: str) -> Response:
-        thumbnail_jpeg = self._document_draft_service.read_thumbnail(page_identifier)
+        thumbnail_jpeg = self._document_draft_service.read_thumbnail(page_identifier, PageRotation.NONE)
         if thumbnail_jpeg is None:
             return Response(status_code=HTTPStatus.NOT_FOUND)
         return Response(content=thumbnail_jpeg, media_type=JPEG_MEDIA_TYPE, headers=dict(THUMBNAIL_CACHE_HEADERS))

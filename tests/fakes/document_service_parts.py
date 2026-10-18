@@ -24,11 +24,13 @@ from digitalizadora.services.document_draft_store import DocumentDraftStore, Dra
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.document_page_renderer import DocumentPageRenderer
+from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
@@ -196,6 +198,7 @@ def build_document_service_parts(
         draft_store=draft_store,
         page_scanner=functools.partial(scan_service.scan_document_page, page_capture=page_capture),
         finalizer=_build_finalizer(output_folder, pdf_assembly_service, finalizer_free_space_reader),
+        page_views=DocumentPageViewService(draft_store, PageImageViewService()),
     )
     return DocumentServiceParts(
         document_draft_service=DocumentDraftService(scan_service, collaborators, clock),
