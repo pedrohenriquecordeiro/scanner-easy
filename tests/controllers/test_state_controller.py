@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.state_controller import StateController
 from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
@@ -19,6 +20,7 @@ SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.PDF,
     scan_preset=ScanPreset.DOCUMENT_ECONOMY,
+    capture_mode=CaptureMode.DOCUMENT,
 )
 AVAILABLE_STORAGE = StorageState(free_space_in_bytes=5_000_000_000, estimated_pages_remaining=1200)
 UNAVAILABLE_STORAGE = StorageState(
@@ -136,6 +138,7 @@ def test_state_contains_the_settings(client: TestClient) -> None:
         "output_folder": "/Volumes/External/scans",
         "output_format": "pdf",
         "scan_preset": "document_economy",
+        "capture_mode": "document",
     }
 
 

@@ -4,6 +4,7 @@ from enum import Enum
 from pathlib import Path
 
 from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.errors import InvalidSettingsError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import ApplicationSettingsRepository
@@ -17,6 +18,8 @@ class SettingsUpdate:
     output_folder: str
     output_format: str
     scan_preset: str
+    # None keeps the saved capture mode: a client that predates the mode sends only the first three fields.
+    capture_mode: str | None = None
 
 
 def parse_enum_member[EnumMember: Enum](
@@ -56,12 +59,19 @@ class ApplicationSettingsService:
     def update(self, update: SettingsUpdate) -> ApplicationSettings:
         output_format = parse_enum_member(OutputFormat, update.output_format, "output format")
         scan_preset = parse_enum_member(ScanPreset, update.scan_preset, "scan preset")
+        capture_mode = self._resolve_capture_mode(update.capture_mode)
         output_folder = parse_output_folder(update.output_folder)
         self._folder_preparer(output_folder)
         settings = ApplicationSettings(
             output_folder=output_folder,
             output_format=output_format,
             scan_preset=scan_preset,
+            capture_mode=capture_mode,
         )
         self._settings_repository.save(settings)
         return settings
+
+    def _resolve_capture_mode(self, raw_capture_mode: str | None) -> CaptureMode:
+        if raw_capture_mode is None:
+            return self.current().capture_mode
+        return parse_enum_member(CaptureMode, raw_capture_mode, "capture mode")

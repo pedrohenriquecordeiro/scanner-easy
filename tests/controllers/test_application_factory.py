@@ -58,6 +58,7 @@ SETTINGS_BODY = {
     "output_folder": "/Volumes/External/scans",
     "output_format": "jpg",
     "scan_preset": "photo",
+    "capture_mode": "single",
 }
 CONNECTED_STATE = PrinterConnectionState(
     connected=True,
@@ -225,6 +226,17 @@ def test_put_with_the_required_header_is_accepted(client: TestClient) -> None:
 
 def test_put_with_an_incomplete_body_answers_422_in_the_error_shape(client: TestClient) -> None:
     response = client.put("/api/settings", json={}, headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        {"code": "invalid_settings", "message": CATALOG.message_for("invalid_settings")},
+    )
+
+
+def test_put_with_a_capture_mode_that_is_not_text_answers_422_in_the_error_shape(client: TestClient) -> None:
+    response = client.put(
+        "/api/settings", json={**SETTINGS_BODY, "capture_mode": 1}, headers=STATE_CHANGING_HEADERS
+    )
 
     assert (response.status_code, response.json()) == (
         HTTPStatus.UNPROCESSABLE_ENTITY,

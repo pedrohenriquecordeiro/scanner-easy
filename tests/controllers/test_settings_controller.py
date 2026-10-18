@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.errors import OutputFolderUnavailableError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
@@ -19,6 +20,7 @@ INITIAL_SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/Initial/scans"),
     output_format=OutputFormat.PDF,
     scan_preset=ScanPreset.DOCUMENT,
+    capture_mode=CaptureMode.DOCUMENT,
 )
 VALID_BODY = {
     "output_folder": "/Volumes/External/scans",
@@ -60,6 +62,7 @@ def test_get_settings_returns_the_saved_settings(client: TestClient) -> None:
             "output_folder": "/Volumes/Initial/scans",
             "output_format": "pdf",
             "scan_preset": "document",
+            "capture_mode": "document",
         },
     )
 
@@ -67,7 +70,10 @@ def test_get_settings_returns_the_saved_settings(client: TestClient) -> None:
 def test_put_settings_returns_the_new_settings(client: TestClient) -> None:
     response = client.put("/api/settings", json=VALID_BODY)
 
-    assert (response.status_code, response.json()) == (HTTPStatus.OK, VALID_BODY)
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.OK,
+        {**VALID_BODY, "capture_mode": "document"},
+    )
 
 
 def test_put_settings_saves_the_new_settings(
@@ -79,6 +85,7 @@ def test_put_settings_saves_the_new_settings(
         output_folder=Path("/Volumes/External/scans"),
         output_format=OutputFormat.JPEG,
         scan_preset=ScanPreset.PHOTO,
+        capture_mode=CaptureMode.DOCUMENT,
     )
 
 
@@ -129,3 +136,48 @@ def test_a_rejected_put_leaves_the_saved_settings_untouched(
     client.put("/api/settings", json={**VALID_BODY, "scan_preset": "poster"})
 
     assert settings_repository.load() == INITIAL_SETTINGS
+
+
+def test_put_settings_with_the_single_mode_saves_it(
+    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
+) -> None:
+    client.put("/api/settings", json={**VALID_BODY, "capture_mode": "single"})
+
+    assert settings_repository.load().capture_mode is CaptureMode.SINGLE
+
+
+def test_put_settings_with_the_single_mode_returns_it(client: TestClient) -> None:
+    response = client.put("/api/settings", json={**VALID_BODY, "capture_mode": "single"})
+
+    assert response.json()["capture_mode"] == "single"
+
+
+def test_put_settings_with_a_null_capture_mode_keeps_the_saved_mode(client: TestClient) -> None:
+    response = client.put("/api/settings", json={**VALID_BODY, "capture_mode": None})
+
+    assert (response.status_code, response.json()["capture_mode"]) == (HTTPStatus.OK, "document")
+
+
+def test_put_settings_with_an_unknown_capture_mode_answers_422(client: TestClient) -> None:
+    response = client.put("/api/settings", json={**VALID_BODY, "capture_mode": "batch"})
+
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        INVALID_SETTINGS_BODY,
+    )
+
+
+def test_put_settings_with_an_unknown_capture_mode_saves_nothing(
+    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
+) -> None:
+    client.put("/api/settings", json={**VALID_BODY, "capture_mode": "batch"})
+
+    assert settings_repository.load() == INITIAL_SETTINGS
+
+
+def test_put_settings_with_an_unknown_capture_mode_prepares_no_folder(
+    client: TestClient, folder_preparer: StubFolderPreparer
+) -> None:
+    client.put("/api/settings", json={**VALID_BODY, "capture_mode": "batch"})
+
+    assert folder_preparer.prepared_folders == []

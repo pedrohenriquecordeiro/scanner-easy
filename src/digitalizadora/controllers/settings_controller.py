@@ -17,6 +17,8 @@ class SettingsRequestBody(BaseModel):
     output_folder: str
     output_format: str
     scan_preset: str
+    # Missing or null keeps the saved mode, so a client that predates the mode keeps working.
+    capture_mode: str | None = None
 
 
 class SettingsController:
@@ -42,6 +44,7 @@ class SettingsController:
             output_folder=body.output_folder,
             output_format=body.output_format,
             scan_preset=body.scan_preset,
+            capture_mode=body.capture_mode,
         )
         try:
             saved_settings = self._settings_service.update(update)

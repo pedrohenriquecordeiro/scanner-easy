@@ -1,8 +1,10 @@
+import dataclasses
 from pathlib import Path
 
 import pytest
 
 from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.errors import InvalidSettingsError, OutputFolderUnavailableError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
@@ -40,6 +42,15 @@ def build_update(
 ) -> SettingsUpdate:
     return SettingsUpdate(
         output_folder=output_folder, output_format=output_format, scan_preset=scan_preset
+    )
+
+
+def build_capture_mode_update(capture_mode: str | None) -> SettingsUpdate:
+    return SettingsUpdate(
+        output_folder="/Volumes/External/scans",
+        output_format="jpg",
+        scan_preset="photo",
+        capture_mode=capture_mode,
     )
 
 
@@ -183,6 +194,7 @@ INVALID_UPDATES = [
     build_update(output_folder="relative/scans"),
     build_update(output_folder=FOLDER_WITH_NULL_CHARACTER),
     build_update(output_folder=FOLDER_OF_UNKNOWN_USER),
+    build_capture_mode_update("batch"),
 ]
 
 
@@ -221,3 +233,70 @@ def test_unavailable_folder_propagates_and_saves_nothing(
         settings_service.update(build_update())
 
     assert settings_repository.load() == INITIAL_SETTINGS
+
+
+DOCUMENT_MODE_SETTINGS = dataclasses.replace(INITIAL_SETTINGS, capture_mode=CaptureMode.DOCUMENT)
+
+
+@pytest.fixture
+def document_mode_repository() -> InMemoryApplicationSettingsRepository:
+    return InMemoryApplicationSettingsRepository(DOCUMENT_MODE_SETTINGS)
+
+
+@pytest.fixture
+def document_mode_service(
+    document_mode_repository: InMemoryApplicationSettingsRepository,
+    folder_preparer: RecordingFolderPreparer,
+) -> ApplicationSettingsService:
+    return ApplicationSettingsService(document_mode_repository, folder_preparer)
+
+
+def test_update_without_capture_mode_keeps_the_saved_mode(
+    document_mode_service: ApplicationSettingsService,
+) -> None:
+    saved = document_mode_service.update(build_update())
+
+    assert saved.capture_mode is CaptureMode.DOCUMENT
+
+
+def test_update_without_capture_mode_saves_the_kept_mode(
+    document_mode_service: ApplicationSettingsService,
+    document_mode_repository: InMemoryApplicationSettingsRepository,
+) -> None:
+    document_mode_service.update(build_capture_mode_update(None))
+
+    assert document_mode_repository.load().capture_mode is CaptureMode.DOCUMENT
+
+
+def test_update_with_the_document_mode_saves_it(
+    settings_service: ApplicationSettingsService,
+    settings_repository: InMemoryApplicationSettingsRepository,
+) -> None:
+    settings_service.update(build_capture_mode_update("document"))
+
+    assert settings_repository.load().capture_mode is CaptureMode.DOCUMENT
+
+
+def test_update_with_the_single_mode_leaves_the_document_mode(
+    document_mode_service: ApplicationSettingsService,
+) -> None:
+    saved = document_mode_service.update(build_capture_mode_update("single"))
+
+    assert saved.capture_mode is CaptureMode.SINGLE
+
+
+@pytest.mark.parametrize("capture_mode", list(CaptureMode))
+def test_update_accepts_every_known_capture_mode(
+    settings_service: ApplicationSettingsService, capture_mode: CaptureMode
+) -> None:
+    saved = settings_service.update(build_capture_mode_update(capture_mode.value))
+
+    assert saved.capture_mode is capture_mode
+
+
+@pytest.mark.parametrize("unknown_capture_mode", ["batch", "DOCUMENT", ""])
+def test_update_rejects_an_unknown_capture_mode(
+    settings_service: ApplicationSettingsService, unknown_capture_mode: str
+) -> None:
+    with pytest.raises(InvalidSettingsError):
+        settings_service.update(build_capture_mode_update(unknown_capture_mode))

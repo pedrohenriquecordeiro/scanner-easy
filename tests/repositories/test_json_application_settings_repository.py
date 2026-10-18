@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
@@ -45,6 +46,7 @@ def test_save_writes_the_documented_json_shape(tmp_path):
         "output_folder": "/Volumes/Archive/Digitalização",
         "output_format": "jpg",
         "scan_preset": "photo",
+        "capture_mode": "single",
     }
 
 
@@ -124,5 +126,82 @@ def test_unusable_file_is_reported_with_a_warning(tmp_path, caplog):
 def test_missing_file_is_not_reported_as_a_problem(tmp_path, caplog):
     with caplog.at_level(logging.WARNING):
         build_repository(tmp_path / "settings.json").load()
+
+    assert caplog.records == []
+
+
+DOCUMENT_MODE_SETTINGS = ApplicationSettings(
+    Path("/Volumes/Archive/Digitalização"), OutputFormat.JPEG, ScanPreset.PHOTO, CaptureMode.DOCUMENT
+)
+SETTINGS_OF_THE_VALID_DOCUMENT = ApplicationSettings(Path("/Volumes/Archive"), OutputFormat.JPEG, ScanPreset.PHOTO)
+UNKNOWN_CAPTURE_MODES = ["batch", "DOCUMENT", "", 1, True, None, ["document"], {"mode": "document"}]
+
+
+def test_saved_document_mode_is_loaded_back(tmp_path):
+    repository = build_repository(tmp_path / "settings.json")
+
+    repository.save(DOCUMENT_MODE_SETTINGS)
+
+    assert repository.load() == DOCUMENT_MODE_SETTINGS
+
+
+def test_save_writes_the_document_mode_as_its_text(tmp_path):
+    storage_file = tmp_path / "settings.json"
+
+    build_repository(storage_file).save(DOCUMENT_MODE_SETTINGS)
+
+    assert json.loads(storage_file.read_text(encoding="utf-8"))["capture_mode"] == "document"
+
+
+def test_file_without_the_capture_mode_is_loaded_in_single_mode(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, VALID_DOCUMENT)
+
+    assert build_repository(storage_file).load().capture_mode is CaptureMode.SINGLE
+
+
+def test_file_with_the_document_mode_is_loaded_in_document_mode(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, "capture_mode": "document"})
+
+    assert build_repository(storage_file).load().capture_mode is CaptureMode.DOCUMENT
+
+
+@pytest.mark.parametrize("unknown_capture_mode", UNKNOWN_CAPTURE_MODES)
+def test_unknown_capture_mode_is_read_as_single_keeping_the_other_fields(tmp_path, unknown_capture_mode):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, "capture_mode": unknown_capture_mode})
+
+    assert build_repository(storage_file).load() == SETTINGS_OF_THE_VALID_DOCUMENT
+
+
+def test_unknown_capture_mode_is_reported_with_a_warning(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, "capture_mode": "batch"})
+
+    with caplog.at_level(logging.WARNING):
+        build_repository(storage_file).load()
+
+    assert [record.levelno for record in caplog.records] == [logging.WARNING]
+
+
+def test_unknown_capture_mode_is_reported_only_once(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, "capture_mode": "batch"})
+    repository = build_repository(storage_file)
+
+    with caplog.at_level(logging.WARNING):
+        repository.load()
+        repository.load()
+
+    assert [record.levelno for record in caplog.records] == [logging.WARNING]
+
+
+def test_file_without_the_capture_mode_is_not_reported_as_a_problem(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, VALID_DOCUMENT)
+
+    with caplog.at_level(logging.WARNING):
+        build_repository(storage_file).load()
 
     assert caplog.records == []
