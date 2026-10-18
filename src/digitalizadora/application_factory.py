@@ -1,9 +1,10 @@
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
+from types import MappingProxyType
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from digitalizadora.controllers.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import (
     UNEXPECTED_ERROR_CODE,
     ErrorMessageCatalog,
@@ -22,10 +24,17 @@ from digitalizadora.controllers.printer_controller import PrinterController
 from digitalizadora.controllers.scan_controller import ScanController
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.controllers.state_controller import StateController
-from digitalizadora.domain.errors import InvalidSettingsError
+from digitalizadora.domain.errors import InvalidDocumentNameError, InvalidPageOrderError, InvalidSettingsError
 
 INDEX_FILE_NAME = "index.html"
 STATIC_ROUTE = "/static"
+# R11: a malformed body on these routes answers the code of the route; any other path keeps invalid_settings.
+VALIDATION_ERROR_CODES_BY_PATH: Mapping[str, str] = MappingProxyType(
+    {
+        "/api/document/page-order": InvalidPageOrderError.code,
+        "/api/document/name": InvalidDocumentNameError.code,
+    }
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +46,7 @@ class ApplicationControllers:
     settings: SettingsController
     printer: PrinterController
     preview: PreviewController
+    document: DocumentController
 
 
 @dataclass(frozen=True)
@@ -61,9 +71,10 @@ class ErrorResponses:
     async def respond_to_invalid_body(
         self, request: Request, error: RequestValidationError
     ) -> JSONResponse:
+        error_code = VALIDATION_ERROR_CODES_BY_PATH.get(request.url.path, InvalidSettingsError.code)
         return JSONResponse(
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-            content=build_error_body(self._error_message_catalog, InvalidSettingsError.code),
+            content=build_error_body(self._error_message_catalog, error_code),
         )
 
     async def respond_to_http_error(
@@ -112,6 +123,7 @@ def create_application(
         controllers.settings,
         controllers.printer,
         controllers.preview,
+        controllers.document,
     ):
         application.include_router(controller.build_router())
 

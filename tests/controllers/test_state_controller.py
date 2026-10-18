@@ -14,6 +14,11 @@ from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.services.application_state_service import ApplicationState, StorageState
 from tests.controllers.controller_test_support import SCANNED_AT, build_test_client
+from tests.fakes.stub_document_draft_service import (
+    STUB_DRAFT_SESSION,
+    StubDocumentDraftService,
+    build_stub_snapshot,
+)
 
 CATALOG = ErrorMessageCatalog()
 SETTINGS = ApplicationSettings(
@@ -58,8 +63,13 @@ def state_service() -> StubApplicationStateService:
 
 
 @pytest.fixture
-def client(state_service: StubApplicationStateService) -> TestClient:
-    controller = StateController(state_service, CATALOG)
+def document_service() -> StubDocumentDraftService:
+    return StubDocumentDraftService(build_stub_snapshot(2))
+
+
+@pytest.fixture
+def client(state_service: StubApplicationStateService, document_service: StubDocumentDraftService) -> TestClient:
+    controller = StateController(state_service, document_service, CATALOG)
     return build_test_client(controller.build_router())
 
 
@@ -176,4 +186,29 @@ def test_state_has_exactly_the_documented_keys(client: TestClient) -> None:
         "last_error",
         "settings",
         "storage",
+        "document",
     }
+
+
+def test_state_contains_the_document_summary(client: TestClient) -> None:
+    body = client.get("/api/state").json()
+
+    assert body["document"] == {
+        "draft_session": STUB_DRAFT_SESSION,
+        "revision": 2,
+        "page_count": 2,
+        "estimated_size_in_bytes": 6,
+        "draft_storage": {
+            "free_space_in_bytes": 80_000_000_000,
+            "estimated_pages_remaining": 9000,
+            "available": True,
+        },
+    }
+
+
+def test_state_estimates_the_draft_storage_with_the_saved_preset(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.get("/api/state")
+
+    assert document_service.received_arguments["describe_draft_storage"] == ScanPreset.DOCUMENT_ECONOMY.settings

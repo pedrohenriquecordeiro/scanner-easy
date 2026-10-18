@@ -1,3 +1,4 @@
+import functools
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ import httpx
 
 from digitalizadora.application_factory import ApplicationControllers, WebInterfaceConfiguration
 from digitalizadora.configuration import ApplicationConfiguration
+from digitalizadora.controllers.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.preview_controller import PreviewController
 from digitalizadora.controllers.printer_controller import PrinterController
@@ -14,9 +16,10 @@ from digitalizadora.controllers.scan_controller import ScanController
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.controllers.state_controller import StateController
 from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.document_draft import generate_draft_session, generate_page_identifier
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.ports import ApplicationSettingsRepository, ScannerGateway
+from digitalizadora.domain.ports import ApplicationSettingsRepository, Clock, ScannerGateway
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
@@ -25,12 +28,17 @@ from digitalizadora.infrastructure.dns_service_discovery_record_source import Dn
 from digitalizadora.infrastructure.escl.escl_scanner_gateway import EsclGatewayTiming, EsclScannerGateway
 from digitalizadora.infrastructure.system_clock import SystemClock
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.repositories.file_system_document_draft_repository import FileSystemDocumentDraftRepository
 from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
 from digitalizadora.repositories.json_application_settings_repository import JsonApplicationSettingsRepository
 from digitalizadora.repositories.json_scanner_endpoint_repository import JsonScannerEndpointRepository
 from digitalizadora.repositories.output_folder_preparer import prepare_output_folder
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.application_state_service import ApplicationStateService
+from digitalizadora.services.document_draft_service import DocumentDraftCollaborators, DocumentDraftService
+from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
+from digitalizadora.services.document_finalizer import DocumentFinalizer
+from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
@@ -45,6 +53,7 @@ logger = logging.getLogger(__name__)
 
 SETTINGS_FILE_NAME = "settings.json"
 SCANNER_ENDPOINT_FILE_NAME = "scanner-endpoint.json"
+DRAFTS_FOLDER_NAME = "drafts"
 STATIC_DIRECTORY = Path(__file__).parent / "web" / "static"
 
 SCANNER_DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -73,6 +82,7 @@ class _Repositories:
     settings: JsonApplicationSettingsRepository
     scanner_endpoint: JsonScannerEndpointRepository
     scan_output: FileSystemScanOutputRepository
+    document_draft: FileSystemDocumentDraftRepository
 
 
 @dataclass(frozen=True)
@@ -83,12 +93,22 @@ class _ScannerAccess:
 
 
 @dataclass(frozen=True)
+class _SharedServices:
+    """A single clock, scan encoder and storage guard for the whole container."""
+
+    clock: Clock
+    scan_encoder: ScanEncoder
+    storage_guard: StorageGuardService
+
+
+@dataclass(frozen=True)
 class _Services:
     scan: ScanService
     settings: ApplicationSettingsService
     state: ApplicationStateService
     printer_connection: PrinterConnectionService
     progress_tracker: ScanProgressTracker
+    document_draft: DocumentDraftService
 
 
 def build_scanner_http_client(scanner_transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
@@ -112,10 +132,17 @@ def build_container(
 ) -> ApplicationContainer:
     chosen_overrides = overrides if overrides is not None else ContainerOverrides()
     configuration.data_directory.mkdir(parents=True, exist_ok=True)
-    repositories = _build_repositories(configuration)
+    clock = SystemClock()
+    repositories = _build_repositories(configuration, clock)
+    # R12: a second copy stops here (DraftFolderInUseError), before it touches the output folder, the saved
+    # scanner address or the draft folder of the copy that is already running.
+    repositories.document_draft.claim_exclusive_access()
     _prepare_saved_output_folder(repositories.settings)
     scanner_access = _build_scanner_access(chosen_overrides)
-    services = _build_services(repositories, scanner_access, _build_storage_guard_service(chosen_overrides))
+    shared_services = _SharedServices(clock, _build_scan_encoder(), _build_storage_guard_service(chosen_overrides))
+    services = _build_services(repositories, scanner_access, shared_services)
+    # Before the server answers (6.6.2); recover_draft never raises, so the server always starts.
+    services.document_draft.recover_draft()
     _apply_scanner_address_override(configuration, services.printer_connection)
     error_message_catalog = ErrorMessageCatalog()
     return ApplicationContainer(
@@ -124,7 +151,7 @@ def build_container(
     )
 
 
-def _build_repositories(configuration: ApplicationConfiguration) -> _Repositories:
+def _build_repositories(configuration: ApplicationConfiguration, clock: Clock) -> _Repositories:
     file_writer = AtomicFileWriter()
     default_settings = ApplicationSettings(
         output_folder=configuration.default_output_folder,
@@ -140,6 +167,9 @@ def _build_repositories(configuration: ApplicationConfiguration) -> _Repositorie
             configuration.data_directory / SCANNER_ENDPOINT_FILE_NAME, file_writer
         ),
         scan_output=FileSystemScanOutputRepository(settings_repository, ScanFileNamingPolicy(), file_writer),
+        document_draft=FileSystemDocumentDraftRepository(
+            configuration.data_directory / DRAFTS_FOLDER_NAME, file_writer, clock
+        ),
     )
 
 
@@ -180,42 +210,58 @@ def _build_gateway_factory(scanner_access: _ScannerAccess) -> Callable[[ScannerE
     return build_gateway
 
 
-def _build_scan_output_service(
-    repositories: _Repositories, storage_guard_service: StorageGuardService
-) -> ScanOutputService:
-    scan_encoder = ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService())
-    return ScanOutputService(scan_encoder, repositories.scan_output, storage_guard_service)
+def _build_scan_encoder() -> ScanEncoder:
+    return ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService())
 
 
 def _build_services(
-    repositories: _Repositories, scanner_access: _ScannerAccess, storage_guard_service: StorageGuardService
+    repositories: _Repositories, scanner_access: _ScannerAccess, shared_services: _SharedServices
 ) -> _Services:
-    progress_tracker = ScanProgressTracker(SystemClock())
+    progress_tracker = ScanProgressTracker(shared_services.clock)
     printer_connection_service = PrinterConnectionService(
         BonjourScannerDiscovery(scanner_access.service_record_source),
         repositories.scanner_endpoint,
         _build_gateway_factory(scanner_access),
     )
+    scan_output_service = ScanOutputService(
+        shared_services.scan_encoder, repositories.scan_output, shared_services.storage_guard
+    )
+    scan_service = ScanService(printer_connection_service, scan_output_service, progress_tracker)
     return _Services(
-        scan=ScanService(
-            printer_connection_service,
-            _build_scan_output_service(repositories, storage_guard_service),
-            progress_tracker,
-        ),
+        scan=scan_service,
         settings=ApplicationSettingsService(repositories.settings, prepare_output_folder),
-        state=ApplicationStateService(progress_tracker, repositories.settings, storage_guard_service),
+        state=ApplicationStateService(progress_tracker, repositories.settings, shared_services.storage_guard),
         printer_connection=printer_connection_service,
         progress_tracker=progress_tracker,
+        document_draft=_build_document_draft_service(repositories, shared_services, scan_service),
+    )
+
+
+def _build_document_draft_service(
+    repositories: _Repositories, shared_services: _SharedServices, scan_service: ScanService
+) -> DocumentDraftService:
+    draft_store = DocumentDraftStore(
+        repositories.document_draft,
+        shared_services.storage_guard,
+        DraftIdentitySource(draft_session=generate_draft_session(), page_identifier_factory=generate_page_identifier),
+    )
+    page_capture = DocumentPageCapture(shared_services.scan_encoder, draft_store)
+    finalizer = DocumentFinalizer(PdfAssemblyService(), repositories.scan_output, shared_services.storage_guard)
+    # The destination is bound once here, so DocumentDraftService never depends on DocumentPageCapture.
+    page_scanner = functools.partial(scan_service.scan_document_page, page_capture=page_capture)
+    return DocumentDraftService(
+        scan_service, DocumentDraftCollaborators(draft_store, page_scanner, finalizer), shared_services.clock
     )
 
 
 def _build_controllers(services: _Services, error_message_catalog: ErrorMessageCatalog) -> ApplicationControllers:
     return ApplicationControllers(
         scan=ScanController(services.scan, services.settings, error_message_catalog),
-        state=StateController(services.state, error_message_catalog),
+        state=StateController(services.state, services.document_draft, error_message_catalog),
         settings=SettingsController(services.settings, error_message_catalog),
         printer=PrinterController(services.printer_connection, error_message_catalog),
         preview=PreviewController(services.progress_tracker),
+        document=DocumentController(services.document_draft, services.settings, error_message_catalog),
     )
 
 

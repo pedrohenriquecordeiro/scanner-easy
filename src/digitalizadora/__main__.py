@@ -10,6 +10,8 @@ import uvicorn
 from digitalizadora.application_factory import create_application
 from digitalizadora.composition_root import build_container
 from digitalizadora.configuration import ApplicationConfiguration
+from digitalizadora.controllers.error_message_catalog import ERROR_MESSAGES
+from digitalizadora.domain.errors import DraftFolderInUseError
 
 LOG_FILE_NAME = "digitalizadora.log"
 LOG_MAXIMUM_BYTES = 1024 * 1024
@@ -26,9 +28,10 @@ KEEP_TERMINAL_OPEN_MESSAGE = (
     "Para encerrar, aperte Control-C ou feche a janela."
 )
 INVALID_CONFIGURATION_MESSAGE = "Configuração inválida: {reason}"
+# R12: a second copy on another port is refused anyway, so the message no longer suggests one.
 PORT_IN_USE_MESSAGE = (
-    "A porta {port} já está em uso. Provavelmente o Digitalizadora já está aberto em outra janela do Terminal. "
-    "Feche a outra janela ou escolha outra porta, por exemplo: DIGITALIZADORA_PORT=8766 make run"
+    "A porta {port} já está em uso. Provavelmente o Digitalizadora já está aberto em outra janela do Terminal: "
+    "use aquela janela. Se a porta é de outro programa, escolha outra, por exemplo: DIGITALIZADORA_PORT=8766 make run"
 )
 
 
@@ -74,7 +77,12 @@ def run_application(environment: Mapping[str, str], home_directory: Path) -> int
     except OSError:
         print(PORT_IN_USE_MESSAGE.format(port=configuration.port))
         return EXIT_CODE_FAILURE
-    container = build_container(configuration)
+    try:
+        container = build_container(configuration)
+    except DraftFolderInUseError:
+        # Another copy owns the drafts folder (R12): two copies would lose confirmed pages.
+        print(ERROR_MESSAGES[DraftFolderInUseError.code])
+        return EXIT_CODE_FAILURE
     application = create_application(container.controllers, container.web_configuration)
     print_startup_instructions(configuration)
     # log_config=None keeps uvicorn's records flowing to the root handlers (the log file included);

@@ -9,10 +9,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from digitalizadora.application_factory import (
+    VALIDATION_ERROR_CODES_BY_PATH,
     ApplicationControllers,
     WebInterfaceConfiguration,
     create_application,
 )
+from digitalizadora.controllers.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.preview_controller import PreviewController
 from digitalizadora.controllers.printer_controller import PrinterController
@@ -40,9 +42,15 @@ from tests.controllers.controller_test_support import (
     StubPrinterConnectionService,
     StubScanService,
 )
+from tests.fakes.document_drafts import page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.sample_images import build_sample_jpeg
+from tests.fakes.stub_document_draft_service import (
+    STUB_DRAFT_SESSION,
+    StubDocumentDraftService,
+    build_stub_snapshot,
+)
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1:8765", "localhost:8765"})
 INDEX_HTML = "<!doctype html><title>Digitalizadora</title>"
@@ -71,6 +79,11 @@ UNEXPECTED_ERROR_BODY = {
     "code": "unexpected_error",
     "message": CATALOG.message_for("unexpected_error"),
 }
+DOCUMENT_DELETE_PATHS = [
+    "/api/document",
+    "/api/document/pages/last",
+    f"/api/document/pages/{page_identifier_at(1)}",
+]
 
 
 @dataclass(frozen=True)
@@ -79,6 +92,7 @@ class ApplicationParts:
     scan_service: StubScanService
     printer_service: StubPrinterConnectionService
     progress_tracker: ScanProgressTracker
+    document_service: StubDocumentDraftService
 
 
 def build_application_parts() -> ApplicationParts:
@@ -87,18 +101,21 @@ def build_application_parts() -> ApplicationParts:
     settings_service = ApplicationSettingsService(settings_repository, StubFolderPreparer())
     scan_service = StubScanService()
     printer_service = StubPrinterConnectionService(CONNECTED_STATE)
+    document_service = StubDocumentDraftService(build_stub_snapshot(2))
     storage_guard_service = StorageGuardService(lambda folder: FREE_SPACE_IN_BYTES)
     controllers = ApplicationControllers(
         scan=ScanController(scan_service, settings_service, CATALOG),
         state=StateController(
             ApplicationStateService(progress_tracker, settings_repository, storage_guard_service),
+            document_service,
             CATALOG,
         ),
         settings=SettingsController(settings_service, CATALOG),
         printer=PrinterController(printer_service, CATALOG),
         preview=PreviewController(progress_tracker),
+        document=DocumentController(document_service, settings_service, CATALOG),
     )
-    return ApplicationParts(controllers, scan_service, printer_service, progress_tracker)
+    return ApplicationParts(controllers, scan_service, printer_service, progress_tracker, document_service)
 
 
 def build_application(
@@ -379,3 +396,71 @@ def test_shutdown_callbacks_run_once_when_the_application_stops(
         pass
 
     assert (first_callback.call_count, second_callback.call_count) == (1, 1)
+
+
+def test_document_is_reachable_through_the_factory(client: TestClient) -> None:
+    body = client.get("/api/document").json()
+
+    assert (body["draft_session"], body["document"]["page_count"]) == (STUB_DRAFT_SESSION, 2)
+
+
+def test_state_carries_the_document_summary_through_the_factory(client: TestClient) -> None:
+    assert client.get("/api/state").json()["document"]["page_count"] == 2
+
+
+def test_post_document_pages_with_the_required_header_is_accepted(client: TestClient) -> None:
+    response = client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
+
+    assert response.status_code == HTTPStatus.ACCEPTED
+
+
+@pytest.mark.parametrize("path", DOCUMENT_DELETE_PATHS)
+def test_document_delete_without_the_required_header_is_rejected(client: TestClient, path: str) -> None:
+    response = client.delete(path)
+
+    assert (response.status_code, response.json()["code"]) == (HTTPStatus.FORBIDDEN, "missing_request_header")
+
+
+def test_rejected_document_delete_does_not_reach_the_document_service(
+    client: TestClient, parts: ApplicationParts
+) -> None:
+    client.delete("/api/document")
+
+    assert parts.document_service.calls == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"page_identifiers": page_identifier_at(1)}, {"page_identifiers": [1, 2]}],
+    ids=["empty", "text", "numbers"],
+)
+def test_malformed_page_order_answers_the_code_of_the_route(client: TestClient, body: dict[str, object]) -> None:
+    response = client.put("/api/document/page-order", json=body, headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        {"code": "invalid_page_order", "message": CATALOG.message_for("invalid_page_order")},
+    )
+
+
+@pytest.mark.parametrize("body", [{}, {"name": None}, {"name": ["Contrato"]}], ids=["empty", "null", "list"])
+def test_malformed_document_name_answers_the_code_of_the_route(client: TestClient, body: dict[str, object]) -> None:
+    response = client.put("/api/document/name", json=body, headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        {"code": "invalid_document_name", "message": CATALOG.message_for("invalid_document_name")},
+    )
+
+
+def test_malformed_body_does_not_reach_the_document_service(client: TestClient, parts: ApplicationParts) -> None:
+    client.put("/api/document/name", json={}, headers=STATE_CHANGING_HEADERS)
+
+    assert parts.document_service.calls == []
+
+
+def test_validation_codes_by_path_cover_only_the_two_document_bodies() -> None:
+    assert dict(VALIDATION_ERROR_CODES_BY_PATH) == {
+        "/api/document/page-order": "invalid_page_order",
+        "/api/document/name": "invalid_document_name",
+    }

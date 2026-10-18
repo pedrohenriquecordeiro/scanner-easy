@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from digitalizadora.application_factory import create_application
 from digitalizadora.composition_root import (
+    DRAFTS_FOLDER_NAME,
     ApplicationContainer,
     ContainerOverrides,
     build_container,
@@ -20,6 +21,7 @@ from digitalizadora.configuration import ApplicationConfiguration
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.infrastructure.bonjour_scanner_discovery import ServiceRecord
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.repositories.file_system_document_draft_repository import OWNER_LOCK_FILE_NAME
 from digitalizadora.repositories.json_scanner_endpoint_repository import JsonScannerEndpointRepository
 from tests.fakes.configuration_builder import TEST_PORT, build_application_configuration
 
@@ -265,3 +267,43 @@ async def test_scanner_http_client_does_not_follow_redirects() -> None:
 async def test_scanner_http_client_ignores_proxy_settings() -> None:
     async with build_scanner_http_client() as http_client:
         assert http_client.trust_env is False
+
+
+def test_document_endpoint_reports_no_draft_on_a_fresh_start(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
+        body = client.get("/api/document").json()
+    assert (body["revision"], body["document"], body["recovery"]) == (0, None, None)
+
+
+def test_state_endpoint_reports_an_empty_document_summary(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    fixed_overrides = dataclasses.replace(overrides, free_space_reader=lambda folder: FIXED_FREE_SPACE_IN_BYTES)
+    with build_client(build_container(configuration, fixed_overrides), LOOPBACK_BASE_ADDRESS) as client:
+        summary = client.get("/api/state").json()["document"]
+    draft_storage = summary["draft_storage"]
+    assert (summary["page_count"], draft_storage["free_space_in_bytes"], draft_storage["available"]) == (
+        0,
+        FIXED_FREE_SPACE_IN_BYTES,
+        True,
+    )
+
+
+def test_startup_claims_the_drafts_folder(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    build_container(configuration, overrides)
+    assert (configuration.data_directory / DRAFTS_FOLDER_NAME / OWNER_LOCK_FILE_NAME).is_file()
+
+
+def test_containers_in_different_data_directories_have_different_sessions(
+    tmp_path: Path, overrides: ContainerOverrides
+) -> None:
+    draft_sessions = []
+    for folder_name in ("first", "second"):
+        container = build_container(build_application_configuration(tmp_path / folder_name, None), overrides)
+        with build_client(container, LOOPBACK_BASE_ADDRESS) as client:
+            draft_sessions.append(client.get("/api/document").json()["draft_session"])
+    assert draft_sessions[0] != draft_sessions[1]

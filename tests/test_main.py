@@ -7,6 +7,13 @@ import pytest
 import uvicorn
 
 from digitalizadora.__main__ import configure_logging, ensure_port_is_available, run_application
+from digitalizadora.composition_root import DRAFTS_FOLDER_NAME
+from digitalizadora.configuration import ApplicationConfiguration
+from digitalizadora.controllers.error_message_catalog import ERROR_MESSAGES
+from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.repositories.file_system_document_draft_repository import FileSystemDocumentDraftRepository
+from tests.fakes.document_drafts import DRAFT_CREATED_AT
+from tests.fakes.fixed_clock import FixedClock
 
 LOOPBACK_HOST = "127.0.0.1"
 
@@ -23,6 +30,17 @@ def find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.bind((LOOPBACK_HOST, 0))
         return probe.getsockname()[1]
+
+
+@pytest.fixture
+def copy_already_running(tmp_path: Path) -> FileSystemDocumentDraftRepository:
+    """Plays the copy that is already running: it holds the lock of the drafts folder during the test (R12)."""
+    data_directory = ApplicationConfiguration.from_environment({}, tmp_path).data_directory
+    repository = FileSystemDocumentDraftRepository(
+        data_directory / DRAFTS_FOLDER_NAME, AtomicFileWriter(), FixedClock(DRAFT_CREATED_AT)
+    )
+    repository.claim_exclusive_access()
+    return repository
 
 
 @pytest.fixture(autouse=True)
@@ -113,3 +131,30 @@ def test_run_application_tells_how_to_open_the_page(
     run_application({"DIGITALIZADORA_PORT": str(port)}, tmp_path)
     output = capsys.readouterr().out
     assert (f"http://{LOOPBACK_HOST}:{port}" in output, "Terminal aberta" in output) == (True, True)
+
+
+def test_port_in_use_tells_to_use_the_window_already_open(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind((LOOPBACK_HOST, 0))
+        listener.listen()
+        run_application({"DIGITALIZADORA_PORT": str(listener.getsockname()[1])}, tmp_path)
+    assert "use aquela janela" in capsys.readouterr().out
+
+
+@pytest.mark.usefixtures("copy_already_running")
+def test_data_directory_in_use_is_explained_in_portuguese_and_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(uvicorn, "run", RecordingUvicornRun())
+    exit_code = run_application({"DIGITALIZADORA_PORT": str(find_free_port())}, tmp_path)
+    assert (exit_code, ERROR_MESSAGES["draft_folder_in_use"] in capsys.readouterr().out) == (1, True)
+
+
+@pytest.mark.usefixtures("copy_already_running")
+def test_data_directory_in_use_does_not_start_the_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    recorder = RecordingUvicornRun()
+    monkeypatch.setattr(uvicorn, "run", recorder)
+    run_application({"DIGITALIZADORA_PORT": str(find_free_port())}, tmp_path)
+    assert recorder.calls == []
