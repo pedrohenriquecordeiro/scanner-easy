@@ -249,6 +249,19 @@ def test_rotating_a_page_of_the_draft_records_the_rotation_and_leaves_the_scanne
     assert rotation["body"]["document"]["pages"][0]["rotation_degrees"] == 90
 
 
+def test_a_page_rotated_in_the_draft_is_saved_turned_in_the_pdf(configuration: ApplicationConfiguration) -> None:
+    with build_client(configuration, LidBackground.WHITE) as client:
+        save_settings(client, configuration.default_output_folder)
+        client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
+        wait_for_state(client, has_document_pages(1))
+        rotate_first_page(client)
+        finalization = client.post("/api/document/finalize", headers=STATE_CHANGING_HEADERS).json()
+    with pikepdf.open(Path(finalization["output_folder"]) / finalization["file_name"]) as document:
+        media_box = [float(value) for value in document.pages[0].mediabox]
+    points_per_pixel = POINTS_PER_INCH / DOTS_PER_INCH
+    assert media_box[2:] == pytest.approx([GLASS_SIZE[1] * points_per_pixel, GLASS_SIZE[0] * points_per_pixel], abs=1.0)
+
+
 def test_rotating_a_page_that_is_not_in_the_draft_answers_page_not_found(
     configuration: ApplicationConfiguration,
 ) -> None:

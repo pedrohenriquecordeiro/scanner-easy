@@ -23,10 +23,12 @@ from digitalizadora.services.document_draft_service import DocumentDraftCollabor
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
+from digitalizadora.services.document_page_renderer import DocumentPageRenderer
+from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
-from digitalizadora.services.pdf_assembly_service import PdfAssemblyService, PdfDocumentMetadata
+from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_service import ScanService
@@ -103,12 +105,12 @@ class ObservingPdfAssemblyService(PdfAssemblyService):
         self.manifests_during_assembly: list[DocumentDraft] = []
         self.assembly_thread_identifiers: list[int] = []
 
-    def write_pdf_at_embedded_resolutions(
-        self, page_files: Sequence[Path], metadata: PdfDocumentMetadata, output_stream: BinaryIO
+    def write_pdf_from_sources(
+        self, page_sources: Sequence[PageImageSource], metadata: PdfDocumentMetadata, output_stream: BinaryIO
     ) -> None:
         self.manifests_during_assembly.append(decode_manifest(self._manifest_path.read_bytes()))
         self.assembly_thread_identifiers.append(threading.get_ident())
-        super().write_pdf_at_embedded_resolutions(page_files, metadata, output_stream)
+        super().write_pdf_from_sources(page_sources, metadata, output_stream)
 
 
 @dataclass(frozen=True)
@@ -153,7 +155,11 @@ def _build_finalizer(
     scan_output_repository = FileSystemScanOutputRepository(
         settings_repository, ScanFileNamingPolicy(), AtomicFileWriter()
     )
-    return DocumentFinalizer(pdf_assembly_service, scan_output_repository, StorageGuardService(free_space_reader))
+    return DocumentFinalizer(
+        DocumentPdfAssembler(DocumentPageRenderer(), pdf_assembly_service),
+        scan_output_repository,
+        StorageGuardService(free_space_reader),
+    )
 
 
 def build_document_service_parts(

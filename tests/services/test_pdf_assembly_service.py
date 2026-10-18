@@ -1,6 +1,5 @@
 import io
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pikepdf
 import pytest
@@ -9,6 +8,7 @@ from PIL import Image
 from digitalizadora.domain.errors import ScanFailedError
 from digitalizadora.services.pdf_assembly_service import (
     DEFAULT_PDF_TITLE_TEMPLATE,
+    PageImageSource,
     PdfAssemblyService,
     PdfDocumentMetadata,
     PdfDocumentSpecification,
@@ -136,18 +136,28 @@ ONE_INCH_IN_POINTS = 72.0
 HALF_INCH_IN_POINTS = 36.0
 
 
-def write_page_files(folder: Path, jpeg_pages: list[bytes]) -> list[Path]:
-    page_files = []
-    for position, jpeg_page in enumerate(jpeg_pages, 1):
-        page_file = folder / f"page-{position}.jpg"
-        page_file.write_bytes(jpeg_page)
-        page_files.append(page_file)
-    return page_files
+class FixedPageSource:
+    """A page source that answers the same bytes every time it is read."""
+
+    def __init__(self, jpeg_content: bytes) -> None:
+        self._jpeg_content = jpeg_content
+
+    def read(self) -> bytes:
+        return self._jpeg_content
 
 
-def write_streamed_pdf(page_files: list[Path]) -> bytes:
+class VanishedPageSource:
+    def read(self) -> bytes:
+        raise ScanFailedError("The page file vanished")
+
+
+def write_page_sources(jpeg_pages: list[bytes]) -> list[FixedPageSource]:
+    return [FixedPageSource(jpeg_page) for jpeg_page in jpeg_pages]
+
+
+def write_streamed_pdf(page_sources: list[PageImageSource]) -> bytes:
     output_stream = io.BytesIO()
-    PdfAssemblyService().write_pdf_at_embedded_resolutions(page_files, DOCUMENT_METADATA, output_stream)
+    PdfAssemblyService().write_pdf_from_sources(page_sources, DOCUMENT_METADATA, output_stream)
     return output_stream.getvalue()
 
 
@@ -161,55 +171,55 @@ def test_default_title_template_names_the_moment():
     assert DEFAULT_PDF_TITLE_TEMPLATE.format(moment=CREATED_AT) == TITLE
 
 
-def test_streamed_pages_of_300_and_600_dots_per_inch_have_the_same_physical_size(tmp_path):
+def test_streamed_pages_of_300_and_600_dots_per_inch_have_the_same_physical_size():
     page_at_300 = build_sample_jpeg(width_pixels=300, height_pixels=150, dots_per_inch=300)
     page_at_600 = build_sample_jpeg(width_pixels=600, height_pixels=300, dots_per_inch=600)
 
-    pdf_content = write_streamed_pdf(write_page_files(tmp_path, [page_at_300, page_at_600]))
+    pdf_content = write_streamed_pdf(write_page_sources([page_at_300, page_at_600]))
 
     assert read_all_page_sizes(pdf_content) == pytest.approx(
         [ONE_INCH_IN_POINTS, HALF_INCH_IN_POINTS, ONE_INCH_IN_POINTS, HALF_INCH_IN_POINTS], abs=POINT_TOLERANCE
     )
 
 
-def test_streamed_pages_keep_the_given_order(tmp_path):
+def test_streamed_pages_keep_the_given_order():
     jpeg_pages = [
         build_sample_jpeg(width_pixels=144, height_pixels=72, dots_per_inch=72),
         build_sample_jpeg(width_pixels=72, height_pixels=72, dots_per_inch=72),
         build_sample_jpeg(width_pixels=216, height_pixels=72, dots_per_inch=72),
     ]
 
-    pdf_content = write_streamed_pdf(write_page_files(tmp_path, jpeg_pages))
+    pdf_content = write_streamed_pdf(write_page_sources(jpeg_pages))
 
     assert read_all_page_sizes(pdf_content)[::2] == pytest.approx([144.0, 72.0, 216.0], abs=POINT_TOLERANCE)
 
 
-def test_streamed_jpeg_is_embedded_without_recompression(tmp_path):
+def test_streamed_jpeg_is_embedded_without_recompression():
     jpeg_content = build_sample_jpeg(dots_per_inch=300)
 
-    pdf_content = write_streamed_pdf(write_page_files(tmp_path, [jpeg_content]))
+    pdf_content = write_streamed_pdf(write_page_sources([jpeg_content]))
 
     with open_pdf(pdf_content) as pdf:
         image_stream = next(iter(pdf.pages[0].get_images().values()))
         assert image_stream.read_raw_bytes() == jpeg_content
 
 
-def test_streamed_pdf_stores_the_title_of_the_metadata(tmp_path):
-    pdf_content = write_streamed_pdf(write_page_files(tmp_path, [build_sample_jpeg()]))
+def test_streamed_pdf_stores_the_title_of_the_metadata():
+    pdf_content = write_streamed_pdf(write_page_sources([build_sample_jpeg()]))
 
     with open_pdf(pdf_content) as pdf:
         assert str(pdf.docinfo["/Title"]) == "Contrato do apartamento"
 
 
-def test_streamed_pdf_stores_the_creation_date_in_universal_time(tmp_path):
-    pdf_content = write_streamed_pdf(write_page_files(tmp_path, [build_sample_jpeg()]))
+def test_streamed_pdf_stores_the_creation_date_in_universal_time():
+    pdf_content = write_streamed_pdf(write_page_sources([build_sample_jpeg()]))
 
     with open_pdf(pdf_content) as pdf:
         assert str(pdf.docinfo["/CreationDate"]) == "D:20261013183012Z"
 
 
-def test_streamed_pdf_creator_is_digitalizadora(tmp_path):
-    pdf_content = write_streamed_pdf(write_page_files(tmp_path, [build_sample_jpeg()]))
+def test_streamed_pdf_creator_is_digitalizadora():
+    pdf_content = write_streamed_pdf(write_page_sources([build_sample_jpeg()]))
 
     with open_pdf(pdf_content) as pdf:
         assert str(pdf.docinfo["/Creator"]) == "Digitalizadora"
@@ -220,11 +230,36 @@ def test_streamed_pdf_without_pages_raises_scan_failed():
         write_streamed_pdf([])
 
 
-def test_page_file_that_is_not_an_image_raises_scan_failed(tmp_path):
+def test_page_file_that_is_not_an_image_raises_scan_failed():
     with pytest.raises(ScanFailedError):
-        write_streamed_pdf(write_page_files(tmp_path, [b"not an image"]))
+        write_streamed_pdf(write_page_sources([b"not an image"]))
 
 
-def test_page_file_that_vanished_raises_scan_failed(tmp_path):
+def test_a_source_that_cannot_be_read_raises_scan_failed():
     with pytest.raises(ScanFailedError):
-        write_streamed_pdf([tmp_path / "page-1.jpg"])
+        write_streamed_pdf([VanishedPageSource()])
+
+
+def test_a_source_is_read_only_when_the_pdf_reaches_its_page():
+    reads: list[str] = []
+
+    class RecordingPageSource:
+        def __init__(self, name: str) -> None:
+            self._name = name
+
+        def read(self) -> bytes:
+            reads.append(self._name)
+            return build_sample_jpeg()
+
+    write_streamed_pdf([RecordingPageSource("first"), RecordingPageSource("second")])
+
+    assert reads == ["first", "second"]
+
+
+def test_a_source_that_raises_a_memory_error_lets_it_through():
+    class ExhaustedPageSource:
+        def read(self) -> bytes:
+            raise MemoryError
+
+    with pytest.raises(MemoryError):
+        write_streamed_pdf([ExhaustedPageSource()])

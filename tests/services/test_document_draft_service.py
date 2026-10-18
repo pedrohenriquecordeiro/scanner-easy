@@ -654,3 +654,30 @@ async def test_an_edit_of_the_framing_removes_the_finalization_marks(service, pa
     manifest = parts.read_manifest_on_disk()
 
     assert (manifest.finalization_started_at, manifest.finished_document) == (None, None)
+
+
+def read_pdf_media_box(pdf_path: Path) -> list[float]:
+    with pikepdf.open(pdf_path) as document:
+        return [float(value) for value in document.pages[0].mediabox]
+
+
+async def test_a_rotated_page_goes_into_the_saved_pdf_with_its_new_orientation(service, parts):
+    await add_pages(service, 1)
+    page_size = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
+    await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+    finalization = await service.finalize()
+
+    media_box = read_pdf_media_box(finalization.result.output_path)
+    assert (media_box[2] > media_box[3]) is (page_size[1] > page_size[0])
+
+
+async def test_a_cropped_page_goes_into_the_saved_pdf_with_the_size_of_its_frame(service, parts):
+    await add_pages(service, 1)
+    page_width, page_height = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
+    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, PageCrop(0.0, 0.0, 0.5, 1.0))
+
+    finalization = await service.finalize()
+
+    media_box = read_pdf_media_box(finalization.result.output_path)
+    assert media_box[2] / media_box[3] == pytest.approx(page_width / 2 / page_height, rel=0.1)

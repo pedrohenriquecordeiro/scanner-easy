@@ -23,7 +23,8 @@ from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftStorageState
-from digitalizadora.services.document_finalizer import DocumentAssemblyInput, DocumentFinalizer
+from digitalizadora.services.document_finalizer import DocumentFinalizer
+from digitalizadora.services.document_pdf_assembler import DocumentAssemblyInput
 from digitalizadora.services.scan_service import ScanService
 
 
