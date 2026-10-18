@@ -60,13 +60,17 @@ CATALOG = ErrorMessageCatalog()
 SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.JPEG,
-    scan_preset=ScanPreset.PHOTO,
+    scan_settings=ScanPreset.PHOTO.settings,
 )
 SETTINGS_BODY = {
     "output_folder": "/Volumes/External/scans",
     "output_format": "jpg",
+    "dots_per_inch": 600,
+    "color_mode": "color",
     "scan_preset": "photo",
     "capture_mode": "single",
+    "rotation_degrees": 0,
+    "auto_crop": False,
 }
 CONNECTED_STATE = PrinterConnectionState(
     connected=True,

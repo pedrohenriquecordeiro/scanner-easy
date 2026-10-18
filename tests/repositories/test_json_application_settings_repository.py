@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 from pathlib import Path
@@ -6,15 +7,21 @@ import pytest
 
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
+from digitalizadora.domain.color_mode import ColorMode
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.json_application_settings_repository import JsonApplicationSettingsRepository
 
 DEFAULT_SETTINGS = ApplicationSettings(
-    Path("/Users/someone/Pictures/Digitalizadora"), OutputFormat.PDF, ScanPreset.DOCUMENT
+    Path("/Users/someone/Pictures/Digitalizadora"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings
 )
-CUSTOM_SETTINGS = ApplicationSettings(Path("/Volumes/Archive/Digitalização"), OutputFormat.JPEG, ScanPreset.PHOTO)
+CUSTOM_SETTINGS = ApplicationSettings(
+    Path("/Volumes/Archive/Digitalização"), OutputFormat.JPEG, ScanPreset.PHOTO.settings
+)
 
 
 def build_repository(storage_file: Path) -> JsonApplicationSettingsRepository:
@@ -45,8 +52,11 @@ def test_save_writes_the_documented_json_shape(tmp_path):
     assert json.loads(storage_file.read_text(encoding="utf-8")) == {
         "output_folder": "/Volumes/Archive/Digitalização",
         "output_format": "jpg",
-        "scan_preset": "photo",
+        "dots_per_inch": 600,
+        "color_mode": "color",
         "capture_mode": "single",
+        "rotation_degrees": 0,
+        "auto_crop": False,
     }
 
 
@@ -68,6 +78,9 @@ def test_save_replaces_the_previous_settings(tmp_path):
 
 
 VALID_DOCUMENT = {"output_folder": "/Volumes/Archive", "output_format": "jpg", "scan_preset": "photo"}
+SETTINGS_OF_THE_VALID_DOCUMENT = ApplicationSettings(
+    Path("/Volumes/Archive"), OutputFormat.JPEG, ScanPreset.PHOTO.settings
+)
 UNUSABLE_DOCUMENTS = [
     {**VALID_DOCUMENT, "output_format": "tiff"},
     {**VALID_DOCUMENT, "scan_preset": "poster"},
@@ -108,9 +121,7 @@ def test_valid_document_is_loaded_as_written_by_hand(tmp_path):
     storage_file = tmp_path / "settings.json"
     write_document(storage_file, VALID_DOCUMENT)
 
-    assert build_repository(storage_file).load() == ApplicationSettings(
-        Path("/Volumes/Archive"), OutputFormat.JPEG, ScanPreset.PHOTO
-    )
+    assert build_repository(storage_file).load() == SETTINGS_OF_THE_VALID_DOCUMENT
 
 
 def test_unusable_file_is_reported_with_a_warning(tmp_path, caplog):
@@ -131,9 +142,8 @@ def test_missing_file_is_not_reported_as_a_problem(tmp_path, caplog):
 
 
 DOCUMENT_MODE_SETTINGS = ApplicationSettings(
-    Path("/Volumes/Archive/Digitalização"), OutputFormat.JPEG, ScanPreset.PHOTO, CaptureMode.DOCUMENT
+    Path("/Volumes/Archive/Digitalização"), OutputFormat.JPEG, ScanPreset.PHOTO.settings, CaptureMode.DOCUMENT
 )
-SETTINGS_OF_THE_VALID_DOCUMENT = ApplicationSettings(Path("/Volumes/Archive"), OutputFormat.JPEG, ScanPreset.PHOTO)
 UNKNOWN_CAPTURE_MODES = ["batch", "DOCUMENT", "", 1, True, None, ["document"], {"mode": "document"}]
 
 
@@ -198,6 +208,184 @@ def test_unknown_capture_mode_is_reported_only_once(tmp_path, caplog):
 
 
 def test_file_without_the_capture_mode_is_not_reported_as_a_problem(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, VALID_DOCUMENT)
+
+    with caplog.at_level(logging.WARNING):
+        build_repository(storage_file).load()
+
+    assert caplog.records == []
+
+
+ADJUSTED_SETTINGS = ApplicationSettings(
+    Path("/Volumes/Archive"),
+    OutputFormat.PDF,
+    ScanSettings(1200, ColorMode.GRAYSCALE),
+    CaptureMode.DOCUMENT,
+    ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True),
+)
+NEW_FORMAT_DOCUMENT = {
+    "output_folder": "/Volumes/Archive",
+    "output_format": "jpg",
+    "dots_per_inch": 400,
+    "color_mode": "grayscale",
+    "capture_mode": "document",
+    "rotation_degrees": 270,
+    "auto_crop": True,
+}
+SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT = ApplicationSettings(
+    Path("/Volumes/Archive"),
+    OutputFormat.JPEG,
+    ScanSettings(400, ColorMode.GRAYSCALE),
+    CaptureMode.DOCUMENT,
+    ImageAdjustment(rotation=PageRotation.COUNTERCLOCKWISE_90, auto_crop=True),
+)
+
+
+def test_adjusted_settings_are_loaded_back_equal(tmp_path):
+    repository = build_repository(tmp_path / "settings.json")
+
+    repository.save(ADJUSTED_SETTINGS)
+
+    assert repository.load() == ADJUSTED_SETTINGS
+
+
+def test_save_does_not_write_the_scan_preset_any_more(tmp_path):
+    storage_file = tmp_path / "settings.json"
+
+    build_repository(storage_file).save(CUSTOM_SETTINGS)
+
+    assert "scan_preset" not in json.loads(storage_file.read_text(encoding="utf-8"))
+
+
+def test_new_format_document_is_loaded_as_written_by_hand(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, NEW_FORMAT_DOCUMENT)
+
+    assert build_repository(storage_file).load() == SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT
+
+
+def test_old_document_with_only_the_preset_gets_the_preset_quality(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, VALID_DOCUMENT)
+
+    assert build_repository(storage_file).load().scan_settings == ScanPreset.PHOTO.settings
+
+
+def test_old_document_gets_no_adjustment(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, VALID_DOCUMENT)
+
+    assert build_repository(storage_file).load().adjustment == NO_ADJUSTMENT
+
+
+def test_the_quality_pair_wins_over_the_preset(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, "dots_per_inch": 1200, "color_mode": "grayscale"})
+
+    assert build_repository(storage_file).load().scan_settings == ScanSettings(1200, ColorMode.GRAYSCALE)
+
+
+@pytest.mark.parametrize(
+    "invalid_pair",
+    [
+        {"dots_per_inch": 301, "color_mode": "color"},
+        {"dots_per_inch": 300, "color_mode": "sepia"},
+        {"dots_per_inch": True, "color_mode": "color"},
+        {"dots_per_inch": "300", "color_mode": "color"},
+        {"dots_per_inch": 300},
+        {"color_mode": "color"},
+    ],
+)
+def test_an_invalid_quality_pair_falls_back_to_the_preset(tmp_path, invalid_pair):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, **invalid_pair})
+
+    assert build_repository(storage_file).load().scan_settings == ScanPreset.PHOTO.settings
+
+
+def test_an_invalid_quality_pair_keeps_the_other_fields(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, "dots_per_inch": 301, "color_mode": "color"})
+
+    assert build_repository(storage_file).load() == SETTINGS_OF_THE_VALID_DOCUMENT
+
+
+def test_an_invalid_quality_pair_is_reported_with_a_warning(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**VALID_DOCUMENT, "dots_per_inch": 301, "color_mode": "color"})
+
+    with caplog.at_level(logging.WARNING):
+        build_repository(storage_file).load()
+
+    assert [record.levelno for record in caplog.records] == [logging.WARNING]
+
+
+def test_an_invalid_quality_pair_without_a_preset_makes_the_file_unusable(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(
+        storage_file,
+        {"output_folder": "/Volumes/Archive", "output_format": "jpg", "dots_per_inch": 301, "color_mode": "color"},
+    )
+
+    assert build_repository(storage_file).load() == DEFAULT_SETTINGS
+
+
+@pytest.mark.parametrize("invalid_rotation", [45, "90", None, True, False, 90.0, 360, -90, [90]])
+def test_an_invalid_rotation_is_read_as_no_rotation_keeping_the_other_fields(tmp_path, invalid_rotation):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": invalid_rotation})
+
+    assert build_repository(storage_file).load() == dataclasses.replace(
+        SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT, adjustment=ImageAdjustment(auto_crop=True)
+    )
+
+
+@pytest.mark.parametrize("invalid_auto_crop", [1, 0, "true", None, [True]])
+def test_an_invalid_auto_crop_is_read_as_off_keeping_the_other_fields(tmp_path, invalid_auto_crop):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "auto_crop": invalid_auto_crop})
+
+    assert build_repository(storage_file).load() == dataclasses.replace(
+        SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT, adjustment=ImageAdjustment(rotation=PageRotation.COUNTERCLOCKWISE_90)
+    )
+
+
+@pytest.mark.parametrize(
+    ("document_update", "expected_warning_count"),
+    [
+        ({"rotation_degrees": 45}, 1),
+        ({"auto_crop": "yes"}, 1),
+        ({"rotation_degrees": 45, "auto_crop": "yes", "capture_mode": "batch"}, 3),
+    ],
+)
+def test_each_invalid_tolerant_value_is_reported_once(tmp_path, caplog, document_update, expected_warning_count):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, **document_update})
+    repository = build_repository(storage_file)
+
+    with caplog.at_level(logging.WARNING):
+        repository.load()
+        repository.load()
+
+    assert len(caplog.records) == expected_warning_count
+
+
+def test_a_changed_invalid_rotation_is_reported_again(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    repository = build_repository(storage_file)
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": 45})
+    repository.load()
+    caplog.clear()
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": 46})
+
+    with caplog.at_level(logging.WARNING):
+        repository.load()
+
+    assert len(caplog.records) == 1
+
+
+def test_a_missing_rotation_and_auto_crop_are_not_reported_as_problems(tmp_path, caplog):
     storage_file = tmp_path / "settings.json"
     write_document(storage_file, VALID_DOCUMENT)
 

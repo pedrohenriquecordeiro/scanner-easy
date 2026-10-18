@@ -17,7 +17,7 @@ class DocumentPageCapture:
         self._draft_store = draft_store
 
     def ensure_capacity(self, request: ScanRequest) -> None:
-        self._draft_store.ensure_capacity_for_page(request.settings)
+        self._draft_store.ensure_capacity_for_page(request.settings, request.adjustment)
 
     def store(self, scanned_image: ScannedImage, job: ScanJob) -> DocumentPage:
         # DocumentDraftService always asks for JPEG: the encoded content is the normalised master JPEG.

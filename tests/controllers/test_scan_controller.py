@@ -9,7 +9,9 @@ from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.scan_controller import ScanController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import ScanAlreadyRunningError, ScannerUnreachableError
+from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import (
@@ -22,7 +24,8 @@ from tests.fakes.in_memory_settings_repository import InMemoryApplicationSetting
 SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.JPEG,
-    scan_preset=ScanPreset.PHOTO,
+    scan_settings=ScanPreset.PHOTO.settings,
+    adjustment=ImageAdjustment(rotation=PageRotation.CLOCKWISE_90),
 )
 CATALOG = ErrorMessageCatalog()
 

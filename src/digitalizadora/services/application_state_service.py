@@ -51,7 +51,7 @@ class ApplicationStateService:
         try:
             free_space_in_bytes = self._storage_guard_service.free_space_in_bytes(folder)
             estimated_pages_remaining = self._storage_guard_service.estimate_pages_remaining(
-                folder, settings.scan_preset.settings
+                folder, settings.scan_settings, settings.adjustment
             )
         except OutputFolderUnavailableError:
             return UNAVAILABLE_STORAGE_STATE

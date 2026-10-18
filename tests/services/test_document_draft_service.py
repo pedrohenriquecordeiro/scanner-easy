@@ -7,7 +7,7 @@ import pikepdf
 import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
-from digitalizadora.domain.document_draft import DocumentFinalizationResult, DraftSnapshot
+from digitalizadora.domain.document_draft import DocumentFinalizationResult, DocumentPage, DraftSnapshot
 from digitalizadora.domain.document_draft_reconciliation import (
     MANIFEST_FILE_NAME,
     page_file_name,
@@ -21,12 +21,16 @@ from digitalizadora.domain.errors import (
     NoOpenDocumentError,
     OutputFolderUnavailableError,
 )
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scanned_image import ScannedImage
 from digitalizadora.services.document_draft_service import DocumentDraftService
 from digitalizadora.services.document_draft_store import DraftStorageState
 from digitalizadora.services.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, estimated_page_bytes
-from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, page_identifier_at
+from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, build_document_page, page_identifier_at
 from tests.fakes.document_service_parts import (
     DRAFT_SESSION,
     PLENTY_OF_FREE_SPACE_IN_BYTES,
@@ -472,3 +476,39 @@ async def test_finalize_again_with_the_mark_but_without_the_pdf_writes_a_new_pdf
     second_finalization = await service.finalize()
 
     assert second_finalization.result.output_path.is_file()
+
+
+class RecordingPageScanner:
+    def __init__(self) -> None:
+        self.requests: list[ScanRequest] = []
+
+    async def __call__(self, request: ScanRequest) -> DocumentPage:
+        self.requests.append(request)
+        return build_document_page(FIRST_PAGE_IDENTIFIER)
+
+
+async def test_add_page_passes_the_adjustment_to_the_page_scanner(parts):
+    page_scanner = RecordingPageScanner()
+    collaborators = dataclasses.replace(parts.collaborators, page_scanner=page_scanner)
+    adjustment = ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
+
+    await DocumentDraftService(parts.scan_service, collaborators, parts.clock).add_page(SETTINGS, adjustment)
+
+    assert page_scanner.requests == [ScanRequest(SETTINGS, OutputFormat.JPEG, adjustment)]
+
+
+async def test_add_page_without_adjustment_asks_for_no_adjustment(parts):
+    page_scanner = RecordingPageScanner()
+    collaborators = dataclasses.replace(parts.collaborators, page_scanner=page_scanner)
+
+    await DocumentDraftService(parts.scan_service, collaborators, parts.clock).add_page(SETTINGS)
+
+    assert page_scanner.requests[0].adjustment == NO_ADJUSTMENT
+
+
+def test_describe_draft_storage_counts_the_adjustment(service):
+    adjusted_storage = service.describe_draft_storage(SETTINGS, ImageAdjustment(auto_crop=True))
+
+    unadjusted_storage = service.describe_draft_storage(SETTINGS)
+
+    assert adjusted_storage.estimated_pages_remaining < unadjusted_storage.estimated_pages_remaining

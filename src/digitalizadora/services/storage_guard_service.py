@@ -4,15 +4,17 @@ from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.scan_quality import pixels_per_page
 from digitalizadora.domain.scan_settings import ScanSettings
 
 BYTES_PER_KIBIBYTE = 1024
 MINIMUM_FREE_SPACE_BYTES = BYTES_PER_KIBIBYTE**3
-PLATEN_WIDTH_INCHES = 8.5
-PLATEN_HEIGHT_INCHES = 11.69
 ESTIMATED_BYTES_PER_PIXEL_COLOR = 0.12
 ESTIMATED_BYTES_PER_PIXEL_GRAYSCALE = 0.08
 SAFETY_MARGIN_PAGES = 3
+# Conservative: re-encoding a rotated or cropped page at quality 95 can return a bigger JPEG than the scanner's.
+ADJUSTED_PAGE_SIZE_FACTOR = 2
 
 ESTIMATED_BYTES_PER_PIXEL = {
     ColorMode.COLOR: ESTIMATED_BYTES_PER_PIXEL_COLOR,
@@ -20,10 +22,9 @@ ESTIMATED_BYTES_PER_PIXEL = {
 }
 
 
-def estimated_page_bytes(settings: ScanSettings) -> int:
-    pixels_wide = round(PLATEN_WIDTH_INCHES * settings.dots_per_inch)
-    pixels_high = round(PLATEN_HEIGHT_INCHES * settings.dots_per_inch)
-    return round(pixels_wide * pixels_high * ESTIMATED_BYTES_PER_PIXEL[settings.color_mode])
+def estimated_page_bytes(settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT) -> int:
+    unadjusted_bytes = round(pixels_per_page(settings.dots_per_inch) * ESTIMATED_BYTES_PER_PIXEL[settings.color_mode])
+    return unadjusted_bytes * ADJUSTED_PAGE_SIZE_FACTOR if adjustment.is_active else unadjusted_bytes
 
 
 def read_free_space_in_bytes(folder: Path) -> int:
@@ -39,15 +40,20 @@ class StorageGuardService:
     def __init__(self, free_space_reader: Callable[[Path], int] = read_free_space_in_bytes) -> None:
         self._free_space_reader = free_space_reader
 
-    def ensure_space_for_scan(self, folder: Path, settings: ScanSettings) -> None:
-        self._ensure_free_space(folder, MINIMUM_FREE_SPACE_BYTES + SAFETY_MARGIN_PAGES * estimated_page_bytes(settings))
+    def ensure_space_for_scan(
+        self, folder: Path, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT
+    ) -> None:
+        page_bytes = estimated_page_bytes(settings, adjustment)
+        self._ensure_free_space(folder, MINIMUM_FREE_SPACE_BYTES + SAFETY_MARGIN_PAGES * page_bytes)
 
     def ensure_space_for_file(self, folder: Path, file_size_in_bytes: int) -> None:
         self._ensure_free_space(folder, MINIMUM_FREE_SPACE_BYTES + file_size_in_bytes)
 
-    def estimate_pages_remaining(self, folder: Path, settings: ScanSettings) -> int:
+    def estimate_pages_remaining(
+        self, folder: Path, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT
+    ) -> int:
         usable_space = self._free_space_reader(folder) - MINIMUM_FREE_SPACE_BYTES
-        return max(0, usable_space // estimated_page_bytes(settings))
+        return max(0, usable_space // estimated_page_bytes(settings, adjustment))
 
     def free_space_in_bytes(self, folder: Path) -> int:
         return self._free_space_reader(folder)

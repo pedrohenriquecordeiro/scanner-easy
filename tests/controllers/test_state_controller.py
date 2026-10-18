@@ -8,7 +8,9 @@ from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.state_controller import StateController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
+from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_result import ScanResult
@@ -21,11 +23,13 @@ from tests.fakes.stub_document_draft_service import (
 )
 
 CATALOG = ErrorMessageCatalog()
+ADJUSTMENT = ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
 SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.PDF,
-    scan_preset=ScanPreset.DOCUMENT_ECONOMY,
+    scan_settings=ScanPreset.DOCUMENT_ECONOMY.settings,
     capture_mode=CaptureMode.DOCUMENT,
+    adjustment=ADJUSTMENT,
 )
 AVAILABLE_STORAGE = StorageState(free_space_in_bytes=5_000_000_000, estimated_pages_remaining=1200)
 UNAVAILABLE_STORAGE = StorageState(
@@ -147,8 +151,12 @@ def test_state_contains_the_settings(client: TestClient) -> None:
     assert body["settings"] == {
         "output_folder": "/Volumes/External/scans",
         "output_format": "pdf",
+        "dots_per_inch": 200,
+        "color_mode": "grayscale",
         "scan_preset": "document_economy",
         "capture_mode": "document",
+        "rotation_degrees": 180,
+        "auto_crop": True,
     }
 
 
@@ -206,9 +214,12 @@ def test_state_contains_the_document_summary(client: TestClient) -> None:
     }
 
 
-def test_state_estimates_the_draft_storage_with_the_saved_preset(
+def test_state_estimates_the_draft_storage_with_the_saved_quality_and_adjustment(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
     client.get("/api/state")
 
-    assert document_service.received_arguments["describe_draft_storage"] == ScanPreset.DOCUMENT_ECONOMY.settings
+    assert document_service.received_arguments["describe_draft_storage"] == (
+        ScanPreset.DOCUMENT_ECONOMY.settings,
+        ADJUSTMENT,
+    )

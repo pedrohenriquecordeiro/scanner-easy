@@ -15,6 +15,7 @@ from digitalizadora.domain.errors import (
     NoOpenDocumentError,
     ScanAlreadyRunningError,
 )
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scan_request import ScanRequest
@@ -58,8 +59,10 @@ class DocumentDraftService:
     def snapshot(self) -> DraftSnapshot:
         return self._draft_store.snapshot()
 
-    def describe_draft_storage(self, settings: ScanSettings) -> DraftStorageState:
-        return self._draft_store.describe_storage(settings)
+    def describe_draft_storage(
+        self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT
+    ) -> DraftStorageState:
+        return self._draft_store.describe_storage(settings, adjustment)
 
     def read_thumbnail(self, page_identifier: str) -> bytes | None:
         # No lock: a thumbnail file never changes after it is written.
@@ -70,12 +73,14 @@ class DocumentDraftService:
         if self._lock.locked() or self._waiting_edit_count:
             raise DocumentBusyError("Another change to the document draft is in progress")
 
-    async def add_page(self, settings: ScanSettings) -> DocumentPage:
+    async def add_page(self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT) -> DocumentPage:
         self.ensure_can_add_page()
         # No await between the check and taking the lock: with no holder and no edit waiting, a free
         # asyncio.Lock is taken without yielding to the event loop, so the page never waits (R17).
         async with self._lock:
-            return await self._page_scanner(ScanRequest(settings=settings, output_format=OutputFormat.JPEG))
+            return await self._page_scanner(
+                ScanRequest(settings=settings, output_format=OutputFormat.JPEG, adjustment=adjustment)
+            )
 
     async def rename(self, raw_name: str) -> DocumentDraft:
         return await self._run_edit(functools.partial(self._draft_store.rename, raw_name))

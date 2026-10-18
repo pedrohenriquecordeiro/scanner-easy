@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_settings import ScanSettings
 
@@ -8,3 +9,5 @@ from digitalizadora.domain.scan_settings import ScanSettings
 class ScanRequest:
     settings: ScanSettings
     output_format: OutputFormat
+    # Last field with a default: every two-argument construction keeps working and means no adjustment.
+    adjustment: ImageAdjustment = NO_ADJUSTMENT

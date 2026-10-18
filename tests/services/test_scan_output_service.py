@@ -6,6 +6,7 @@ import pytest
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError, ScanFailedError
+from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_request import ScanRequest
@@ -192,3 +193,23 @@ def test_repository_error_propagates():
 
     with pytest.raises(OutputFolderUnavailableError):
         service.store(SCANNED_IMAGE, JOB)
+
+
+ADJUSTED_REQUEST = ScanRequest(SETTINGS, OutputFormat.PDF, ImageAdjustment(auto_crop=True))
+ENOUGH_FREE_SPACE_FOR_AN_ADJUSTED_PAGE = MINIMUM_FREE_SPACE_BYTES + SAFETY_MARGIN_PAGES * estimated_page_bytes(
+    SETTINGS, ADJUSTED_REQUEST.adjustment
+)
+
+
+def test_capacity_check_counts_the_adjustment_of_the_request():
+    reader = RecordingFreeSpaceReader(ENOUGH_FREE_SPACE_FOR_AN_ADJUSTED_PAGE - 1)
+    service = build_service(StubScanEncoder(), RecordingScanOutputRepository(), reader)
+
+    with pytest.raises(InsufficientStorageError):
+        service.ensure_capacity(ADJUSTED_REQUEST)
+
+
+def test_capacity_check_accepts_exactly_the_space_of_an_adjusted_page():
+    reader = RecordingFreeSpaceReader(ENOUGH_FREE_SPACE_FOR_AN_ADJUSTED_PAGE)
+
+    build_service(StubScanEncoder(), RecordingScanOutputRepository(), reader).ensure_capacity(ADJUSTED_REQUEST)

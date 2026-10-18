@@ -7,7 +7,9 @@ import pytest
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
+from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.pixel_region import PixelRegion
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
@@ -41,7 +43,9 @@ MODELS = [
     EncodedScan(b"x", OutputFormat.JPEG, MOMENT, b"t"),
     RESULT,
     StoredScan(result=RESULT, thumbnail_jpeg=b"t"),
-    ApplicationSettings(Path("/tmp"), OutputFormat.PDF, ScanPreset.DOCUMENT),
+    ApplicationSettings(Path("/tmp"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings),
+    ImageAdjustment(),
+    PixelRegion(0, 0, 1, 1),
     ScanProgressSnapshot(ScanPhase.IDLE, 0, None, None),
 ]
 

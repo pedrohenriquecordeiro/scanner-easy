@@ -32,7 +32,9 @@ from digitalizadora.domain.errors import (
     ScanAlreadyRunningError,
     ScannerUnreachableError,
 )
+from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
@@ -42,10 +44,12 @@ from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.stub_document_draft_service import StubDocumentDraftService, build_stub_snapshot
 
 CATALOG = ErrorMessageCatalog()
+ADJUSTMENT = ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
 SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.PDF,
-    scan_preset=ScanPreset.PHOTO,
+    scan_settings=ScanPreset.PHOTO.settings,
+    adjustment=ADJUSTMENT,
 )
 SECOND_PAGE_IDENTIFIER = page_identifier_at(2)
 REVERSED_PAGE_ORDER = [page_identifier_at(2), page_identifier_at(1)]
@@ -143,12 +147,12 @@ def test_post_pages_answers_202_accepted(client: TestClient) -> None:
     assert (response.status_code, response.json()) == (HTTPStatus.ACCEPTED, {"accepted": True})
 
 
-def test_post_pages_adds_a_page_with_the_saved_preset(
+def test_post_pages_adds_a_page_with_the_saved_quality_and_adjustment(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
     client.post("/api/document/pages")
 
-    assert document_service.received_arguments["add_page"] == ScanPreset.PHOTO.settings
+    assert document_service.received_arguments["add_page"] == (ScanPreset.PHOTO.settings, ADJUSTMENT)
 
 
 @pytest.mark.parametrize(

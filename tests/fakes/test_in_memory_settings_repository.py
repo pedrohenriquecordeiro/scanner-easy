@@ -5,8 +5,8 @@ from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 
-INITIAL_SETTINGS = ApplicationSettings(Path("/scans"), OutputFormat.PDF, ScanPreset.DOCUMENT)
-CHANGED_SETTINGS = ApplicationSettings(Path("/photos"), OutputFormat.JPEG, ScanPreset.PHOTO)
+INITIAL_SETTINGS = ApplicationSettings(Path("/scans"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
+CHANGED_SETTINGS = ApplicationSettings(Path("/photos"), OutputFormat.JPEG, ScanPreset.PHOTO.settings)
 
 
 def test_load_returns_the_settings_given_at_construction():

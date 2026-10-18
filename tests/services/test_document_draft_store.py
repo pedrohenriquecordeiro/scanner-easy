@@ -22,6 +22,7 @@ from digitalizadora.domain.errors import (
     OutputFolderUnavailableError,
     PageNotFoundError,
 )
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_result import ScanResult
@@ -814,3 +815,22 @@ def test_next_accepted_change_forgets_the_last_finished_document(draft_store):
     add_pages(draft_store, 1)
 
     assert draft_store.snapshot().last_finished_document is None
+
+
+ADJUSTED = ImageAdjustment(auto_crop=True)
+
+
+def test_capacity_check_counts_the_adjustment_of_the_page(draft_store):
+    with pytest.raises(InsufficientDraftStorageError):
+        draft_store.ensure_capacity_for_page(SETTINGS, ADJUSTED)
+
+
+def test_capacity_check_without_adjustment_accepts_exactly_enough_space(draft_store):
+    assert draft_store.ensure_capacity_for_page(SETTINGS, NO_ADJUSTMENT) is None
+
+
+def test_describe_storage_estimates_fewer_pages_when_the_pages_are_adjusted(draft_repository):
+    free_space = MINIMUM_FREE_SPACE_BYTES + 10 * estimated_page_bytes(SETTINGS)
+    draft_store = build_store(draft_repository, RecordingFreeSpaceReader(free_space))
+
+    assert draft_store.describe_storage(SETTINGS, ADJUSTED).estimated_pages_remaining == 5

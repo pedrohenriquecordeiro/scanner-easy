@@ -156,7 +156,7 @@ def _build_repositories(configuration: ApplicationConfiguration, clock: Clock) -
     default_settings = ApplicationSettings(
         output_folder=configuration.default_output_folder,
         output_format=OutputFormat.PDF,
-        scan_preset=ScanPreset.DOCUMENT,
+        scan_settings=ScanPreset.DOCUMENT.settings,
     )
     settings_repository = JsonApplicationSettingsRepository(
         configuration.data_directory / SETTINGS_FILE_NAME, default_settings, file_writer

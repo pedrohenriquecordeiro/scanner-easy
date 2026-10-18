@@ -5,21 +5,34 @@ from pathlib import Path
 
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
+from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InvalidSettingsError
+from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.ports import ApplicationSettingsRepository
 from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scan_quality import is_supported_dots_per_inch
+from digitalizadora.domain.scan_settings import ScanSettings
 
 NULL_CHARACTER = "\0"
 
 
 @dataclass(frozen=True)
 class SettingsUpdate:
+    """The two first fields are required; None in any other field keeps the saved value.
+
+    A client that predates the custom quality sends only the scan preset, which then sets both quality values.
+    """
+
     output_folder: str
     output_format: str
-    scan_preset: str
-    # None keeps the saved capture mode: a client that predates the mode sends only the first three fields.
+    scan_preset: str | None = None
     capture_mode: str | None = None
+    dots_per_inch: int | None = None
+    color_mode: str | None = None
+    rotation_degrees: int | None = None
+    auto_crop: bool | None = None
 
 
 def parse_enum_member[EnumMember: Enum](
@@ -57,21 +70,67 @@ class ApplicationSettingsService:
         return self._settings_repository.load()
 
     def update(self, update: SettingsUpdate) -> ApplicationSettings:
+        saved = self.current()
         output_format = parse_enum_member(OutputFormat, update.output_format, "output format")
-        scan_preset = parse_enum_member(ScanPreset, update.scan_preset, "scan preset")
-        capture_mode = self._resolve_capture_mode(update.capture_mode)
+        scan_settings = self._resolve_scan_settings(update, saved)
+        capture_mode = self._resolve_capture_mode(update, saved)
+        adjustment = self._resolve_adjustment(update, saved)
         output_folder = parse_output_folder(update.output_folder)
         self._folder_preparer(output_folder)
         settings = ApplicationSettings(
             output_folder=output_folder,
             output_format=output_format,
-            scan_preset=scan_preset,
+            scan_settings=scan_settings,
             capture_mode=capture_mode,
+            adjustment=adjustment,
         )
         self._settings_repository.save(settings)
         return settings
 
-    def _resolve_capture_mode(self, raw_capture_mode: str | None) -> CaptureMode:
-        if raw_capture_mode is None:
-            return self.current().capture_mode
-        return parse_enum_member(CaptureMode, raw_capture_mode, "capture mode")
+    @staticmethod
+    def _resolve_scan_settings(update: SettingsUpdate, saved: ApplicationSettings) -> ScanSettings:
+        scan_preset = None
+        if update.scan_preset is not None:
+            scan_preset = parse_enum_member(ScanPreset, update.scan_preset, "scan preset")
+        if update.dots_per_inch is None and update.color_mode is None:
+            return saved.scan_settings if scan_preset is None else scan_preset.settings
+        return ScanSettings(
+            dots_per_inch=_resolve_dots_per_inch(update.dots_per_inch, saved.scan_settings),
+            color_mode=_resolve_color_mode(update.color_mode, saved.scan_settings),
+        )
+
+    @staticmethod
+    def _resolve_capture_mode(update: SettingsUpdate, saved: ApplicationSettings) -> CaptureMode:
+        if update.capture_mode is None:
+            return saved.capture_mode
+        return parse_enum_member(CaptureMode, update.capture_mode, "capture mode")
+
+    @staticmethod
+    def _resolve_adjustment(update: SettingsUpdate, saved: ApplicationSettings) -> ImageAdjustment:
+        return ImageAdjustment(
+            rotation=_resolve_rotation(update.rotation_degrees, saved.adjustment),
+            auto_crop=saved.adjustment.auto_crop if update.auto_crop is None else update.auto_crop,
+        )
+
+
+def _resolve_dots_per_inch(requested_dots_per_inch: int | None, saved_settings: ScanSettings) -> int:
+    if requested_dots_per_inch is None:
+        return saved_settings.dots_per_inch
+    if not is_supported_dots_per_inch(requested_dots_per_inch):
+        raise InvalidSettingsError(f"Unsupported resolution: {requested_dots_per_inch!r}")
+    return requested_dots_per_inch
+
+
+def _resolve_color_mode(requested_color_mode: str | None, saved_settings: ScanSettings) -> ColorMode:
+    if requested_color_mode is None:
+        return saved_settings.color_mode
+    return parse_enum_member(ColorMode, requested_color_mode, "colour mode")
+
+
+def _resolve_rotation(requested_degrees: int | None, saved_adjustment: ImageAdjustment) -> PageRotation:
+    if requested_degrees is None:
+        return saved_adjustment.rotation
+    try:
+        return PageRotation(requested_degrees)
+    except ValueError as error:
+        raise InvalidSettingsError(f"Unsupported rotation: {requested_degrees!r}") from error

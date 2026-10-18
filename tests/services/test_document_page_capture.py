@@ -7,6 +7,7 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentPage
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import InsufficientDraftStorageError, ScanFailedError
+from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
@@ -82,6 +83,17 @@ def test_ensure_capacity_checks_the_drafts_disk_with_the_request_settings(page_c
 
     with pytest.raises(InsufficientDraftStorageError):
         page_capture.ensure_capacity(photo_request)
+
+
+def test_ensure_capacity_counts_the_adjustment_of_the_request(page_capture):
+    adjusted_request = ScanRequest(
+        settings=ScanPreset.DOCUMENT.settings,
+        output_format=OutputFormat.JPEG,
+        adjustment=ImageAdjustment(auto_crop=True),
+    )
+
+    with pytest.raises(InsufficientDraftStorageError):
+        page_capture.ensure_capacity(adjusted_request)
 
 
 def test_ensure_capacity_accepts_a_page_that_fits_on_the_drafts_disk(page_capture, free_space_reader, drafts_folder):

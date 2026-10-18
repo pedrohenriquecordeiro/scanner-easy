@@ -23,7 +23,7 @@ class ScanOutputService:
         # The folder comes first: a disconnected disk must fail before the printer spends up to 75 s on a page.
         self._scan_output_repository.ensure_output_folder_ready()
         self._storage_guard_service.ensure_space_for_scan(
-            self._scan_output_repository.output_folder(), request.settings
+            self._scan_output_repository.output_folder(), request.settings, request.adjustment
         )
 
     def store(self, scanned_image: ScannedImage, job: ScanJob) -> StoredScan:

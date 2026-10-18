@@ -146,7 +146,7 @@ def _build_finalizer(
     output_folder: Path, pdf_assembly_service: PdfAssemblyService, free_space_reader: Callable[[Path], int]
 ) -> DocumentFinalizer:
     settings_repository = InMemoryApplicationSettingsRepository(
-        ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT)
+        ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
     )
     scan_output_repository = FileSystemScanOutputRepository(
         settings_repository, ScanFileNamingPolicy(), AtomicFileWriter()

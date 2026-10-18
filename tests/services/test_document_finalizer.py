@@ -77,7 +77,7 @@ def build_finalizer(
     output_folder: Path, free_space_reader: RecordingFreeSpaceReader, file_writer: AtomicFileWriter
 ) -> DocumentFinalizer:
     settings_repository = InMemoryApplicationSettingsRepository(
-        ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT)
+        ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
     )
     return DocumentFinalizer(
         PdfAssemblyService(),
@@ -222,7 +222,7 @@ def test_unreadable_page_leaves_no_file_in_the_output_folder(finalizer, seeded_i
 
 def test_memory_error_while_assembling_raises_document_too_large(seeded_input, output_folder, free_space_reader):
     settings_repository = InMemoryApplicationSettingsRepository(
-        ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT)
+        ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
     )
     finalizer = DocumentFinalizer(
         ExhaustedMemoryPdfAssemblyService(),

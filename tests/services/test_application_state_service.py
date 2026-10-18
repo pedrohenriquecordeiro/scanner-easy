@@ -25,7 +25,7 @@ FREE_SPACE_IN_BYTES = 50 * 1024**3
 SETTINGS = ApplicationSettings(
     output_folder=OUTPUT_FOLDER,
     output_format=OutputFormat.PDF,
-    scan_preset=ScanPreset.DOCUMENT,
+    scan_settings=ScanPreset.DOCUMENT.settings,
 )
 UNAVAILABLE_STORAGE = StorageState(
     free_space_in_bytes=0, estimated_pages_remaining=0, output_folder_available=False
@@ -97,7 +97,7 @@ def test_state_reflects_settings_saved_after_the_service_was_built(
     photo_settings = ApplicationSettings(
         output_folder=OUTPUT_FOLDER,
         output_format=OutputFormat.JPEG,
-        scan_preset=ScanPreset.PHOTO,
+        scan_settings=ScanPreset.PHOTO.settings,
     )
     settings_repository.save(photo_settings)
 
@@ -143,10 +143,10 @@ def test_a_heavier_preset_leaves_fewer_estimated_pages(
     settings_repository: InMemoryApplicationSettingsRepository,
 ) -> None:
     settings_repository.save(
-        ApplicationSettings(OUTPUT_FOLDER, OutputFormat.PDF, ScanPreset.DOCUMENT_ECONOMY)
+        ApplicationSettings(OUTPUT_FOLDER, OutputFormat.PDF, ScanPreset.DOCUMENT_ECONOMY.settings)
     )
     economy_pages = state_service.build_state().storage.estimated_pages_remaining
-    settings_repository.save(ApplicationSettings(OUTPUT_FOLDER, OutputFormat.PDF, ScanPreset.PHOTO))
+    settings_repository.save(ApplicationSettings(OUTPUT_FOLDER, OutputFormat.PDF, ScanPreset.PHOTO.settings))
 
     photo_pages = state_service.build_state().storage.estimated_pages_remaining
 
@@ -159,7 +159,7 @@ def test_missing_output_folder_gives_an_unavailable_storage_state(
     missing_folder_settings = ApplicationSettings(
         output_folder=tmp_path / "unplugged-disk" / "scans",
         output_format=OutputFormat.PDF,
-        scan_preset=ScanPreset.DOCUMENT,
+        scan_settings=ScanPreset.DOCUMENT.settings,
     )
     state_service = ApplicationStateService(
         progress_tracker,

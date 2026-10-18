@@ -10,8 +10,8 @@ from pydantic import BaseModel
 
 from digitalizadora.controllers.document_body import build_document_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
+from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import DamagedDocumentPageError, DigitalizadoraError
-from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.document_draft_service import DocumentDraftService
 
@@ -83,7 +83,7 @@ class DocumentController:
             self._document_draft_service.ensure_can_add_page()
         except DigitalizadoraError as error:
             return self._respond_to_error(error)
-        settings = self._settings_service.current().scan_preset.settings
+        settings = self._settings_service.current()
         background_tasks.add_task(self._run_add_page, settings)
         return JSONResponse(status_code=HTTPStatus.ACCEPTED, content={"accepted": True})
 
@@ -139,9 +139,9 @@ class DocumentController:
             status_code=DOCUMENT_ERROR_STATUSES.get(error.code, HTTPStatus.INTERNAL_SERVER_ERROR), content=content
         )
 
-    async def _run_add_page(self, settings: ScanSettings) -> None:
+    async def _run_add_page(self, settings: ApplicationSettings) -> None:
         try:
-            await self._document_draft_service.add_page(settings)
+            await self._document_draft_service.add_page(settings.scan_settings, settings.adjustment)
         except DigitalizadoraError as error:
             # The progress tracker already holds the code of a failed page. A refusal of the second check
             # (another accepted request went first) only reaches the log: no sheet is read twice (R17).

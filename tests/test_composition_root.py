@@ -104,8 +104,12 @@ def test_state_endpoint_reports_default_settings(
     expected_settings = {
         "output_folder": str(configuration.default_output_folder),
         "output_format": "pdf",
+        "dots_per_inch": 300,
+        "color_mode": "color",
         "scan_preset": "document",
         "capture_mode": "single",
+        "rotation_degrees": 0,
+        "auto_crop": False,
     }
     assert (response.status_code, response.json()["settings"]) == (200, expected_settings)
 

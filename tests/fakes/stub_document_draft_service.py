@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentFinalizationResult, DocumentPage, DraftSnapshot
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -51,8 +52,10 @@ class StubDocumentDraftService:
     def snapshot(self) -> DraftSnapshot:
         return self.draft_snapshot
 
-    def describe_draft_storage(self, settings: ScanSettings) -> DraftStorageState:
-        self.received_arguments["describe_draft_storage"] = settings
+    def describe_draft_storage(
+        self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT
+    ) -> DraftStorageState:
+        self.received_arguments["describe_draft_storage"] = (settings, adjustment)
         return self.draft_storage
 
     def ensure_can_add_page(self) -> None:
@@ -64,8 +67,8 @@ class StubDocumentDraftService:
         self.received_arguments["read_thumbnail"] = page_identifier
         return self.thumbnails.get(page_identifier)
 
-    async def add_page(self, settings: ScanSettings) -> DocumentPage:
-        self._record("add_page", settings)
+    async def add_page(self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT) -> DocumentPage:
+        self._record("add_page", (settings, adjustment))
         return build_document_page(page_identifier_at(1))
 
     async def rename(self, raw_name: str) -> DocumentDraft | None:

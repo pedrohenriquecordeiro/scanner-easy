@@ -41,7 +41,7 @@ def build_encoded_scan(
 
 
 def build_settings(output_folder: Path) -> ApplicationSettings:
-    return ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT)
+    return ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
 
 
 def build_repository(output_folder: Path, file_writer) -> FileSystemScanOutputRepository:
