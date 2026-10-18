@@ -36,6 +36,45 @@ ERROR_MESSAGES: Mapping[str, str] = MappingProxyType(
         ),
         FORBIDDEN_HOST_CODE: "Acesso recusado: o endereço usado não é o da própria máquina.",
         MISSING_REQUEST_HEADER_CODE: "Requisição recusada: falta o cabeçalho X-Requested-With.",
+        "no_open_document": "Não há documento em andamento. Adicione uma página para começar.",
+        "page_not_found": "Essa página não está mais no documento. A lista foi atualizada.",
+        "invalid_page_order": (
+            "A nova ordem das páginas não confere com o documento. A lista foi atualizada; tente de novo."
+        ),
+        "invalid_document_name": (
+            "Nome de documento inválido: comprido demais ou só com pontos e caracteres invisíveis. "
+            "Use um nome mais curto, com letras ou números."
+        ),
+        "empty_document": (
+            "O documento não tem páginas. Adicione pelo menos uma página antes de finalizar."
+        ),
+        "document_busy": (
+            "O documento está sendo finalizado ou alterado. Aguarde um instante e tente de novo."
+        ),
+        "draft_folder_in_use": (
+            "O Digitalizadora já está aberto em outra janela do Terminal. "
+            "Use aquela janela, ou feche-a antes de abrir de novo."
+        ),
+        "draft_storage_unavailable": (
+            "Não consigo guardar as páginas do documento no disco do Mac. "
+            "Veja o registro em ~/Library/Logs/Digitalizadora."
+        ),
+        "insufficient_draft_storage": (
+            "Pouco espaço livre no disco do Mac para guardar as páginas do documento. "
+            "Libere espaço e tente de novo."
+        ),
+        "document_assembly_failed": (
+            "Não consegui montar o PDF porque uma página guardada não pôde ser lida como imagem. "
+            "Veja o registro em ~/Library/Logs/Digitalizadora."
+        ),
+        "damaged_document_page": (
+            "Uma página guardada do documento está danificada ou sumiu do disco do Mac. "
+            "Ela está marcada na grade: exclua-a e digitalize-a de novo."
+        ),
+        "document_too_large": (
+            "O documento é grande demais para montar com a memória livre do Mac. "
+            "Feche outros programas e tente de novo."
+        ),
     }
 )
 

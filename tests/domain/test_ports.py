@@ -13,6 +13,7 @@ EXPECTED_PORT_NAMES = {
     "ScannerEndpointRepository",
     "ApplicationSettingsRepository",
     "ScanOutputRepository",
+    "DocumentDraftRepository",
 }
 EXPECTED_METHOD_NAMES_BY_PORT = {
     "Clock": {"now"},
@@ -21,7 +22,26 @@ EXPECTED_METHOD_NAMES_BY_PORT = {
     "ScannerDiscovery": {"discover"},
     "ScannerEndpointRepository": {"load", "save", "clear"},
     "ApplicationSettingsRepository": {"load", "save"},
-    "ScanOutputRepository": {"output_folder", "ensure_output_folder_ready", "save"},
+    "ScanOutputRepository": {"output_folder", "ensure_output_folder_ready", "save", "save_document"},
+    "DocumentDraftRepository": {
+        "storage_folder",
+        "claim_exclusive_access",
+        "ensure_storage_folder_ready",
+        "load_manifest",
+        "save_manifest",
+        "ensure_draft_folder_exists",
+        "write_page_files",
+        "page_file_path",
+        "page_file_size",
+        "read_thumbnail",
+        "delete_page_files",
+        "take_inventory",
+        "delete_files",
+        "set_aside_files",
+        "set_aside_draft_folder",
+        "delete_draft",
+        "finished_document_exists",
+    },
 }
 
 

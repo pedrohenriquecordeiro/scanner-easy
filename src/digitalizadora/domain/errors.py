@@ -40,3 +40,69 @@ class OutputFolderUnavailableError(DigitalizadoraError):
 
 class InvalidSettingsError(DigitalizadoraError):
     code = "invalid_settings"
+
+
+class NoOpenDocumentError(DigitalizadoraError):
+    code = "no_open_document"
+
+
+class PageNotFoundError(DigitalizadoraError):
+    code = "page_not_found"
+
+
+class InvalidPageOrderError(DigitalizadoraError):
+    code = "invalid_page_order"
+
+
+class InvalidDocumentNameError(DigitalizadoraError):
+    code = "invalid_document_name"
+
+
+class EmptyDocumentError(DigitalizadoraError):
+    code = "empty_document"
+
+
+class DocumentBusyError(DigitalizadoraError):
+    code = "document_busy"
+
+
+class DraftFolderInUseError(DigitalizadoraError):
+    code = "draft_folder_in_use"
+
+
+class DraftStorageUnavailableError(DigitalizadoraError):
+    code = "draft_storage_unavailable"
+
+
+class UnreadableDraftError(DraftStorageUnavailableError):
+    """The manifest cannot be used; the recovery sets the draft folder aside."""
+
+
+class InsufficientDraftStorageError(InsufficientStorageError):
+    code = "insufficient_draft_storage"
+
+
+class DocumentAssemblyFailedError(DigitalizadoraError):
+    code = "document_assembly_failed"
+
+
+class DamagedDocumentPageError(DocumentAssemblyFailedError):
+    code = "damaged_document_page"
+
+    def __init__(self, page_identifier: str, page_position: int) -> None:
+        super().__init__(f"Page {page_position} ({page_identifier}) is missing or has an unexpected size")
+        self.page_identifier = page_identifier
+        self.page_position = page_position
+
+
+class DocumentTooLargeError(DocumentAssemblyFailedError):
+    code = "document_too_large"
+
+
+def as_draft_storage_error(error: DigitalizadoraError) -> DigitalizadoraError:
+    """Translates a storage error raised for the draft folder, which lives on the internal disk."""
+    if isinstance(error, InsufficientStorageError) and not isinstance(error, InsufficientDraftStorageError):
+        return InsufficientDraftStorageError(str(error))
+    if isinstance(error, OutputFolderUnavailableError):
+        return DraftStorageUnavailableError(str(error))
+    return error
