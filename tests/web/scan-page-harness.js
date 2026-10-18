@@ -1,108 +1,27 @@
 "use strict";
 
-// Runs the real static scripts in a Node vm context with a fake DOM, timers and fetch, plays each scenario
-// and prints one JSON object with what the page did. tests/web/test_scan_page_behaviour.py asserts on it.
+// Runs the real static scripts in the fake browser of fake-browser.js (fake DOM, timers and fetch), plays each
+// scenario and prints one JSON object with what the page did. tests/web/test_scan_page_behaviour.py asserts on it.
 
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
+const { BrowserPage, build_json_response } = require("./fake-browser.js");
 
-const STATIC_DIRECTORY = path.resolve(__dirname, "..", "..", "src", "digitalizadora", "web", "static");
-const SCRIPT_FILE_NAMES = ["scan-trigger-policy.js", "application.js"];
-const ELEMENT_PATTERN = /<([a-z]+)\b[^>]*\bid="([^"]+)"/g;
-const FLUSH_ROUNDS = 10;
 const ACTIVE_POLL_DELAY_MILLISECONDS = 500;
 const PRINTER_POLL_DELAY_MILLISECONDS = 15000;
 const POST_SCAN_PRINTER_DELAY_MILLISECONDS = 6000;
 const BYTE_COUNTS = [0, 999, 1000, 999949, 999950, 1234567, 5e9];
 const PAGE_COUNTS = [0, 1, 1234];
 
-const SETTINGS = { output_folder: "/Users/teste/Digitalizadora", output_format: "pdf", scan_preset: "document" };
+const SETTINGS = {
+  output_folder: "/Users/teste/Digitalizadora",
+  output_format: "pdf",
+  scan_preset: "document",
+  capture_mode: "single",
+};
 const AVAILABLE_STORAGE = { free_space_in_bytes: 12e9, estimated_pages_remaining: 4000, output_folder_available: true };
 const LOW_STORAGE = { free_space_in_bytes: 1e9, estimated_pages_remaining: 300, output_folder_available: true };
 const UNAVAILABLE_STORAGE = { free_space_in_bytes: 0, estimated_pages_remaining: 0, output_folder_available: false };
 const CONFLICT_BODY = { code: "scan_already_running", message: "Já existe uma digitalização em andamento." };
 const FINISHED_SCAN_RESULT = { file_name: "2026-10-17_00001.pdf", size_in_bytes: 1234567, scanned_at: "2026-10-17T10:00:00" };
-
-class FakeElement {
-  constructor(tag_name, page_document) {
-    this.tagName = tag_name;
-    this.page_document = page_document;
-    this.listeners = {};
-    this.dataset = {};
-    this.attributes = {};
-    this.textContent = "";
-    this.hidden = false;
-    this.disabled = false;
-    this.value = "";
-    this.checked = false;
-    this.title = "";
-    this.src = "";
-  }
-
-  addEventListener(event_type, listener) {
-    (this.listeners[event_type] ??= []).push(listener);
-  }
-
-  setAttribute(attribute_name, attribute_value) {
-    this.attributes[attribute_name] = attribute_value;
-  }
-
-  focus() {
-    this.page_document.activeElement = this;
-  }
-}
-
-class FakeDocument {
-  constructor(page_markup) {
-    this.listeners = {};
-    this.body = new FakeElement("BODY", this);
-    this.activeElement = this.body;
-    this.elements = new Map();
-    for (const [, tag_name, element_identifier] of page_markup.matchAll(ELEMENT_PATTERN)) {
-      this.elements.set(element_identifier, new FakeElement(tag_name.toUpperCase(), this));
-    }
-  }
-
-  addEventListener(event_type, listener) {
-    (this.listeners[event_type] ??= []).push(listener);
-  }
-
-  getElementById(element_identifier) {
-    return this.elements.get(element_identifier) ?? null;
-  }
-}
-
-class FakeTimers {
-  constructor() {
-    this.pending = new Map();
-    this.next_handle = 1;
-  }
-
-  setTimeout(callback, delay_milliseconds) {
-    const handle = this.next_handle;
-    this.next_handle += 1;
-    this.pending.set(handle, { callback, delay_milliseconds });
-    return handle;
-  }
-
-  clearTimeout(handle) {
-    this.pending.delete(handle);
-  }
-
-  run_pending_with_delay(delay_milliseconds) {
-    for (const [handle, timer] of [...this.pending]) {
-      if (timer.delay_milliseconds === delay_milliseconds) {
-        this.pending.delete(handle);
-        timer.callback();
-      }
-    }
-  }
-}
-
-function build_json_response(status_code, body) {
-  return { ok: status_code >= 200 && status_code < 300, status: status_code, json: async () => body };
-}
 
 function build_default_responses() {
   return {
@@ -120,86 +39,19 @@ function build_printer(route) {
   return { connected: true, display_name: "DeskJet 2800", scanner_state: "idle", route, error: null };
 }
 
-class PageUnderTest {
+class PageUnderTest extends BrowserPage {
   constructor(response_overrides) {
-    const page_markup = fs.readFileSync(path.join(STATIC_DIRECTORY, "index.html"), "utf8");
-    this.responses = { ...build_default_responses(), ...response_overrides };
-    this.requests = [];
-    this.timers = new FakeTimers();
-    this.document = new FakeDocument(page_markup);
-    const context = vm.createContext({
-      document: this.document,
-      window: this.timers,
-      fetch: (request_path, options) => this.fetch(request_path, options),
-    });
-    for (const file_name of SCRIPT_FILE_NAMES) {
-      vm.runInContext(fs.readFileSync(path.join(STATIC_DIRECTORY, file_name), "utf8"), context, { filename: file_name });
-    }
-    this.context = context;
-  }
-
-  fetch(request_path, options) {
-    const request_key = `${options.method} ${request_path}`;
-    this.requests.push({ key: request_key, headers: { ...options.headers } });
-    const response = this.responses[request_key];
-    // A request without a scripted answer stays pending, like a printer that has not answered yet.
-    return response === undefined ? new Promise(() => {}) : Promise.resolve(response);
-  }
-
-  async load() {
-    for (const listener of this.document.listeners.DOMContentLoaded ?? []) {
-      listener();
-    }
-    await this.flush();
-  }
-
-  async flush() {
-    for (let round = 0; round < FLUSH_ROUNDS; round += 1) {
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-  }
-
-  element(element_identifier) {
-    return this.document.getElementById(element_identifier);
+    super({ ...build_default_responses(), ...response_overrides });
   }
 
   async press_space(target, repeat) {
-    const key_event = {
-      code: "Space",
-      repeat,
-      target,
-      default_prevented: false,
-      preventDefault() {
-        this.default_prevented = true;
-      },
-    };
-    for (const listener of [...(target.listeners.keydown ?? []), ...(this.document.listeners.keydown ?? [])]) {
-      listener(key_event);
-    }
+    const key_event = this.dispatch_key("keydown", { code: "Space", target, repeat });
     await this.flush();
     return key_event;
   }
 
-  async click(element) {
-    // Browsers never deliver a click to a disabled button.
-    if (!element.disabled) {
-      for (const listener of element.listeners.click ?? []) {
-        listener({ target: element });
-      }
-    }
-    await this.flush();
-  }
-
-  count_requests(request_key) {
-    return this.requests.filter((request) => request.key === request_key).length;
-  }
-
   count_scan_requests() {
     return this.count_requests("POST /api/scans");
-  }
-
-  evaluate(expression) {
-    return vm.runInContext(expression, this.context);
   }
 }
 
@@ -214,14 +66,14 @@ async function load_page(response_overrides) {
 async function count_scans_after_space_on(element_identifier) {
   const page = await load_page({});
   const key_event = await page.press_space(page.element(element_identifier), false);
-  return { scan_requests: page.count_scan_requests(), default_prevented: key_event.default_prevented };
+  return { scan_requests: page.count_scan_requests(), default_prevented: key_event.defaultPrevented };
 }
 
 const SCENARIOS = {
   async space_on_the_page_body() {
     const page = await load_page({});
     const key_event = await page.press_space(page.document.body, false);
-    return { scan_requests: page.count_scan_requests(), default_prevented: key_event.default_prevented };
+    return { scan_requests: page.count_scan_requests(), default_prevented: key_event.defaultPrevented };
   },
   space_on_the_scan_button: () => count_scans_after_space_on("scan-button"),
   space_in_the_folder_field: () => count_scans_after_space_on("output-folder-input"),
@@ -231,7 +83,7 @@ const SCENARIOS = {
   async repeated_space_only() {
     const page = await load_page({});
     const key_event = await page.press_space(page.document.body, true);
-    return { scan_requests: page.count_scan_requests(), default_prevented: key_event.default_prevented };
+    return { scan_requests: page.count_scan_requests(), default_prevented: key_event.defaultPrevented };
   },
   async held_space() {
     const page = await load_page({});
@@ -248,7 +100,7 @@ const SCENARIOS = {
   },
   async start_scan_called_twice_while_pending() {
     const page = await load_page({});
-    const scan_page = page.evaluate("new ScanPage(collect_elements())");
+    const scan_page = page.evaluate("build_scan_page(collect_elements())");
     scan_page.start_scan();
     scan_page.start_scan();
     await page.flush();

@@ -8,6 +8,9 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/application.css">
   <script src="/static/scan-trigger-policy.js" defer></script>
+  <script src="/static/error-banner.js" defer></script>
+  <script src="/static/document-page-policy.js" defer></script>
+  <script src="/static/document-panel.js" defer></script>
   <script src="/static/application.js" defer></script>
 </head>
 <body>
@@ -34,6 +37,18 @@
     </div>
 
     <section class="scan-section" aria-label="Digitalizar">
+      <fieldset class="format-group mode-group">
+        <legend>Modo</legend>
+        <label class="choice-label" for="capture-mode-single">
+          <input id="capture-mode-single" type="radio" name="capture-mode" value="single" checked>
+          <span>Rápido</span>
+        </label>
+        <label class="choice-label" for="capture-mode-document">
+          <input id="capture-mode-document" type="radio" name="capture-mode" value="document">
+          <span>Documento</span>
+        </label>
+      </fieldset>
+
       <button id="scan-button" class="scan-button" type="button" autofocus>
         <span id="scan-button-label" class="scan-button-label">Digitalizar</span>
         <kbd class="scan-button-hint">Espaço</kbd>
@@ -41,8 +56,51 @@
       <p id="status-line" class="status-line" role="status" aria-live="polite">Pronto para digitalizar. Coloque a folha no vidro e aperte Espaço.</p>
     </section>
 
+    <p id="document-pending-notice" class="document-pending-notice" hidden>
+      <span id="document-pending-text"></span>
+      <button id="return-to-document-button" type="button">Voltar ao modo Documento</button>
+    </p>
+
+    <section id="document-section" class="document-section" aria-label="Documento" hidden>
+      <div class="field">
+        <label for="document-name-input">Nome do documento (opcional)</label>
+        <input id="document-name-input" type="text" name="document-name" autocomplete="off" spellcheck="false">
+      </div>
+
+      <p id="document-recovery-notice" class="document-notice" hidden></p>
+      <p id="document-previous-save-notice" class="document-notice" hidden></p>
+      <p id="document-finished-message" class="document-finished-message" hidden></p>
+      <p id="document-empty-message" class="document-empty-message">
+        Nenhuma página ainda. Coloque a primeira folha no vidro e aperte Espaço.
+      </p>
+
+      <ol id="document-page-grid" class="document-page-grid" aria-label="Páginas do documento"></ol>
+
+      <div class="document-bar">
+        <p id="document-summary" class="document-summary" hidden></p>
+        <p id="document-large-warning" class="storage-warning" hidden>
+          <span aria-hidden="true">⚠</span>
+          Documento grande: finalizar pode levar alguns segundos e usar bastante memória.
+        </p>
+        <div class="document-actions">
+          <button id="discard-last-page-button" type="button">Descartar última <kbd>Backspace</kbd></button>
+          <button id="cancel-document-button" type="button">Cancelar documento</button>
+          <button id="finalize-document-button" class="finalize-button" type="button">
+            Finalizar PDF <kbd>Enter</kbd>
+          </button>
+        </div>
+      </div>
+
+      <p id="draft-storage-line" class="storage-line"></p>
+      <p id="draft-storage-warning" class="storage-warning" hidden>
+        <span aria-hidden="true">⚠</span>
+        Pouco espaço no disco do Mac para as páginas do documento. Libere espaço antes de continuar.
+      </p>
+      <p id="document-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
+    </section>
+
     <section class="settings-section" aria-label="Ajustes">
-      <fieldset class="format-group">
+      <fieldset id="output-format-group" class="format-group">
         <legend>Formato do arquivo</legend>
         <label class="choice-label" for="output-format-pdf">
           <input id="output-format-pdf" type="radio" name="output-format" value="pdf" checked>
@@ -55,10 +113,10 @@
       </fieldset>
 
       <div class="field">
-        <label for="preset-select">Modo de digitalização</label>
+        <label for="preset-select">Qualidade</label>
         <select id="preset-select" name="scan-preset">
-          <option value="document">Documento (300 dpi, cor)</option>
-          <option value="document_economy">Documento econômico (200 dpi, cinza)</option>
+          <option value="document">Texto (300 dpi, cor)</option>
+          <option value="document_economy">Texto econômico (200 dpi, cinza)</option>
           <option value="photo">Foto (600 dpi, cor)</option>
         </select>
       </div>
@@ -92,5 +150,25 @@
 
     <p id="session-counter" class="session-counter">Digitalizações nesta sessão: 0</p>
   </main>
+
+  <dialog id="confirmation-dialog" class="page-dialog" aria-labelledby="confirmation-text">
+    <p id="confirmation-text" class="dialog-text"></p>
+    <div class="dialog-actions">
+      <button id="confirmation-reject-button" type="button">Voltar</button>
+      <button id="confirmation-accept-button" class="finalize-button" type="button">Confirmar</button>
+    </div>
+  </dialog>
+
+  <dialog id="move-page-dialog" class="page-dialog" aria-labelledby="move-page-title">
+    <p id="move-page-title" class="dialog-text">Mover a página para outra posição</p>
+    <div class="field">
+      <label for="move-page-position-input">Nova posição</label>
+      <input id="move-page-position-input" type="number" name="move-page-position" min="1" step="1">
+    </div>
+    <div class="dialog-actions">
+      <button id="move-page-reject-button" type="button">Voltar</button>
+      <button id="move-page-accept-button" class="finalize-button" type="button">Mover</button>
+    </div>
+  </dialog>
 </body>
 </html>

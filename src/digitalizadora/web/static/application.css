@@ -150,7 +150,8 @@ body {
 
 button,
 select,
-input[type="text"] {
+input[type="text"],
+input[type="number"] {
   min-height: var(--size-touch-target);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-control);
@@ -165,9 +166,15 @@ select {
   padding: 0.5rem 1rem;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="number"] {
   min-width: 0;
   padding: 0.5rem 0.75rem;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .scan-button {
@@ -326,6 +333,187 @@ input[type="text"] {
   margin: 0;
   color: var(--color-text-muted);
   text-align: center;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.document-pending-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font-weight: 600;
+}
+
+.document-section {
+  display: grid;
+  gap: 1rem;
+  padding: var(--size-gutter);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.document-notice,
+.document-finished-message,
+.document-empty-message,
+.document-summary {
+  margin: 0;
+}
+
+.document-notice {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-warning-background);
+  color: var(--color-warning-text);
+  font-weight: 600;
+}
+
+.document-finished-message {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-success-background);
+  color: var(--color-success-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.document-empty-message {
+  color: var(--color-text-muted);
+}
+
+.document-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.page-tile {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+  cursor: grab;
+}
+
+.page-tile.is-drop-before {
+  box-shadow: inset 4px 0 0 var(--color-accent);
+}
+
+.page-tile.is-drop-after {
+  box-shadow: inset -4px 0 0 var(--color-accent);
+}
+
+.page-tile.is-damaged {
+  border-color: var(--color-error-border);
+  background: var(--color-error-background);
+}
+
+.page-thumbnail,
+.page-placeholder {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  object-fit: contain;
+  background: var(--color-surface);
+}
+
+.page-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.page-number {
+  font-weight: 700;
+  text-align: center;
+}
+
+.page-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+}
+
+.page-actions button {
+  min-height: 2.5rem;
+  padding: 0.25rem;
+}
+
+.page-actions .page-move-to {
+  grid-column: 1 / -1;
+}
+
+.document-bar {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.document-summary {
+  font-weight: 600;
+}
+
+.document-actions,
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.document-actions kbd {
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.finalize-button {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
+
+.finalize-button kbd {
+  color: inherit;
+}
+
+.page-dialog {
+  max-width: min(28rem, calc(100vw - 2 * var(--size-gutter)));
+  padding: 1.25rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.page-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.dialog-text {
+  margin: 0 0 1rem;
+  font-weight: 600;
 }
 
 .noscript-message {

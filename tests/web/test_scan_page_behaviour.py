@@ -9,7 +9,7 @@ NODE_EXECUTABLE = shutil.which("node")
 HARNESS_PATH = Path(__file__).resolve().parent / "scan-page-harness.js"
 HARNESS_TIMEOUT_SECONDS = 30
 SCAN_ALREADY_RUNNING_MESSAGE = "Já existe uma digitalização em andamento."
-SCANNING_MESSAGE = "Digitalizando… (cerca de 15 s; no modo Foto, cerca de 75 s)"
+SCANNING_MESSAGE = "Digitalizando… (cerca de 15 s)"
 OUTPUT_FOLDER_UNAVAILABLE_TEXT = "Pasta de saída indisponível. Se for um disco externo, confira se está conectado."
 
 pytestmark = pytest.mark.skipif(
