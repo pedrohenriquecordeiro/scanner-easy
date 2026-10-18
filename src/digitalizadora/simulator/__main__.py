@@ -7,11 +7,13 @@ from digitalizadora.simulator.fake_escl_scanner_app import (
     create_fake_escl_scanner_app,
     parse_lid_background,
 )
+from digitalizadora.simulator.photo_scene_page import parse_photo_scene
 
 SIMULATOR_HOST = "127.0.0.1"
 DEFAULT_SIMULATOR_PORT = 8080
 SIMULATOR_LOG_LEVEL = "info"
 LID_BACKGROUND_VARIABLE = "DIGITALIZADORA_SIMULATOR_LID_BACKGROUND"
+SCENE_VARIABLE = "DIGITALIZADORA_SIMULATOR_SCENE"
 PORT_VARIABLE = "DIGITALIZADORA_SIMULATOR_PORT"
 SIMULATOR_MESSAGE = (
     "Impressora de mentira ligada em {address}. "
@@ -35,7 +37,8 @@ def main() -> None:
     port = read_simulator_port(os.environ.get(PORT_VARIABLE))
     print(SIMULATOR_MESSAGE.format(address=build_scanner_address(port)))
     lid_background = parse_lid_background(os.environ.get(LID_BACKGROUND_VARIABLE))
-    application = create_fake_escl_scanner_app(FakeScannerBehavior(lid_background=lid_background))
+    scene = parse_photo_scene(os.environ.get(SCENE_VARIABLE))
+    application = create_fake_escl_scanner_app(FakeScannerBehavior(lid_background=lid_background, scene=scene))
     uvicorn.run(application, host=SIMULATOR_HOST, port=port, log_level=SIMULATOR_LOG_LEVEL)
 
 

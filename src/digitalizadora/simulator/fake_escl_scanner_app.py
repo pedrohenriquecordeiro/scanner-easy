@@ -18,6 +18,7 @@ from fastapi import FastAPI, Request, Response
 from PIL import Image, ImageDraw, ImageFont
 
 from digitalizadora.infrastructure.escl.escl_protocol import ESCL_UNITS_PER_INCH
+from digitalizadora.simulator.photo_scene_page import PhotoScene, build_photo_scene_image
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,8 @@ class FakeScannerBehavior:
     document_status_code: int = HTTPStatus.OK
     processing_polls_after_document: int = 0
     lid_background: LidBackground = LidBackground.WHITE
+    # Anything but SHEET puts one or two synthetic photos on a white lid, whatever the lid background says.
+    scene: PhotoScene = PhotoScene.SHEET
 
 
 def build_capabilities_document(color_modes: Sequence[str]) -> bytes:
@@ -121,7 +124,8 @@ class RequestedScan:
     color_mode: str
 
 
-PILLOW_MODE_BY_COLOR_MODE = {"RGB24": "RGB", "Grayscale8": "L"}
+GRAYSCALE_COLOR_MODE = "Grayscale8"
+PILLOW_MODE_BY_COLOR_MODE = {"RGB24": "RGB", GRAYSCALE_COLOR_MODE: "L"}
 
 
 def _local_name(tag: str) -> str:
@@ -214,6 +218,15 @@ def _dark_lid_sheet_box(size_in_pixels: tuple[int, int]) -> tuple[int, int, int,
     )
 
 
+def build_photo_scene_page(requested_scan: RequestedScan, scene: PhotoScene) -> bytes:
+    page = build_photo_scene_image(page_size_in_pixels(requested_scan), scene)
+    if requested_scan.color_mode == GRAYSCALE_COLOR_MODE:
+        page = page.convert(PILLOW_MODE_BY_COLOR_MODE[requested_scan.color_mode])
+    buffer = io.BytesIO()
+    page.save(buffer, format="JPEG", quality=JPEG_QUALITY)
+    return buffer.getvalue()
+
+
 def build_synthetic_page(requested_scan: RequestedScan, page_number: int, lid_background: LidBackground) -> bytes:
     size_in_pixels = page_size_in_pixels(requested_scan)
     if lid_background is LidBackground.WHITE:
@@ -275,8 +288,12 @@ class FakeEsclScanner:
             return Response(status_code=self._behavior.document_status_code)
         job.page_delivered = True
         self._processing_polls_remaining = self._behavior.processing_polls_after_document
-        page = build_synthetic_page(job.requested_scan, job.page_number, self._behavior.lid_background)
-        return Response(content=page, media_type=JPEG_MEDIA_TYPE)
+        return Response(content=self._build_page(job), media_type=JPEG_MEDIA_TYPE)
+
+    def _build_page(self, job: "_ScanJob") -> bytes:
+        if self._behavior.scene is not PhotoScene.SHEET:
+            return build_photo_scene_page(job.requested_scan, self._behavior.scene)
+        return build_synthetic_page(job.requested_scan, job.page_number, self._behavior.lid_background)
 
     async def delete_job(self, job_identifier: str) -> Response:
         if self._jobs.pop(job_identifier, None) is None:

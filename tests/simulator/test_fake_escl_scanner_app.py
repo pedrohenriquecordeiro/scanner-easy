@@ -25,6 +25,15 @@ from digitalizadora.simulator.fake_escl_scanner_app import (
     frame_margins_in_pixels,
     parse_lid_background,
 )
+from digitalizadora.simulator.photo_scene_page import (
+    PHOTO_PLACEMENTS_BY_SCENE,
+    SCENE_DRAWING_WIDTH_PIXELS,
+    PhotoPlacement,
+    PhotoScene,
+    build_photo_scene_image,
+    parse_photo_scene,
+    photo_corners,
+)
 
 SCANNER_BASE_ADDRESS = "http://scanner.test"
 CAPABILITIES_PATH = "/eSCL/ScannerCapabilities"
@@ -38,6 +47,7 @@ FAST_RESOLUTION = 75
 JPEG_START_OF_IMAGE = b"\xff\xd8"
 DARK_LEVEL_LIMIT = 100
 LIGHT_LEVEL_LIMIT = 240
+SHADED_LID_LEVEL_LIMIT = 230
 
 
 def build_client(behavior: FakeScannerBehavior | None = None) -> httpx.AsyncClient:
@@ -426,3 +436,114 @@ async def test_the_dark_lid_page_is_a_jpeg_of_the_requested_size() -> None:
 )
 def test_the_lid_background_is_read_from_text(text: str | None, expected_background: LidBackground) -> None:
     assert parse_lid_background(text) is expected_background
+
+
+TWO_PHOTOS = FakeScannerBehavior(scene=PhotoScene.PHOTOS_TWO)
+ONE_PHOTO = FakeScannerBehavior(scene=PhotoScene.PHOTOS_ONE)
+MAGENTA_MARKER = (230, 0, 230)
+GREEN_MARKER = (0, 200, 0)
+COLOR_TOLERANCE = 40
+
+
+def is_close_to(pixel: tuple[int, int, int], color: tuple[int, int, int]) -> bool:
+    return all(abs(found - wanted) < COLOR_TOLERANCE for found, wanted in zip(pixel, color, strict=True))
+
+
+def photo_corner_pixel(placement: PhotoPlacement, size: tuple[int, int], corner_index: int) -> tuple[int, int]:
+    """A point a little inside the corner of the photo, toward its centre."""
+    corners = photo_corners(placement, size)
+    centre = (placement.center_x * size[0], placement.center_y * size[1])
+    corner = corners[corner_index]
+    return round(corner[0] + 0.04 * (centre[0] - corner[0])), round(corner[1] + 0.04 * (centre[1] - corner[1]))
+
+
+def test_the_scene_is_the_sheet_by_default() -> None:
+    assert FakeScannerBehavior().scene is PhotoScene.SHEET
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_scene"),
+    [
+        ("photos_one", PhotoScene.PHOTOS_ONE),
+        ("photos_two", PhotoScene.PHOTOS_TWO),
+        ("sheet", PhotoScene.SHEET),
+        ("", PhotoScene.SHEET),
+        (None, PhotoScene.SHEET),
+        ("three_photos", PhotoScene.SHEET),
+        ("PHOTOS_TWO", PhotoScene.SHEET),
+    ],
+)
+def test_the_scene_is_read_from_text(text: str | None, expected_scene: PhotoScene) -> None:
+    assert parse_photo_scene(text) is expected_scene
+
+
+async def test_the_photo_scene_page_is_a_jpeg_of_the_requested_size() -> None:
+    async with build_client(TWO_PHOTOS) as client:
+        image = await read_scanned_page(client)
+    assert (image.format, image.size) == ("JPEG", (2550 * FAST_RESOLUTION // 300, 3508 * FAST_RESOLUTION // 300))
+
+
+async def test_the_photo_scene_has_a_white_lid_at_every_corner() -> None:
+    async with build_client(TWO_PHOTOS) as client:
+        image = (await read_scanned_page(client)).convert("L")
+    width_pixels, height_pixels = image.size
+    corners = [(1, 1), (width_pixels - 2, 1), (1, height_pixels - 2), (width_pixels - 2, height_pixels - 2)]
+    assert all(image.getpixel(corner) > SHADED_LID_LEVEL_LIMIT for corner in corners)
+
+
+async def test_the_photo_scene_in_grayscale_is_a_grayscale_jpeg() -> None:
+    async with build_client(TWO_PHOTOS) as client:
+        image = await read_scanned_page(client, "Grayscale8")
+    assert image.mode == "L"
+
+
+@pytest.mark.parametrize("placement_index", [0, 1])
+async def test_each_photo_of_the_scene_shows_its_markers_at_its_own_top_corners(placement_index: int) -> None:
+    async with build_client(TWO_PHOTOS) as client:
+        image = (await read_scanned_page(client)).convert("RGB")
+    placement = PHOTO_PLACEMENTS_BY_SCENE[PhotoScene.PHOTOS_TWO][placement_index]
+    left_marker = image.getpixel(photo_corner_pixel(placement, image.size, 0))
+    right_marker = image.getpixel(photo_corner_pixel(placement, image.size, 1))
+    assert (is_close_to(left_marker, MAGENTA_MARKER), is_close_to(right_marker, GREEN_MARKER)) == (True, True)
+
+
+async def test_the_photos_of_the_scene_are_found_where_the_placements_say() -> None:
+    async with build_client(TWO_PHOTOS) as client:
+        image = (await read_scanned_page(client)).convert("L")
+    first, second = PHOTO_PLACEMENTS_BY_SCENE[PhotoScene.PHOTOS_TWO]
+    centres = [(round(p.center_x * image.width), round(p.center_y * image.height)) for p in (first, second)]
+    assert [image.getpixel(centre) < LIGHT_LEVEL_LIMIT for centre in centres] == [True, True]
+
+
+async def test_the_scene_with_one_photo_leaves_the_lower_half_of_the_glass_empty() -> None:
+    async with build_client(ONE_PHOTO) as client:
+        image = (await read_scanned_page(client)).convert("L")
+    assert image.getpixel((image.width // 2, round(0.9 * image.height))) > SHADED_LID_LEVEL_LIMIT
+
+
+async def test_the_scene_ignores_the_lid_background() -> None:
+    behavior = FakeScannerBehavior(lid_background=LidBackground.DARK, scene=PhotoScene.PHOTOS_ONE)
+    async with build_client(behavior) as client:
+        image = (await read_scanned_page(client)).convert("L")
+    assert image.getpixel((1, 1)) > SHADED_LID_LEVEL_LIMIT
+
+
+def test_the_two_photos_of_the_acceptance_scene_do_not_touch() -> None:
+    size = (1000, 1376)
+    first, second = (photo_corners(placement, size) for placement in PHOTO_PLACEMENTS_BY_SCENE[PhotoScene.PHOTOS_TWO])
+
+    assert max(y for _, y in first) < min(y for _, y in second)
+
+
+@pytest.mark.parametrize("scene", [PhotoScene.PHOTOS_ONE, PhotoScene.PHOTOS_TWO])
+def test_every_photo_of_every_scene_lies_inside_the_glass(scene: PhotoScene) -> None:
+    size = (1000, 1376)
+    corners = [corner for placement in PHOTO_PLACEMENTS_BY_SCENE[scene] for corner in photo_corners(placement, size)]
+
+    assert all(0 <= x <= size[0] and 0 <= y <= size[1] for x, y in corners)
+
+
+def test_the_scene_is_drawn_small_and_enlarged_for_a_large_glass() -> None:
+    image = build_photo_scene_image((SCENE_DRAWING_WIDTH_PIXELS * 2, 400), PhotoScene.PHOTOS_ONE)
+
+    assert image.size == (SCENE_DRAWING_WIDTH_PIXELS * 2, 400)
