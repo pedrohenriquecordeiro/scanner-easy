@@ -99,6 +99,22 @@ def test_the_crop_to_suggest_leaves_a_side_without_an_edge_at_the_glass(service,
     assert (crop.left, crop.bottom) == (0.0, 1.0)
 
 
+def build_dark_cover_around_a_bright_picture() -> bytes:
+    cover_box = (30, 30, 169, 249)
+    picture_box = (60, 90, 139, 189)
+    return build_scan_jpeg(
+        LID_SIZE, [(cover_box, (25, 30, 70)), (picture_box, (220, 200, 120))], background=(40, 40, 40)
+    )
+
+
+def test_a_dark_cover_around_a_bright_picture_is_not_cut_down_to_the_picture_by_the_crop_to_apply(service):
+    assert service.detect_crop_to_apply(build_dark_cover_around_a_bright_picture()) is None
+
+
+def test_a_dark_cover_around_a_bright_picture_is_not_cut_down_to_the_picture_by_the_crop_to_suggest(service):
+    assert service.detect_crop_to_suggest(build_dark_cover_around_a_bright_picture()) is None
+
+
 def test_the_crop_to_suggest_of_a_white_page_is_none(service):
     assert service.detect_crop_to_suggest(build_scan_jpeg(LID_SIZE)) is None
 

@@ -755,3 +755,12 @@ Anotar tudo (tempo por passo, frações detectadas, tamanhos) para ajustar as co
 - **Visão ampliada e miniatura são recalculadas por URL** a cada recarga da página (o servidor não guarda cache); medido em 0,11 s a 1200 dpi.
 - **Girar o último arquivo JPG recodifica** (qualidade 95) a cada giro; o PDF não. O arquivo é seu: a mudança é na hora e sem desfazer além de girar três vezes.
 - **Edição de moldura em duas abas** ao mesmo tempo: a última gravação vale; a revisão sobe e a outra aba relê o documento (R19).
+
+## 11. Notas da implementação do servidor (T32 a T43)
+
+O que saiu diferente do desenho acima, medido nas quatro digitalizações reais do livro:
+
+- **A borda esquerda agora é lida do vidro ao lado do livro.** O detector por lado (6.3) deixava a esquerda na borda do vidro. Passou a ler também as faixas de vidro acima e abaixo do livro (já achados topo e base) e a procurar onde o vidro começa a mudar de nível em relação ao seu nível de partida (8 níveis). Fica a candidata mais externa, para a moldura nunca entrar no livro. Resultado antes da margem de 1%: esquerda entre 0,103 e 0,137 (verdade estimada: 0,13). A mesma regra vale para qualquer lado que o centro não veja (testada com o livro transposto).
+- **Uma borda precisa de um trecho de vidro antes dela.** O detector aceita um degrau só se os 3% anteriores à borda (depois dos 2% ignorados) forem estáveis (variação de até 12 níveis) e se o nível novo durar pelo menos 3% do lado. Sem isso, o lado de dentro de uma linha fina impressa (a moldura desenhada da página branca do simulador, a 2%) passava por borda de folha. Também se exige pelo menos uma borda em cada eixo, senão a primeira e a última linha de texto de uma página cheia viravam moldura.
+- **As duas digitalizações reais não foram copiadas para `tests/fixtures/`**, como o desenho previa: a regra desta rodada é não versioná-las. Os testes de detecção usam uma imagem sintética do mesmo cenário (`tests/fakes/book_on_glass.py`) e, quando a variável `DIGITALIZADORA_REAL_SCANS_FOLDER` aponta para a pasta das digitalizações, rodam também contra as reais (12 testes que ficam pulados sem a variável).
+- `ScanContentRotator` (PDF) usa `Page.rotate(90, relative=True)` do pikepdf; o fluxo da imagem fica byte a byte igual (testado).
