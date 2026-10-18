@@ -46,10 +46,10 @@ ERROR_MESSAGES: Mapping[str, str] = MappingProxyType(
             "Use um nome mais curto, com letras ou números."
         ),
         "empty_document": (
-            "O documento não tem páginas. Adicione pelo menos uma página antes de finalizar."
+            "O documento não tem páginas. Adicione pelo menos uma página antes de salvar."
         ),
         "document_busy": (
-            "O documento está sendo finalizado ou alterado. Aguarde um instante e tente de novo."
+            "O documento está sendo salvo ou alterado. Aguarde um instante e tente de novo."
         ),
         "draft_folder_in_use": (
             "O Digitalizadora já está aberto em outra janela do Terminal. "
@@ -74,6 +74,10 @@ ERROR_MESSAGES: Mapping[str, str] = MappingProxyType(
         "document_too_large": (
             "O documento é grande demais para montar com a memória livre do Mac. "
             "Feche outros programas e tente de novo."
+        ),
+        "image_adjustment_failed": (
+            "Não consegui girar ou cortar a imagem com a memória livre do Mac. "
+            "Escolha uma resolução menor, desligue o corte automático e tente de novo."
         ),
     }
 )

@@ -29,6 +29,7 @@ from digitalizadora.domain import errors
         (errors.InsufficientDraftStorageError, "insufficient_draft_storage"),
         (errors.DocumentAssemblyFailedError, "document_assembly_failed"),
         (errors.DocumentTooLargeError, "document_too_large"),
+        (errors.ImageAdjustmentFailedError, "image_adjustment_failed"),
     ],
 )
 def test_error_class_exposes_its_code(

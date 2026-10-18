@@ -281,3 +281,43 @@ def test_generate_page_identifier_returns_a_valid_identifier() -> None:
 
 def test_generate_draft_session_returns_sixteen_lowercase_hexadecimal_digits() -> None:
     assert re.fullmatch(r"[0-9a-f]{16}", generate_draft_session()) is not None
+
+
+REPLACEMENT = DocumentPage(
+    page_identifier="b17e5c9d11f04b2f",
+    scanned_at=DRAFT_CREATED_AT,
+    dots_per_inch=300,
+    color_mode=ColorMode.COLOR,
+    size_in_bytes=777,
+)
+
+
+def test_with_page_replaced_keeps_the_position(draft: DocumentDraft) -> None:
+    assert draft.with_page_replaced(SECOND, REPLACEMENT).page_identifiers == (
+        FIRST,
+        REPLACEMENT.page_identifier,
+        THIRD,
+    )
+
+
+def test_with_page_replaced_swaps_the_page_details(draft: DocumentDraft) -> None:
+    assert draft.with_page_replaced(FIRST, REPLACEMENT).pages[0] == REPLACEMENT
+
+
+def test_with_page_replaced_of_an_unknown_page_raises(draft: DocumentDraft) -> None:
+    with pytest.raises(PageNotFoundError):
+        draft.with_page_replaced(UNKNOWN, REPLACEMENT)
+
+
+def test_with_page_replaced_clears_both_finalization_markers(marked_draft: DocumentDraft) -> None:
+    replaced = marked_draft.with_page_replaced(SECOND, REPLACEMENT)
+
+    assert (replaced.finalization_started_at, replaced.finished_document) == (None, None)
+
+
+def test_with_page_replaced_keeps_the_name_and_creation_moment(draft: DocumentDraft) -> None:
+    named = draft.renamed("Contrato")
+
+    replaced = named.with_page_replaced(SECOND, REPLACEMENT)
+
+    assert (replaced.name, replaced.created_at) == ("Contrato", named.created_at)

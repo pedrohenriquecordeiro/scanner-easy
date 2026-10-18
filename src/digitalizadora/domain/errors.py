@@ -99,6 +99,10 @@ class DocumentTooLargeError(DocumentAssemblyFailedError):
     code = "document_too_large"
 
 
+class ImageAdjustmentFailedError(DigitalizadoraError):
+    code = "image_adjustment_failed"
+
+
 def as_draft_storage_error(error: DigitalizadoraError) -> DigitalizadoraError:
     """Translates a storage error raised for the draft folder, which lives on the internal disk."""
     if isinstance(error, InsufficientStorageError) and not isinstance(error, InsufficientDraftStorageError):

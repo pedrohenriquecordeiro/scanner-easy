@@ -88,6 +88,16 @@ class DocumentDraft:
     def with_page_appended(self, page: DocumentPage) -> "DocumentDraft":
         return self._with_content(self.name, (*self.pages, page))
 
+    def with_page_replaced(self, page_identifier: str, replacement: DocumentPage) -> "DocumentDraft":
+        replaced_position = self.position_of(page_identifier)
+        return self._with_content(
+            self.name,
+            tuple(
+                replacement if position == replaced_position else page
+                for position, page in enumerate(self.pages, FIRST_PAGE_POSITION)
+            ),
+        )
+
     def without_page(self, page_identifier: str) -> "DocumentDraft":
         removed_position = self.position_of(page_identifier)
         remaining_pages = tuple(
