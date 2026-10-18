@@ -36,8 +36,6 @@ const PRINTER_POLL_INTERVAL_MILLISECONDS = 15000;
 // Gate 0: the printer reports Processing for 4 to 5 s after each delivery.
 const POST_SCAN_PRINTER_REFRESH_DELAY_MILLISECONDS = 6000;
 const IMMEDIATE_REFRESH_MILLISECONDS = 0;
-// A key held on the quality slider changes it many times a second: only the last value is saved.
-const QUALITY_SAVE_DELAY_MILLISECONDS = 300;
 
 const BYTES_PER_UNIT = 1000;
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
@@ -249,8 +247,6 @@ function collect_elements() {
     resolution_warning_text: document.getElementById("resolution-warning-text"),
     auto_crop_checkbox: document.getElementById("auto-crop-checkbox"),
     crop_margin_checkbox: document.getElementById("crop-margin-checkbox"),
-    jpeg_quality_input: document.getElementById("jpeg-quality-input"),
-    jpeg_quality_value: document.getElementById("jpeg-quality-value"),
     output_folder_input: document.getElementById("output-folder-input"),
     output_folder_save_button: document.getElementById("output-folder-save-button"),
     output_folder_message: document.getElementById("output-folder-message"),
@@ -349,10 +345,6 @@ class ScanPage {
     this.is_start_request_pending = false;
     this.is_output_folder_save_pending = false;
     this.saved_settings = null;
-    this.quality_edit_count = 0;
-    this.quality_edits_sent = 0;
-    this.quality_requests_pending = 0;
-    this.quality_save_timer = null;
     this.last_state = null;
     this.state_timer = null;
     this.printer_timer = null;
@@ -407,35 +399,6 @@ class ScanPage {
     this.elements.crop_margin_checkbox.addEventListener("change", () =>
       this.change_adjustment({ crop_margin: this.elements.crop_margin_checkbox.checked }),
     );
-    const { jpeg_quality_input, jpeg_quality_value } = this.elements;
-    // The number follows the slider while it moves (a screen reader reads it); the setting is saved a moment after
-    // the slider is let go or the last key press.
-    jpeg_quality_input.addEventListener("input", () => {
-      jpeg_quality_value.textContent = String(parse_jpeg_quality(jpeg_quality_input.value));
-    });
-    jpeg_quality_input.addEventListener("change", () => this.schedule_quality_save());
-  }
-
-  schedule_quality_save() {
-    this.quality_edit_count += 1;
-    window.clearTimeout(this.quality_save_timer);
-    this.quality_save_timer = window.setTimeout(() => this.save_quality(), QUALITY_SAVE_DELAY_MILLISECONDS);
-  }
-
-  async save_quality() {
-    this.quality_save_timer = null;
-    this.quality_edits_sent = this.quality_edit_count;
-    this.quality_requests_pending += 1;
-    try {
-      await this.change_adjustment({ jpeg_quality: parse_jpeg_quality(this.elements.jpeg_quality_input.value) });
-    } finally {
-      this.quality_requests_pending -= 1;
-    }
-  }
-
-  // An answer about an older value never takes the slider back from a newer one the person already chose.
-  has_newer_quality_than_the_answer() {
-    return this.quality_edit_count > this.quality_edits_sent || this.quality_requests_pending > 1;
   }
 
   capture_mode() {
@@ -758,17 +721,11 @@ class ScanPage {
   }
 
   render_adjustment_controls(settings) {
-    const { auto_crop_checkbox, jpeg_quality_input, jpeg_quality_value } = this.elements;
+    const { auto_crop_checkbox } = this.elements;
     auto_crop_checkbox.checked = settings.auto_crop === true;
     // The margin only matters while the automatic crop is on; the choice stays visible but cannot change otherwise.
     this.elements.crop_margin_checkbox.checked = settings.crop_margin !== false;
     this.elements.crop_margin_checkbox.disabled = settings.auto_crop !== true;
-    if (this.has_newer_quality_than_the_answer()) {
-      return;
-    }
-    const jpeg_quality = parse_jpeg_quality(settings.jpeg_quality);
-    jpeg_quality_input.value = String(jpeg_quality);
-    jpeg_quality_value.textContent = String(jpeg_quality);
   }
 
   async send_settings(settings) {

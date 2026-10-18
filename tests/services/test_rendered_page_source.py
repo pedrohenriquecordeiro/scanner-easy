@@ -10,9 +10,8 @@ from digitalizadora.services.page_framing_renderer import FrameRenderRequest, Pa
 from digitalizadora.services.rendered_page_source import RenderedPageSource
 from tests.fakes.synthetic_scans import build_marked_scan_jpeg, read_jpeg_size
 
-JPEG_QUALITY = 90
-UNTOUCHED = FrameRenderRequest(UNFRAMED, 0, JPEG_QUALITY)
-QUARTER_TURN = FrameRenderRequest(PageFraming(rotation=PageRotation.CLOCKWISE_90), 0, JPEG_QUALITY)
+UNTOUCHED = FrameRenderRequest(UNFRAMED, 0)
+QUARTER_TURN = FrameRenderRequest(PageFraming(rotation=PageRotation.CLOCKWISE_90), 0)
 
 
 class RecordingPageRenderer(PageFramingRenderer):

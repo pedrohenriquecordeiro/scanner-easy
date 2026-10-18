@@ -5,6 +5,7 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.errors import ScanFailedError
+from digitalizadora.domain.image_adjustment import REENCODING_JPEG_QUALITY
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services import page_framing_renderer
@@ -15,7 +16,6 @@ from tests.fakes.synthetic_scans import build_marked_scan_jpeg, find_marker_corn
 
 PAGE_SIZE = (100, 200)
 DOTS_PER_INCH = 300
-JPEG_QUALITY = 90
 TOP_RIGHT_QUADRANT = rectangle((0.5, 0.0, 1.0, 0.5))
 TOP_LEFT_QUADRANT = rectangle((0.0, 0.0, 0.5, 0.5))
 MARKER_REDNESS_THRESHOLD = 30
@@ -36,7 +36,7 @@ def render_request(page_file: Path, request: FrameRenderRequest) -> bytes:
 
 
 def render(page_file: Path, framing: PageFraming) -> bytes:
-    return render_request(page_file, FrameRenderRequest(framing, 0, JPEG_QUALITY))
+    return render_request(page_file, FrameRenderRequest(framing, 0))
 
 
 def read_redness(jpeg_content: bytes, position: tuple[int, int]) -> int:
@@ -139,7 +139,7 @@ def test_an_image_that_cannot_be_decoded_raises_scan_failed(tmp_path):
 
 def test_a_stream_without_an_image_raises_scan_failed():
     with pytest.raises(ScanFailedError):
-        PageFramingRenderer().render_jpeg(io.BytesIO(b""), FrameRenderRequest(QUARTER_TURN, 0, JPEG_QUALITY))
+        PageFramingRenderer().render_jpeg(io.BytesIO(b""), FrameRenderRequest(QUARTER_TURN, 0))
 
 
 def test_a_memory_error_is_not_hidden(page_file, monkeypatch):
@@ -223,7 +223,7 @@ def test_each_frame_of_a_page_with_two_crops_is_rendered_alone(tmp_path):
     page_path.write_bytes(build_photo_scene_jpeg(CANVAS_SIZE, [TILTED_PHOTO, SECOND_PHOTO]))
     framing = PageFraming().with_crops([crop_around(TILTED_PHOTO), crop_around(SECOND_PHOTO)])
 
-    requests = [FrameRenderRequest(framing, index, JPEG_QUALITY) for index in range(2)]
+    requests = [FrameRenderRequest(framing, index) for index in range(2)]
     sizes = [read_jpeg_size(render_request(page_path, request)) for request in requests]
 
     assert sizes == [
@@ -232,34 +232,22 @@ def test_each_frame_of_a_page_with_two_crops_is_rendered_alone(tmp_path):
     ]
 
 
-def test_a_lower_quality_gives_a_smaller_file(tilted_page_file):
-    framing = PageFraming(crops=(crop_around(TILTED_PHOTO),))
+def test_a_rendered_frame_is_written_at_the_fixed_quality(page_file):
+    reference = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(reference, format="JPEG", quality=REENCODING_JPEG_QUALITY)
 
-    sizes = [len(render_request(tilted_page_file, FrameRenderRequest(framing, 0, quality))) for quality in (60, 95)]
+    rendered = Image.open(io.BytesIO(render_request(page_file, FrameRenderRequest(QUARTER_TURN, 0))))
 
-    assert sizes[0] < sizes[1]
-
-
-def test_the_quality_reaches_the_jpeg_of_a_rectangular_crop(page_file):
-    framing = PageFraming(crops=(TOP_LEFT_QUADRANT,))
-    sizes = [len(render_request(page_file, FrameRenderRequest(framing, 0, quality))) for quality in (50, 100)]
-
-    assert sizes[0] < sizes[1]
+    assert rendered.quantization == Image.open(io.BytesIO(reference.getvalue())).quantization
 
 
-def test_the_quality_reaches_the_jpeg_of_a_rotation_alone(page_file):
-    sizes = [len(render_request(page_file, FrameRenderRequest(QUARTER_TURN, 0, quality))) for quality in (50, 100)]
-
-    assert sizes[0] < sizes[1]
-
-
-def test_an_untouched_master_ignores_the_quality(page_file):
-    assert render_request(page_file, FrameRenderRequest(UNFRAMED, 0, 50)) == page_file.read_bytes()
+def test_an_untouched_master_keeps_the_bytes_of_the_scanner(page_file):
+    assert render_request(page_file, FrameRenderRequest(UNFRAMED, 0)) == page_file.read_bytes()
 
 
 def test_a_frame_index_beyond_the_crops_raises_scan_failed(page_file):
     with pytest.raises(ScanFailedError):
-        render_request(page_file, FrameRenderRequest(PageFraming(crops=(TOP_LEFT_QUADRANT,)), 1, JPEG_QUALITY))
+        render_request(page_file, FrameRenderRequest(PageFraming(crops=(TOP_LEFT_QUADRANT,)), 1))
 
 
 def test_a_memory_error_while_straightening_is_not_hidden(tilted_page_file, monkeypatch):

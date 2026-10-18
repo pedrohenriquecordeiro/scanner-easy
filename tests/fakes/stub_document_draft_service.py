@@ -115,8 +115,8 @@ class StubDocumentDraftService:
     async def cancel(self) -> None:
         self._record("cancel", None)
 
-    async def finalize(self, jpeg_quality: int) -> DocumentFinalizationResult:
-        self._record("finalize", jpeg_quality)
+    async def finalize(self) -> DocumentFinalizationResult:
+        self._record("finalize", None)
         return self.finalization
 
     def _record(self, operation: str, argument: object) -> None:

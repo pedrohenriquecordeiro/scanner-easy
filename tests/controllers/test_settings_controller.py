@@ -70,7 +70,6 @@ def test_get_settings_returns_the_saved_settings(client: TestClient) -> None:
             "capture_mode": "document",
             "auto_crop": False,
             "crop_margin": True,
-            "jpeg_quality": 90,
         },
     )
 
@@ -85,7 +84,6 @@ def test_put_settings_returns_the_new_settings(client: TestClient) -> None:
             "capture_mode": "document",
             "auto_crop": False,
             "crop_margin": True,
-            "jpeg_quality": 90,
         },
     )
 
@@ -267,50 +265,14 @@ def test_put_settings_saves_the_crop(
     assert settings_repository.load().adjustment == ImageAdjustment(auto_crop=True)
 
 
-def test_put_settings_saves_the_jpeg_quality(
-    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
-) -> None:
+def test_put_settings_still_accepts_the_retired_jpeg_quality_and_ignores_it(client: TestClient) -> None:
     response = client.put("/api/settings", json={**VALID_BODY, "jpeg_quality": 72})
 
-    assert (response.json()["jpeg_quality"], settings_repository.load().adjustment.jpeg_quality) == (72, 72)
+    assert (response.status_code, "jpeg_quality" in response.json()) == (HTTPStatus.OK, False)
 
 
-def test_put_settings_without_a_jpeg_quality_keeps_the_saved_one(client: TestClient) -> None:
-    client.put("/api/settings", json={**VALID_BODY, "jpeg_quality": 72})
-
-    response = client.put("/api/settings", json=VALID_BODY)
-
-    assert response.json()["jpeg_quality"] == 72
-
-
-def test_put_settings_with_a_null_jpeg_quality_keeps_the_saved_one(client: TestClient) -> None:
-    client.put("/api/settings", json={**VALID_BODY, "jpeg_quality": 72})
-
-    response = client.put("/api/settings", json={**VALID_BODY, "jpeg_quality": None})
-
-    assert response.json()["jpeg_quality"] == 72
-
-
-@pytest.mark.parametrize("invalid_quality", [49, 101, 0, -1, 10**30])
-def test_put_settings_with_a_jpeg_quality_outside_the_range_answers_422(
-    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository, invalid_quality: int
-) -> None:
-    response = client.put("/api/settings", json={**VALID_BODY, "jpeg_quality": invalid_quality})
-
-    assert (response.status_code, response.json()["code"], settings_repository.load().adjustment.jpeg_quality) == (
-        HTTPStatus.UNPROCESSABLE_ENTITY,
-        "invalid_settings",
-        90,
-    )
-
-
-@pytest.mark.parametrize("invalid_quality", [True, 90.5, "90", [90]])
-def test_put_settings_with_a_jpeg_quality_that_is_not_a_whole_number_is_refused(
-    client: TestClient, invalid_quality: object
-) -> None:
-    response = client.put("/api/settings", json={**VALID_BODY, "jpeg_quality": invalid_quality})
-
-    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+def test_get_settings_no_longer_returns_the_jpeg_quality(client: TestClient) -> None:
+    assert "jpeg_quality" not in client.get("/api/settings").json()
 
 
 def test_the_body_of_a_get_is_a_valid_body_for_a_put(client: TestClient) -> None:

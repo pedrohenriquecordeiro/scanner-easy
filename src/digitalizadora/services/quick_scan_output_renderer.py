@@ -10,7 +10,6 @@ from digitalizadora.services.scan_encoder import OutputIdentity, ScanEncoder
 @dataclass(frozen=True)
 class OutputsRequest:
     framing: PageFraming
-    jpeg_quality: int
     identity: OutputIdentity
 
 
@@ -26,7 +25,7 @@ class QuickScanOutputRenderer:
         outputs = []
         for frame_index in range(request.framing.output_count):
             master.seek(0)
-            frame_request = FrameRenderRequest(request.framing, frame_index, request.jpeg_quality)
+            frame_request = FrameRenderRequest(request.framing, frame_index)
             output_jpeg = self._page_framing_renderer.render_jpeg(master, frame_request)
             outputs.append(self._scan_encoder.wrap_output(output_jpeg, request.identity))
         return tuple(outputs)

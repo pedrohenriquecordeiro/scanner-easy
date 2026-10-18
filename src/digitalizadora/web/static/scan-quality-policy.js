@@ -4,9 +4,6 @@
 // index.html loads this file right after scan-trigger-policy.js.
 
 const DEFAULT_DOTS_PER_INCH = 300;
-const MINIMUM_JPEG_QUALITY = 50;
-const MAXIMUM_JPEG_QUALITY = 100;
-const DEFAULT_JPEG_QUALITY = 90;
 const SLOW_SCAN_DOTS_PER_INCH = 600;
 const VERY_SLOW_SCAN_DOTS_PER_INCH = 1200;
 // Measured on the printer up to 600 dpi (Gate 0); 400 and 1200 dpi are estimates by area.
@@ -30,16 +27,4 @@ function describe_resolution_warning(dots_per_inch) {
     return VERY_SLOW_SCAN_WARNING_TEXT;
   }
   return dots_per_inch >= SLOW_SCAN_DOTS_PER_INCH ? SLOW_SCAN_WARNING_TEXT : null;
-}
-
-function parse_jpeg_quality(quality_text) {
-  // A server from before the quality setting sends none, and a field can hold anything: both fall back to the default.
-  const quality = Number(quality_text);
-  const is_usable =
-    quality_text !== null &&
-    quality_text !== "" &&
-    Number.isInteger(quality) &&
-    quality >= MINIMUM_JPEG_QUALITY &&
-    quality <= MAXIMUM_JPEG_QUALITY;
-  return is_usable ? quality : DEFAULT_JPEG_QUALITY;
 }

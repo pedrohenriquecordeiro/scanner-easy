@@ -175,8 +175,7 @@ class DocumentController:
 
     async def finalize_document(self) -> JSONResponse:
         try:
-            jpeg_quality = self._settings_service.current().adjustment.jpeg_quality
-            finalization = await self._document_draft_service.finalize(jpeg_quality)
+            finalization = await self._document_draft_service.finalize()
         except DigitalizadoraError as error:
             return self._respond_to_error(error)
         result = finalization.result

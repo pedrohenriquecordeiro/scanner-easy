@@ -13,11 +13,10 @@ from digitalizadora.services.jpeg_reencoding import TRANSPOSE_BY_ROTATION, read_
 
 @dataclass(frozen=True)
 class FrameRenderRequest:
-    """One output of a page: which crop of the framing (0 when the page has none or one) and the JPEG quality."""
+    """One output of a page: which crop of the framing (0 when the page has none or one)."""
 
     framing: PageFraming
     frame_index: int
-    jpeg_quality: int
 
 
 class PageFramingRenderer:
@@ -40,7 +39,7 @@ class PageFramingRenderer:
     def _render_framed(self, master: BinaryIO, request: FrameRenderRequest) -> bytes:
         image = Image.open(master)
         try:
-            encoding_options = read_encoding_options(image, request.jpeg_quality)
+            encoding_options = read_encoding_options(image)
             image = self._frame(image, request)
             buffer = io.BytesIO()
             image.save(buffer, format="JPEG", **encoding_options)

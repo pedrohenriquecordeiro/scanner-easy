@@ -18,7 +18,6 @@ from tests.fakes.quick_scan_parts import (
     read_image_size,
 )
 
-JPEG_QUALITY = 90
 FIRST_FILE = "2026-10-13_15-30-12-000000000.jpg"
 SECOND_FILE = "2026-10-13_15-30-12-000000001.jpg"
 
@@ -43,7 +42,7 @@ def commit_a_pending_render(parts: QuickScanParts, framing: PageFraming) -> None
 
 
 def test_without_a_slot_nothing_is_restored(parts):
-    parts.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    parts.last_scan_edit_service.restore_after_start()
 
     assert parts.progress_tracker.snapshot().last_scan is None
 
@@ -52,7 +51,7 @@ def test_a_slot_with_its_files_is_restored_into_the_tracker(parts):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.snapshot().last_scan == parts.slot_repository.load().last_scan
 
@@ -61,7 +60,7 @@ def test_the_restored_scan_brings_its_thumbnail(parts):
     stored_scan = parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.last_thumbnail_jpeg() == stored_scan.thumbnail_jpeg
 
@@ -71,7 +70,7 @@ def test_a_thumbnail_that_is_missing_is_built_again_from_the_master(parts):
     (parts.slot_folder / f"thumbnail-{stored_scan.last_scan.scan_identifier}.jpg").unlink()
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.last_thumbnail_jpeg() is not None
 
@@ -80,7 +79,7 @@ def test_a_restored_scan_does_not_count_as_a_scan_of_this_run(parts):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.snapshot().scans_completed == 0
 
@@ -88,9 +87,9 @@ def test_a_restored_scan_does_not_count_as_a_scan_of_this_run(parts):
 async def test_a_restored_scan_can_be_edited(parts):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
     restarted = restart(parts)
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
-    await restarted.last_scan_edit_service.rotate_clockwise(JPEG_QUALITY)
+    await restarted.last_scan_edit_service.rotate_clockwise()
 
     assert read_image_size(restarted.output_folder / FIRST_FILE) == SCENE_SIZE[::-1]
 
@@ -99,7 +98,7 @@ def test_a_restored_scan_keeps_the_framing_it_was_saved_with(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert len(restarted.progress_tracker.snapshot().last_scan.framing.crops) == 2
 
@@ -109,7 +108,7 @@ def test_a_slot_whose_files_were_all_deleted_is_forgotten(parts):
     (parts.output_folder / FIRST_FILE).unlink()
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert (restarted.progress_tracker.snapshot().last_scan, list(restarted.slot_folder.iterdir())) == (None, [])
 
@@ -119,7 +118,7 @@ def test_an_output_folder_that_is_not_reachable_does_not_cost_the_master(parts):
     parts.output_folder.rename(parts.output_folder.parent / "unplugged-disk")
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert (parts.slot_folder / f"master-{stored_scan.last_scan.scan_identifier}.jpg").is_file()
 
@@ -129,7 +128,7 @@ def test_an_output_folder_that_is_not_reachable_restores_no_panel(parts):
     parts.output_folder.rename(parts.output_folder.parent / "unplugged-disk")
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.snapshot().last_scan is None
 
@@ -139,7 +138,7 @@ def test_a_slot_with_at_least_one_file_is_restored(parts):
     (parts.output_folder / SECOND_FILE).unlink()
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.snapshot().last_scan is not None
 
@@ -149,7 +148,7 @@ def test_the_files_of_other_scans_are_deleted_from_the_slot(parts):
     (parts.slot_folder / "master-00000000000000ee.jpg").write_bytes(b"orphan")
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert sorted(path.name for path in restarted.slot_folder.iterdir()) == [
         "manifest.json",
@@ -163,7 +162,7 @@ def test_an_unreadable_manifest_leaves_the_panel_empty(parts):
     (parts.slot_folder / "manifest.json").write_bytes(b"{broken")
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.snapshot().last_scan is None
 
@@ -173,7 +172,7 @@ def test_a_pending_render_is_finished_at_start_up(parts):
     commit_a_pending_render(parts, PageFraming(PageRotation.CLOCKWISE_90))
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert read_image_size(restarted.output_folder / FIRST_FILE) == SCENE_SIZE[::-1]
 
@@ -183,7 +182,7 @@ def test_a_finished_render_clears_the_pending_mark(parts):
     commit_a_pending_render(parts, PageFraming(PageRotation.CLOCKWISE_90))
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.slot_repository.load().render_pending is False
 
@@ -193,7 +192,7 @@ def test_a_finished_render_puts_the_new_framing_in_the_tracker(parts):
     commit_a_pending_render(parts, PageFraming(PageRotation.CLOCKWISE_90))
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.snapshot().last_scan.framing.rotation is PageRotation.CLOCKWISE_90
 
@@ -206,7 +205,7 @@ def test_a_pending_render_with_two_new_frames_creates_the_second_file(parts):
     commit_a_pending_render(parts, two_frames)
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.saved_names() == [FIRST_FILE, SECOND_FILE]
 
@@ -217,7 +216,7 @@ def test_a_pending_render_with_one_frame_less_deletes_the_file_of_that_frame(par
     commit_a_pending_render(parts, one_frame)
     restarted = restart(parts)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.saved_names() == [FIRST_FILE]
 
@@ -231,7 +230,7 @@ def test_restoring_never_raises_when_the_slot_cannot_be_read(parts, monkeypatch)
 
     monkeypatch.setattr(restarted.slot_repository, "load", fail)
 
-    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+    restarted.last_scan_edit_service.restore_after_start()
 
     assert restarted.progress_tracker.snapshot().last_scan is None
 
@@ -242,6 +241,6 @@ def test_a_failure_while_restoring_is_reported_in_the_log(parts, monkeypatch, ca
     monkeypatch.setattr(restarted.slot_repository, "load", lambda: 1 / 0)
 
     with caplog.at_level("WARNING"):
-        restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+        restarted.last_scan_edit_service.restore_after_start()
 
     assert "could not be restored" in caplog.text

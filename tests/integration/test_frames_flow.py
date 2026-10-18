@@ -298,28 +298,10 @@ def test_a_draft_saved_before_the_quadrilaterals_still_loads_its_rectangle(confi
     assert corners_of(page["crops"][0]) == [(0.1, 0.2), (0.6, 0.2), (0.6, 0.7), (0.1, 0.7)]
 
 
-def test_a_lower_jpeg_quality_makes_a_smaller_pdf(configuration, tmp_path):
-    sizes = []
-    for quality in (60, 95):
-        quality_configuration = build_application_configuration(tmp_path / f"q{quality}", SCANNER_ADDRESS)
-        with build_client(quality_configuration, TWO_PHOTOS) as client:
-            save_settings(client, quality_configuration.default_output_folder, auto_crop=True, jpeg_quality=quality)
-            add_document_page(client, 1)
-            finalization = finalize(client)
-            sizes.append(finalization["size_in_bytes"])
-    assert sizes[0] < sizes[1]
-
-
-def test_the_quality_saved_in_the_settings_is_the_one_the_pdf_uses(configuration):
+def test_the_settings_no_longer_carry_a_jpeg_quality_but_still_accept_one_from_an_old_page(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
-        settings = save_settings(client, configuration.default_output_folder, auto_crop=True, jpeg_quality=55)
-
-    assert settings["jpeg_quality"] == 55
-
-
-def test_a_quality_outside_the_range_is_refused_by_the_settings(configuration):
-    with build_client(configuration, TWO_PHOTOS) as client:
+        settings = save_settings(client, configuration.default_output_folder, auto_crop=True)
         body = {"output_folder": str(configuration.default_output_folder), "output_format": "jpg", "jpeg_quality": 20}
         response = client.put("/api/settings", json=body, headers=STATE_CHANGING_HEADERS)
 
-    assert (response.status_code, response.json()["code"]) == (422, "invalid_settings")
+    assert ("jpeg_quality" in settings, response.status_code) == (False, 200)

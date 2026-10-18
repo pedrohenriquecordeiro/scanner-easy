@@ -298,25 +298,6 @@ button:disabled {
   color: var(--color-text-muted);
 }
 
-.slider-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.slider-row input[type="range"] {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--size-touch-target);
-}
-
-.slider-value {
-  min-width: 2.5rem;
-  font-weight: 700;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .checkbox-label {
   display: inline-flex;
   align-items: center;

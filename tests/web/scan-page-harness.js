@@ -8,7 +8,6 @@ const { BrowserPage, build_deferred_response, build_json_response } = require(".
 const ACTIVE_POLL_DELAY_MILLISECONDS = 500;
 const PRINTER_POLL_DELAY_MILLISECONDS = 15000;
 const POST_SCAN_PRINTER_DELAY_MILLISECONDS = 6000;
-const QUALITY_SAVE_DELAY_MILLISECONDS = 300;
 const CONFIRMATION_VISIBLE_MILLISECONDS = 4000;
 const FOLDER_REFUSED_BODY = { code: "output_folder_unavailable", message: "Não consigo usar essa pasta de saída." };
 const BYTE_COUNTS = [0, 999, 1000, 999949, 999950, 1234567, 5e9];
@@ -22,7 +21,6 @@ const SETTINGS = {
   capture_mode: "single",
   auto_crop: false,
   crop_margin: true,
-  jpeg_quality: 90,
 };
 const OLD_SERVER_SETTINGS = {
   output_folder: "/Users/teste/Digitalizadora",
@@ -110,38 +108,9 @@ class PageUnderTest extends BrowserPage {
       auto_crop: this.element("auto-crop-checkbox").checked,
       crop_margin: this.element("crop-margin-checkbox").checked,
       crop_margin_disabled: this.element("crop-margin-checkbox").disabled,
-      jpeg_quality: this.element("jpeg-quality-input").value,
-      jpeg_quality_text: this.element("jpeg-quality-value").textContent,
       warning_hidden: this.element("resolution-warning").hidden,
       warning_text: this.element("resolution-warning-text").textContent,
     };
-  }
-
-  async move_quality_slider(value) {
-    const slider = this.element("jpeg-quality-input");
-    slider.focus();
-    slider.value = value;
-    this.dispatch_simple_event(slider, "input");
-    await this.flush();
-  }
-
-  async choose_quality_without_waiting(value) {
-    const slider = this.element("jpeg-quality-input");
-    slider.value = value;
-    this.dispatch_simple_event(slider, "input");
-    this.dispatch_simple_event(slider, "change");
-    await this.flush();
-  }
-
-  async let_the_quality_save_run() {
-    this.timers.run_pending_with_delay(QUALITY_SAVE_DELAY_MILLISECONDS);
-    await this.flush();
-  }
-
-  async release_quality_slider() {
-    this.dispatch_simple_event(this.element("jpeg-quality-input"), "change");
-    this.timers.run_pending_with_delay(QUALITY_SAVE_DELAY_MILLISECONDS);
-    await this.flush();
   }
 
   async press_key_on(element, code) {
@@ -223,7 +192,6 @@ const SCENARIOS = {
   space_on_the_resolution_select: () => count_scans_after_space_on("resolution-select"),
   space_on_the_color_mode_select: () => count_scans_after_space_on("color-mode-select"),
   space_on_the_auto_crop_checkbox: () => count_scans_after_space_on("auto-crop-checkbox"),
-  space_on_the_quality_slider: () => count_scans_after_space_on("jpeg-quality-input"),
   change_the_resolution: () => change_setting_through("resolution-select", (page) => page.choose_option("resolution-select", "600")),
   change_the_color_mode: () => change_setting_through("color-mode-select", (page) => page.choose_option("color-mode-select", "grayscale")),
   turn_auto_crop_on: () => change_setting_through("auto-crop-checkbox", (page) => page.set_auto_crop(true)),
@@ -231,70 +199,6 @@ const SCENARIOS = {
   async crop_margin_with_the_auto_crop_on() {
     const page = await load_page({ "GET /api/settings": build_json_response(200, { ...SETTINGS, auto_crop: true, crop_margin: false }) });
     return page.read_settings_controls();
-  },
-  async move_the_quality_slider() {
-    const page = await load_page({});
-    await page.move_quality_slider("75");
-    return { controls: page.read_settings_controls(), settings_requests: page.count_requests("PUT /api/settings") };
-  },
-  async move_the_quality_slider_to_nonsense() {
-    const page = await load_page({});
-    await page.move_quality_slider("abc");
-    return page.read_settings_controls();
-  },
-  async release_the_quality_slider() {
-    const saved = { ...SETTINGS, jpeg_quality: 75 };
-    const page = await load_page({ "PUT /api/settings": build_json_response(200, saved) });
-    await page.move_quality_slider("75");
-    await page.release_quality_slider();
-    return {
-      settings_request_body: page.settings_request_body(),
-      controls: page.read_settings_controls(),
-      slider_focused: page.is_focused("jpeg-quality-input"),
-      scan_button_focused: page.is_focused("scan-button"),
-    };
-  },
-  async hold_a_key_on_the_quality_slider() {
-    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 70 }) });
-    for (let value = 89; value >= 70; value -= 1) {
-      await page.choose_quality_without_waiting(String(value));
-    }
-    const requests_while_holding = page.count_requests("PUT /api/settings");
-    await page.let_the_quality_save_run();
-    return {
-      requests_while_holding,
-      requests_after: page.count_requests("PUT /api/settings"),
-      saved_quality: page.settings_request_body().jpeg_quality,
-    };
-  },
-  async answer_about_an_older_quality_while_the_slider_moved_on() {
-    const first_answer = build_deferred_response();
-    const page = await load_page({ "PUT /api/settings": first_answer });
-    await page.choose_quality_without_waiting("70");
-    await page.let_the_quality_save_run();
-    await page.choose_quality_without_waiting("60");
-    first_answer.answer(build_json_response(200, { ...SETTINGS, jpeg_quality: 70 }));
-    await page.flush();
-    return page.read_settings_controls();
-  },
-  async refused_quality() {
-    const page = await load_page({ "PUT /api/settings": build_json_response(422, INVALID_SETTINGS_BODY) });
-    await page.move_quality_slider("75");
-    await page.release_quality_slider();
-    return { banner_text: page.element("error-banner-text").textContent, controls: page.read_settings_controls() };
-  },
-  async quality_filled_from_the_saved_settings() {
-    const page = await load_page({ "GET /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 60 }) });
-    return page.read_settings_controls();
-  },
-  async quality_kept_while_another_setting_changes() {
-    const saved = { ...SETTINGS, jpeg_quality: 60, dots_per_inch: 600 };
-    const page = await load_page({
-      "GET /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 60 }),
-      "PUT /api/settings": build_json_response(200, saved),
-    });
-    await page.choose_option("resolution-select", "600");
-    return { settings_request_body: page.settings_request_body() };
   },
   async settings_without_the_crop_hint() {
     const page = await load_page({});
@@ -425,12 +329,6 @@ const SCENARIOS = {
   async crop_boxes_saved() {
     const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, auto_crop: true }) });
     await page.set_auto_crop(true);
-    return page.read_folder_feedback();
-  },
-  async quality_saved() {
-    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 75 }) });
-    await page.move_quality_slider("75");
-    await page.release_quality_slider();
     return page.read_folder_feedback();
   },
   async capture_mode_saved() {

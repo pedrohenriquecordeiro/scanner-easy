@@ -12,22 +12,20 @@ class StubLastScanEditService:
         self.failure: Exception | None = None
         self.result = LastScanEditResult(build_last_scan())
         self.calls: list[str] = []
-        self.received_jpeg_qualities: list[int] = []
         self.received_crops: list[Sequence[PageCrop]] = []
 
-    async def rotate_clockwise(self, jpeg_quality: int) -> LastScanEditResult:
-        return self._answer("rotate_clockwise", jpeg_quality)
+    async def rotate_clockwise(self) -> LastScanEditResult:
+        return self._answer("rotate_clockwise")
 
-    async def set_crops(self, crops: Sequence[PageCrop], jpeg_quality: int) -> LastScanEditResult:
+    async def set_crops(self, crops: Sequence[PageCrop]) -> LastScanEditResult:
         self.received_crops.append(crops)
-        return self._answer("set_crops", jpeg_quality)
+        return self._answer("set_crops")
 
-    async def detect_crops(self, jpeg_quality: int) -> LastScanEditResult:
-        return self._answer("detect_crops", jpeg_quality)
+    async def detect_crops(self) -> LastScanEditResult:
+        return self._answer("detect_crops")
 
-    def _answer(self, operation: str, jpeg_quality: int) -> LastScanEditResult:
+    def _answer(self, operation: str) -> LastScanEditResult:
         self.calls.append(operation)
-        self.received_jpeg_qualities.append(jpeg_quality)
         if self.failure is not None:
             raise self.failure
         return self.result

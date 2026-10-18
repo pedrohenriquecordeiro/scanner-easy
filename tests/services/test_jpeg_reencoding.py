@@ -3,6 +3,7 @@ import io
 import pytest
 from PIL import Image
 
+from digitalizadora.domain.image_adjustment import REENCODING_JPEG_QUALITY
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.jpeg_reencoding import (
     TRANSPOSE_BY_ROTATION,
@@ -11,7 +12,6 @@ from digitalizadora.services.jpeg_reencoding import (
 )
 from tests.fakes.synthetic_scans import build_scan_jpeg
 
-JPEG_QUALITY = 90
 ICC_PROFILE = b"not a real profile but kept as it is"
 
 
@@ -19,30 +19,29 @@ def open_jpeg(**save_options: object) -> Image.Image:
     return Image.open(io.BytesIO(build_scan_jpeg((32, 24), **save_options)))
 
 
-@pytest.mark.parametrize("jpeg_quality", [50, 90, 100])
-def test_the_options_ask_for_the_quality_given(jpeg_quality: int) -> None:
+def test_the_options_ask_for_the_fixed_quality() -> None:
     with open_jpeg() as image:
-        assert read_encoding_options(image, jpeg_quality)["quality"] == jpeg_quality
+        assert read_encoding_options(image)["quality"] == REENCODING_JPEG_QUALITY
 
 
 def test_the_options_keep_the_density_of_the_source() -> None:
     with open_jpeg(dpi=(300, 300)) as image:
-        assert read_encoding_options(image, JPEG_QUALITY)["dpi"] == (300, 300)
+        assert read_encoding_options(image)["dpi"] == (300, 300)
 
 
 def test_the_options_leave_out_a_density_the_source_does_not_have() -> None:
     with open_jpeg() as image:
-        assert "dpi" not in read_encoding_options(image, JPEG_QUALITY)
+        assert "dpi" not in read_encoding_options(image)
 
 
 def test_the_options_keep_the_icc_profile_of_the_source() -> None:
     with open_jpeg(icc_profile=ICC_PROFILE) as image:
-        assert read_encoding_options(image, JPEG_QUALITY)["icc_profile"] == ICC_PROFILE
+        assert read_encoding_options(image)["icc_profile"] == ICC_PROFILE
 
 
 def test_the_options_keep_the_chroma_subsampling_of_the_source() -> None:
     with open_jpeg(subsampling=0) as image:
-        assert read_encoding_options(image, JPEG_QUALITY)["subsampling"] == 0
+        assert read_encoding_options(image)["subsampling"] == 0
 
 
 def test_replace_with_returns_the_transformed_image() -> None:

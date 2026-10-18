@@ -69,8 +69,8 @@ ONE_PHOTO = ScannedImage(
 WHITE_PAGE = ScannedImage(build_scan_jpeg((200, 280)), "image/jpeg")
 
 
-WHOLE_IMAGE = ImageAdjustment(auto_crop=False, jpeg_quality=90)
-WITH_AUTO_CROP = ImageAdjustment(auto_crop=True, jpeg_quality=90)
+WHOLE_IMAGE = ImageAdjustment(auto_crop=False)
+WITH_AUTO_CROP = ImageAdjustment(auto_crop=True)
 
 
 def job_with(output_format: OutputFormat = OutputFormat.PDF, adjustment: ImageAdjustment = WHOLE_IMAGE) -> ScanJob:
@@ -199,14 +199,6 @@ def test_capacity_check_counts_the_adjustment_of_the_request(tmp_path):
 
 def test_capacity_check_accepts_exactly_the_space_of_an_adjusted_page(tmp_path):
     Environment(tmp_path, ENOUGH_FREE_SPACE_FOR_AN_ADJUSTED_PAGE).build_service().ensure_capacity(ADJUSTED_REQUEST)
-
-
-def test_the_quality_makes_the_capacity_check_stricter(tmp_path):
-    top_quality = ScanRequest(SETTINGS, OutputFormat.PDF, ImageAdjustment(auto_crop=True, jpeg_quality=100))
-    environment = Environment(tmp_path, ENOUGH_FREE_SPACE_FOR_AN_ADJUSTED_PAGE)
-
-    with pytest.raises(InsufficientStorageError):
-        environment.build_service().ensure_capacity(top_quality)
 
 
 def test_a_scan_without_the_crop_saves_one_jpg_with_the_bytes_of_the_scanner(environment):
@@ -354,16 +346,6 @@ def test_a_detection_that_fails_is_reported_in_the_log(tmp_path, caplog):
         environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert "automatic crop of the scan failed" in caplog.text
-
-
-def test_a_lower_quality_gives_smaller_files(environment, tmp_path):
-    high = Environment(tmp_path / "high")
-    low = Environment(tmp_path / "low")
-    high.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, ImageAdjustment(auto_crop=True, jpeg_quality=95)))
-    low.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, ImageAdjustment(auto_crop=True, jpeg_quality=60)))
-
-    sizes = [(env.output_folder / "2026-10-13_15-30-12-000000000.jpg").stat().st_size for env in (high, low)]
-    assert sizes[1] < sizes[0]
 
 
 def test_a_master_that_the_disk_does_not_take_still_gives_the_files(tmp_path):

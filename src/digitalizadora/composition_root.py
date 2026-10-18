@@ -169,7 +169,7 @@ def build_container(
     services = _build_services(repositories, scanner_access, shared_services)
     # Before the server answers (6.6.2); recover_draft never raises, so the server always starts.
     services.document_draft.recover_draft()
-    services.last_scan_edit.restore_after_start(repositories.settings.load().adjustment.jpeg_quality)
+    services.last_scan_edit.restore_after_start()
     _apply_scanner_address_override(configuration, services.printer_connection)
     error_message_catalog = ErrorMessageCatalog()
     return ApplicationContainer(
@@ -333,7 +333,7 @@ def _build_controllers(services: _Services, error_message_catalog: ErrorMessageC
         printer=PrinterController(services.printer_connection, error_message_catalog),
         preview=PreviewController(services.last_scan_view, error_message_catalog),
         document=DocumentController(services.document_draft, services.settings, error_message_catalog),
-        last_scan=LastScanController(services.last_scan_edit, services.settings, error_message_catalog),
+        last_scan=LastScanController(services.last_scan_edit, error_message_catalog),
     )
 
 

@@ -10,7 +10,6 @@ from digitalizadora.controllers.crop_request_body import PageCropsRequestBody
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.controllers.last_scan_body import describe_last_scan
 from digitalizadora.domain.errors import DigitalizadoraError, InvalidCropError
-from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.last_scan_edit_service import LastScanEditResult, LastScanEditService
 
 LAST_SCAN_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
@@ -61,11 +60,9 @@ class LastScanController:
     def __init__(
         self,
         last_scan_edit_service: LastScanEditService,
-        settings_service: ApplicationSettingsService,
         error_message_catalog: ErrorMessageCatalog,
     ) -> None:
         self._last_scan_edit_service = last_scan_edit_service
-        self._settings_service = settings_service
         self._error_message_catalog = error_message_catalog
 
     def build_router(self) -> APIRouter:
@@ -76,18 +73,18 @@ class LastScanController:
         return router
 
     async def rotate_last_scan(self) -> JSONResponse:
-        return await self._respond_to_edit(self._last_scan_edit_service.rotate_clockwise(self._jpeg_quality()))
+        return await self._respond_to_edit(self._last_scan_edit_service.rotate_clockwise())
 
     async def set_last_scan_crops(self, body: PageCropsRequestBody) -> JSONResponse:
         try:
             crops = body.to_page_crops()
         except InvalidCropError as error:
             return self._respond_to_error(error)
-        return await self._respond_to_edit(self._last_scan_edit_service.set_crops(crops, self._jpeg_quality()))
+        return await self._respond_to_edit(self._last_scan_edit_service.set_crops(crops))
 
     async def detect_last_scan_crops(self) -> JSONResponse:
         try:
-            result = await self._last_scan_edit_service.detect_crops(self._jpeg_quality())
+            result = await self._last_scan_edit_service.detect_crops()
         except DigitalizadoraError as error:
             return self._respond_to_error(error)
         content = {
@@ -96,9 +93,6 @@ class LastScanController:
             "ignored_region_count": result.ignored_region_count,
         }
         return JSONResponse(content=content)
-
-    def _jpeg_quality(self) -> int:
-        return self._settings_service.current().adjustment.jpeg_quality
 
     async def _respond_to_edit(self, edit: Awaitable[LastScanEditResult]) -> JSONResponse:
         try:

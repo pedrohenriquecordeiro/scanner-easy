@@ -36,7 +36,6 @@ from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.scripted_file_writer import ScriptedFileWriter
 
-JPEG_QUALITY = 90
 FINALIZED_AT = DRAFT_CREATED_AT + timedelta(minutes=5)
 NAMING_POLICY = ScanFileNamingPolicy(FixedClock(DRAFT_CREATED_AT))
 DOCUMENT_NAME = "Contrato do apartamento"
@@ -73,7 +72,7 @@ def seeded_input(tmp_path: Path) -> DocumentAssemblyInput:
     draft_folder = drafts_folder / CURRENT_DRAFT_FOLDER_NAME
     page_files = [draft_folder / page_file_name(page_identifier) for page_identifier in draft.page_identifiers]
     return DocumentAssemblyInput(
-        draft=draft, page_files=page_files, finalized_at=FINALIZED_AT, jpeg_quality=JPEG_QUALITY
+        draft=draft, page_files=page_files, finalized_at=FINALIZED_AT
     )
 
 
@@ -115,7 +114,7 @@ def read_document_information(pdf_path: Path, key: str) -> str:
 
 
 def test_ensure_capacity_creates_a_missing_output_folder(finalizer, seeded_input, output_folder):
-    finalizer.ensure_capacity(seeded_input.draft, JPEG_QUALITY)
+    finalizer.ensure_capacity(seeded_input.draft)
 
     assert output_folder.is_dir()
 
@@ -126,7 +125,7 @@ def test_ensure_capacity_with_an_unusable_output_folder_raises_output_folder_una
     output_folder.write_bytes(b"a file where the folder should be")
 
     with pytest.raises(OutputFolderUnavailableError):
-        finalizer.ensure_capacity(seeded_input.draft, JPEG_QUALITY)
+        finalizer.ensure_capacity(seeded_input.draft)
 
 
 def test_unusable_output_folder_is_reported_before_the_free_space_is_read(
@@ -136,40 +135,40 @@ def test_unusable_output_folder_is_reported_before_the_free_space_is_read(
     finalizer = build_finalizer(output_folder, free_space_reader, AtomicFileWriter())
 
     with pytest.raises(OutputFolderUnavailableError):
-        finalizer.ensure_capacity(seeded_input.draft, JPEG_QUALITY)
+        finalizer.ensure_capacity(seeded_input.draft)
 
     assert free_space_reader.requested_folders == []
 
 
 def test_ensure_capacity_accepts_the_minimum_plus_the_draft_size_in_the_output_folder(seeded_input, output_folder):
     draft = seeded_input.draft
-    document_size = draft.estimate_document_size_in_bytes(JPEG_QUALITY)
+    document_size = draft.estimate_document_size_in_bytes()
     free_space_reader = RecordingFreeSpaceReader(MINIMUM_FREE_SPACE_BYTES + document_size)
 
-    build_finalizer(output_folder, free_space_reader, AtomicFileWriter()).ensure_capacity(draft, JPEG_QUALITY)
+    build_finalizer(output_folder, free_space_reader, AtomicFileWriter()).ensure_capacity(draft)
 
     assert free_space_reader.requested_folders == [output_folder]
 
 
 def test_ensure_capacity_one_byte_short_raises_insufficient_storage(seeded_input, output_folder):
     draft = seeded_input.draft
-    document_size = draft.estimate_document_size_in_bytes(JPEG_QUALITY)
+    document_size = draft.estimate_document_size_in_bytes()
     free_space_reader = RecordingFreeSpaceReader(MINIMUM_FREE_SPACE_BYTES + document_size - 1)
     finalizer = build_finalizer(output_folder, free_space_reader, AtomicFileWriter())
 
     with pytest.raises(InsufficientStorageError):
-        finalizer.ensure_capacity(draft, JPEG_QUALITY)
+        finalizer.ensure_capacity(draft)
 
 
 def test_ensure_capacity_counts_twice_the_pages_that_need_rendering(seeded_input, output_folder):
     framed_draft = seeded_input.draft.with_page_framing(
         seeded_input.draft.page_identifiers[0], PageFraming(rotation=PageRotation.CLOCKWISE_90)
     )
-    one_byte_short = MINIMUM_FREE_SPACE_BYTES + framed_draft.estimate_document_size_in_bytes(JPEG_QUALITY) - 1
+    one_byte_short = MINIMUM_FREE_SPACE_BYTES + framed_draft.estimate_document_size_in_bytes() - 1
     finalizer = build_finalizer(output_folder, RecordingFreeSpaceReader(one_byte_short), AtomicFileWriter())
 
     with pytest.raises(InsufficientStorageError):
-        finalizer.ensure_capacity(framed_draft, JPEG_QUALITY)
+        finalizer.ensure_capacity(framed_draft)
 
 
 def test_write_document_saves_the_pdf_under_the_document_name(finalizer, seeded_input, output_folder):

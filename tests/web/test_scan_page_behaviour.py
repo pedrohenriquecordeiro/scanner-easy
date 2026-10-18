@@ -19,7 +19,6 @@ SETTINGS_BODY = {
     "capture_mode": "single",
     "auto_crop": False,
     "crop_margin": True,
-    "jpeg_quality": 90,
 }
 FOLDER_REFUSED_MESSAGE = "Não consigo usar essa pasta de saída."
 OUTPUT_FOLDER_UNAVAILABLE_TEXT = "Pasta de saída indisponível. Se for um disco externo, confira se está conectado."
@@ -63,7 +62,6 @@ def test_space_on_the_focused_scan_button_starts_one_scan(scenario_results: dict
         "space_on_the_resolution_select",
         "space_on_the_color_mode_select",
         "space_on_the_auto_crop_checkbox",
-        "space_on_the_quality_slider",
     ],
 )
 def test_space_keeps_its_own_meaning_in_other_controls(scenario_results: dict, scenario_name: str) -> None:
@@ -280,67 +278,6 @@ def test_scanning_status_follows_the_resolution(scenario_results: dict) -> None:
     assert scenario_results["scanning_at_a_high_resolution"]["status_text"] == "Digitalizando… (vários minutos)"
 
 
-def test_the_quality_slider_starts_at_the_default(scenario_results: dict) -> None:
-    controls = scenario_results["default_settings_controls"]
-    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("90", "90")
-
-
-def test_the_saved_quality_fills_the_slider_and_its_number(scenario_results: dict) -> None:
-    controls = scenario_results["quality_filled_from_the_saved_settings"]
-    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("60", "60")
-
-
-def test_a_server_without_the_quality_setting_leaves_the_default(scenario_results: dict) -> None:
-    controls = scenario_results["old_server_controls"]
-    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("90", "90")
-
-
-def test_the_number_follows_the_slider_while_it_moves(scenario_results: dict) -> None:
-    assert scenario_results["move_the_quality_slider"]["controls"]["jpeg_quality_text"] == "75"
-
-
-def test_moving_the_slider_saves_nothing_until_it_is_let_go(scenario_results: dict) -> None:
-    assert scenario_results["move_the_quality_slider"]["settings_requests"] == 0
-
-
-def test_a_value_the_slider_cannot_hold_shows_the_default(scenario_results: dict) -> None:
-    assert scenario_results["move_the_quality_slider_to_nonsense"]["jpeg_quality_text"] == "90"
-
-
-def test_letting_the_slider_go_saves_the_quality_with_the_other_settings(scenario_results: dict) -> None:
-    body = scenario_results["release_the_quality_slider"]["settings_request_body"]
-    assert body == {**SETTINGS_BODY, "jpeg_quality": 75}
-
-
-def test_letting_the_slider_go_keeps_the_focus_on_it(scenario_results: dict) -> None:
-    result = scenario_results["release_the_quality_slider"]
-    assert (result["slider_focused"], result["scan_button_focused"]) == (True, False)
-
-
-def test_a_key_held_on_the_slider_saves_only_the_last_quality_once(scenario_results: dict) -> None:
-    result = scenario_results["hold_a_key_on_the_quality_slider"]
-    assert (result["requests_while_holding"], result["requests_after"], result["saved_quality"]) == (0, 1, 70)
-
-
-def test_an_answer_about_an_older_quality_does_not_take_the_slider_back(scenario_results: dict) -> None:
-    controls = scenario_results["answer_about_an_older_quality_while_the_slider_moved_on"]
-    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("60", "60")
-
-
-def test_another_setting_goes_with_the_saved_quality(scenario_results: dict) -> None:
-    body = scenario_results["quality_kept_while_another_setting_changes"]["settings_request_body"]
-    assert (body["jpeg_quality"], body["dots_per_inch"]) == (60, 600)
-
-
-def test_a_refused_quality_shows_the_server_message_and_puts_the_slider_back(scenario_results: dict) -> None:
-    result = scenario_results["refused_quality"]
-    assert (result["banner_text"], result["controls"]["jpeg_quality"], result["controls"]["jpeg_quality_text"]) == (
-        "A resolução escolhida não é aceita.",
-        "90",
-        "90",
-    )
-
-
 def test_the_crop_checkbox_has_no_hint_any_more(scenario_results: dict) -> None:
     assert scenario_results["settings_without_the_crop_hint"] == {"has_hint": False, "checkbox_description": None}
 
@@ -429,7 +366,7 @@ def test_enter_in_the_folder_field_while_saving_sends_one_request(scenario_resul
     assert scenario_results["enter_twice_in_the_folder_field_while_saving"]["settings_requests"] == 1
 
 
-@pytest.mark.parametrize("scenario_name", ["adjustment_saved", "format_saved", "crop_boxes_saved", "quality_saved"])
+@pytest.mark.parametrize("scenario_name", ["adjustment_saved", "format_saved", "crop_boxes_saved"])
 def test_an_adjustment_confirms_with_the_saved_adjustment_message(scenario_results: dict, scenario_name: str) -> None:
     result = scenario_results[scenario_name]
     assert (result["confirmation_text"], result["confirmation_hidden"]) == ("✔ Ajuste salvo", False)

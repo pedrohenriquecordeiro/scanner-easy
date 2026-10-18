@@ -103,7 +103,7 @@ class ScanOutputService:
 
     def _save_outputs(self, master_jpeg: bytes, framing: PageFraming, job: ScanJob) -> tuple[SavedScanFile, ...]:
         identity = OutputIdentity(job.started_at, job.request.settings.dots_per_inch, job.request.output_format)
-        request = OutputsRequest(framing, job.request.adjustment.jpeg_quality, identity)
+        request = OutputsRequest(framing, identity)
         saved_files = []
         for encoded_scan in self._render_outputs(master_jpeg, request):
             output_path = self._scan_output_repository.save(encoded_scan)

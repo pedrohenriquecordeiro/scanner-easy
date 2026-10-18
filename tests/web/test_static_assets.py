@@ -114,9 +114,6 @@ SETTINGS_ELEMENT_IDENTIFIERS = [
     "resolution-warning",
     "resolution-warning-text",
     "auto-crop-checkbox",
-    "jpeg-quality-input",
-    "jpeg-quality-value",
-    "jpeg-quality-hint",
     "output-folder-save-button",
     "output-folder-message",
     "settings-confirmation",
@@ -377,30 +374,6 @@ def test_the_crop_checkbox_is_not_described_by_a_hint() -> None:
     assert checkbox is not None and "aria-describedby" not in checkbox.group(0)
 
 
-def test_jpeg_quality_is_a_slider_from_50_to_100() -> None:
-    page = read_static_file("index.html")
-    assert re.search(r'<input id="jpeg-quality-input" type="range"[^>]*min="50"[^>]*max="100"[^>]*step="1"', page)
-
-
-def test_jpeg_quality_starts_at_90_in_the_page() -> None:
-    assert re.search(r'<input id="jpeg-quality-input"[^>]*\svalue="90"', read_static_file("index.html"))
-
-
-def test_jpeg_quality_has_a_label_and_shows_its_number() -> None:
-    page = read_static_file("index.html")
-    assert (
-        '<label for="jpeg-quality-input">Qualidade do JPEG</label>' in page
-        and re.search(r'<output id="jpeg-quality-value"[^>]*for="jpeg-quality-input"[^>]*>90</output>', page)
-    )
-
-
-def test_jpeg_quality_has_a_single_short_hint_tied_to_the_slider() -> None:
-    page = read_static_file("index.html")
-    assert re.search(r'aria-describedby="jpeg-quality-hint"', page) and re.search(
-        r'<p id="jpeg-quality-hint"[^>]*>Vale quando a imagem é cortada ou girada\.</p>', page
-    )
-
-
 def test_last_scan_rotate_button_names_its_action() -> None:
     page = read_static_file("index.html")
     assert re.search(
@@ -590,3 +563,8 @@ def test_the_crop_margin_checkbox_comes_right_after_the_auto_crop_one_with_its_l
 def test_the_last_scan_thumbnail_spans_both_rows_so_it_leaves_no_blank_band_under_the_details() -> None:
     stylesheet = " ".join(read_static_file("application.css").split())
     assert ".last-scan-thumbnail-frame { grid-row: 1 / span 2; }" in stylesheet
+
+
+def test_the_page_has_no_jpeg_quality_control() -> None:
+    page = read_static_file("index.html")
+    assert "jpeg-quality" not in page and "Qualidade do JPEG" not in page

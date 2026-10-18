@@ -233,16 +233,6 @@ def test_an_active_crop_doubles_the_estimated_page_size_at_the_default_quality()
     assert estimated_page_bytes(COLOR_AT_300, CROPPED) == 2 * estimated_page_bytes(COLOR_AT_300)
 
 
-def test_an_active_crop_at_the_top_quality_quadruples_the_estimated_page_size():
-    top_quality = ImageAdjustment(auto_crop=True, jpeg_quality=100)
-
-    assert estimated_page_bytes(COLOR_AT_300, top_quality) == 4 * estimated_page_bytes(COLOR_AT_300)
-
-
-def test_the_quality_alone_does_not_change_the_estimated_page_size():
-    assert estimated_page_bytes(COLOR_AT_300, ImageAdjustment(jpeg_quality=100)) == estimated_page_bytes(COLOR_AT_300)
-
-
 def test_no_adjustment_keeps_the_estimated_page_size():
     assert estimated_page_bytes(COLOR_AT_300, NO_ADJUSTMENT) == estimated_page_bytes(COLOR_AT_300)
 

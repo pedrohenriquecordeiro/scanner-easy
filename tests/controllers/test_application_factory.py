@@ -77,7 +77,6 @@ SETTINGS_BODY = {
     "capture_mode": "single",
     "auto_crop": False,
     "crop_margin": True,
-    "jpeg_quality": 90,
 }
 CONNECTED_STATE = PrinterConnectionState(
     connected=True,
@@ -130,7 +129,7 @@ def build_application_parts() -> ApplicationParts:
         printer=PrinterController(printer_service, CATALOG),
         preview=PreviewController(last_scan_view_service, CATALOG),
         document=DocumentController(document_service, settings_service, CATALOG),
-        last_scan=LastScanController(last_scan_edit_service, settings_service, CATALOG),
+        last_scan=LastScanController(last_scan_edit_service, CATALOG),
     )
     return ApplicationParts(
         controllers, scan_service, printer_service, progress_tracker, document_service, last_scan_edit_service

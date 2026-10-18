@@ -1,13 +1,11 @@
 from dataclasses import replace
 from http import HTTPStatus
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.last_scan_controller import LAST_SCAN_ERROR_STATUSES, LastScanController
-from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     DraftStorageUnavailableError,
@@ -23,25 +21,14 @@ from digitalizadora.domain.errors import (
     SavedScanUnreadableError,
     ScanAlreadyRunningError,
 )
-from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.last_scan import SavedScanFile
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.last_scan_edit_service import LastScanEditResult
-from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
-from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
+from tests.controllers.controller_test_support import build_test_client
 from tests.fakes.page_crops import quadrilateral, rectangle
 from tests.fakes.stored_scans import STORED_SCAN_SCANNED_AT, build_last_scan
 from tests.fakes.stub_last_scan_edit_service import StubLastScanEditService
 
 CATALOG = ErrorMessageCatalog()
-SETTINGS = ApplicationSettings(
-    output_folder=Path("/Volumes/External/scans"),
-    output_format=OutputFormat.PDF,
-    scan_settings=ScanPreset.DOCUMENT.settings,
-    adjustment=ImageAdjustment(jpeg_quality=70),
-)
 ROTATION_PATH = "/api/scans/last/rotation"
 CROPS_PATH = "/api/scans/last/crops"
 DETECT_PATH = "/api/scans/last/crops/detect"
@@ -78,10 +65,7 @@ def edit_service() -> StubLastScanEditService:
 
 @pytest.fixture
 def client(edit_service: StubLastScanEditService) -> TestClient:
-    settings_service = ApplicationSettingsService(
-        InMemoryApplicationSettingsRepository(SETTINGS), StubFolderPreparer()
-    )
-    return build_test_client(LastScanController(edit_service, settings_service, CATALOG).build_router())
+    return build_test_client(LastScanController(edit_service, CATALOG).build_router())
 
 
 def send(client: TestClient, method: str, path: str, body: object):
@@ -121,15 +105,6 @@ def test_the_answer_lists_the_files_deleted_and_the_files_kept(
     body = client.post(ROTATION_PATH).json()
 
     assert (body["deleted_file_names"], body["kept_file_names"]) == (["a.pdf"], ["b.pdf"])
-
-
-@pytest.mark.parametrize(("method", "path", "body"), EDIT_REQUESTS)
-def test_every_edit_asks_for_the_saved_jpeg_quality(
-    client: TestClient, edit_service: StubLastScanEditService, method: str, path: str, body: object
-) -> None:
-    send(client, method, path, body)
-
-    assert edit_service.received_jpeg_qualities == [70]
 
 
 @pytest.mark.parametrize(("method", "path", "body"), EDIT_REQUESTS)

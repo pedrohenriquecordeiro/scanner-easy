@@ -8,7 +8,7 @@ from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
-from digitalizadora.domain.image_adjustment import rendered_size_factor
+from digitalizadora.domain.image_adjustment import RENDERED_SIZE_FACTOR
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.scan_result import ScanResult
 
@@ -89,11 +89,10 @@ class DocumentDraft:
     def estimated_size_in_bytes(self) -> int:
         return sum(page.size_in_bytes for page in self.pages)
 
-    def estimate_document_size_in_bytes(self, jpeg_quality: int) -> int:
-        """What the PDF may take: the pages that need rendering come out re-encoded at the quality given."""
-        rendered_factor = rendered_size_factor(jpeg_quality)
+    def estimate_document_size_in_bytes(self) -> int:
+        """What the PDF may take: the pages that need rendering come out re-encoded at the fixed quality."""
         return sum(
-            page.size_in_bytes * (rendered_factor if page.framing.needs_rendering else 1) for page in self.pages
+            page.size_in_bytes * (RENDERED_SIZE_FACTOR if page.framing.needs_rendering else 1) for page in self.pages
         )
 
     def position_of(self, page_identifier: str) -> int:

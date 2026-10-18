@@ -178,7 +178,6 @@ def test_state_contains_the_settings(client: TestClient) -> None:
         "capture_mode": "document",
         "auto_crop": True,
         "crop_margin": True,
-        "jpeg_quality": 90,
     }
 
 

@@ -1,5 +1,4 @@
 import io
-from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import BinaryIO
@@ -25,7 +24,6 @@ DOTS_PER_INCH = 72
 WIDE_PAGE = build_sample_jpeg(width_pixels=144, height_pixels=72, dots_per_inch=DOTS_PER_INCH)
 SQUARE_PAGE = build_sample_jpeg(width_pixels=72, height_pixels=72, dots_per_inch=DOTS_PER_INCH)
 POINT_TOLERANCE = 1.0
-JPEG_QUALITY = 90
 
 
 class RecordingPageRenderer(PageFramingRenderer):
@@ -44,7 +42,7 @@ def seed_input(tmp_path: Path, page_contents: list[bytes], framings: list[PageFr
         draft = draft.with_page_framing(page_identifier, framing)
     draft_folder = drafts_folder / CURRENT_DRAFT_FOLDER_NAME
     page_files = [draft_folder / page_file_name(page_identifier) for page_identifier in draft.page_identifiers]
-    return DocumentAssemblyInput(draft, page_files, FINALIZED_AT, JPEG_QUALITY)
+    return DocumentAssemblyInput(draft, page_files, FINALIZED_AT)
 
 
 def write_pdf(assembly_input: DocumentAssemblyInput, renderer: PageFramingRenderer | None = None) -> bytes:
@@ -105,16 +103,7 @@ def test_each_page_is_rendered_once_and_in_order(tmp_path):
 
     write_pdf(assembly_input, renderer)
 
-    assert renderer.requests == [FrameRenderRequest(framing, 0, JPEG_QUALITY) for framing in framings]
-
-
-def test_the_quality_of_the_assembly_reaches_the_renderer(tmp_path):
-    renderer = RecordingPageRenderer()
-    assembly_input = seed_input(tmp_path, [WIDE_PAGE], [PageFraming(rotation=PageRotation.HALF_TURN)])
-
-    write_pdf(replace(assembly_input, jpeg_quality=61), renderer)
-
-    assert [request.jpeg_quality for request in renderer.requests] == [61]
+    assert renderer.requests == [FrameRenderRequest(framing, 0) for framing in framings]
 
 
 TWO_SIDE_BY_SIDE_CROPS = PageFraming(crops=(rectangle((0.0, 0.0, 0.5, 1.0)), rectangle((0.5, 0.0, 1.0, 1.0))))
@@ -165,7 +154,7 @@ def test_a_page_that_cannot_be_read_raises_scan_failed(tmp_path):
 
 def test_a_draft_without_pages_raises_scan_failed(tmp_path):
     one_page_draft = seed_input(tmp_path, [WIDE_PAGE], [PageFraming()]).draft
-    empty_input = DocumentAssemblyInput(one_page_draft.without_last_page(), [], FINALIZED_AT, JPEG_QUALITY)
+    empty_input = DocumentAssemblyInput(one_page_draft.without_last_page(), [], FINALIZED_AT)
 
     with pytest.raises(ScanFailedError):
         write_pdf(empty_input)

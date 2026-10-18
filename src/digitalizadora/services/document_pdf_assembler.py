@@ -12,13 +12,11 @@ from digitalizadora.services.rendered_page_source import RenderedPageSource
 
 @dataclass(frozen=True)
 class DocumentAssemblyInput:
-    """What the PDF is made of: the draft, its checked page files (one per page, in order), the moment and the
-    quality of the JPEG of every page that has to be written again."""
+    """What the PDF is made of: the draft, its checked page files (one per page, in order), and the moment."""
 
     draft: DocumentDraft
     page_files: Sequence[Path]
     finalized_at: datetime
-    jpeg_quality: int
 
 
 class DocumentPdfAssembler:
@@ -36,6 +34,6 @@ class DocumentPdfAssembler:
         page_sources = []
         for page, page_file in zip(assembly_input.draft.pages, assembly_input.page_files, strict=True):
             for frame_index in range(page.framing.output_count):
-                request = FrameRenderRequest(page.framing, frame_index, assembly_input.jpeg_quality)
+                request = FrameRenderRequest(page.framing, frame_index)
                 page_sources.append(RenderedPageSource(self._page_renderer, page_file, request))
         self._pdf_assembly_service.write_pdf_from_sources(page_sources, metadata, output_stream)

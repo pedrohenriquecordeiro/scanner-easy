@@ -310,30 +310,6 @@ def test_the_detection_after_a_turn_gives_the_crops_in_the_orientation_shown(con
     assert len(body["last_result"]["crops"]) == 2
 
 
-def test_a_lower_quality_makes_smaller_files(configuration, tmp_path):
-    sizes = []
-    for quality in (60, 95):
-        quality_configuration = build_application_configuration(tmp_path / f"q{quality}", SCANNER_ADDRESS)
-        with build_client(quality_configuration, ONE_PHOTO) as client:
-            save_settings(client, quality_configuration.default_output_folder, auto_crop=True, jpeg_quality=quality)
-            (path,) = last_result_paths(scan_once(client))
-            sizes.append(path.stat().st_size)
-    assert sizes[0] < sizes[1]
-
-
-def test_the_quality_applies_again_when_a_frame_is_rewritten(configuration):
-    with build_client(configuration, ONE_PHOTO) as client:
-        save_settings(client, configuration.default_output_folder, auto_crop=True, jpeg_quality=95)
-        state = scan_once(client)
-        (path,) = last_result_paths(state)
-        size_at_95 = path.stat().st_size
-        save_settings(client, configuration.default_output_folder, auto_crop=True, jpeg_quality=55)
-
-        turn_last_scan(client)
-
-    assert path.stat().st_size < size_at_95
-
-
 def test_an_edit_during_nothing_without_a_scan_answers_no_last_scan(configuration):
     with build_client(configuration, ONE_PHOTO) as client:
         response = turn_last_scan(client)

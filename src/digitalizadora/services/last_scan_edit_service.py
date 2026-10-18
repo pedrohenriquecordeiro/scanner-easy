@@ -93,31 +93,31 @@ class LastScanEditService:
         self._thumbnail_service = parts.thumbnail_service
         self._lock = asyncio.Lock()
 
-    async def rotate_clockwise(self, jpeg_quality: int) -> LastScanEditResult:
-        return await self._run_edit(self._plan_rotation, jpeg_quality)
+    async def rotate_clockwise(self) -> LastScanEditResult:
+        return await self._run_edit(self._plan_rotation)
 
-    async def set_crops(self, crops: Sequence[PageCrop], jpeg_quality: int) -> LastScanEditResult:
-        return await self._run_edit(functools.partial(self._plan_crops, crops), jpeg_quality)
+    async def set_crops(self, crops: Sequence[PageCrop]) -> LastScanEditResult:
+        return await self._run_edit(functools.partial(self._plan_crops, crops))
 
-    async def detect_crops(self, jpeg_quality: int) -> LastScanEditResult:
-        return await self._run_edit(self._plan_detection, jpeg_quality)
+    async def detect_crops(self) -> LastScanEditResult:
+        return await self._run_edit(self._plan_detection)
 
-    def restore_after_start(self, jpeg_quality: int) -> None:
+    def restore_after_start(self) -> None:
         """Brings the last scan of the previous run back from its slot. It never raises: the server must start."""
         try:
-            self._restore_last_scan(jpeg_quality)
+            self._restore_last_scan()
         except Exception:
             LOGGER.warning("The last scan of the previous run could not be restored", exc_info=True)
 
     async def _run_edit(
-        self, plan: Callable[[QuickScanSlot], _PlannedFraming], jpeg_quality: int
+        self, plan: Callable[[QuickScanSlot], _PlannedFraming]
     ) -> LastScanEditResult:
         async with self._lock:
             last_scan, thumbnail_jpeg = self._require_editable_last_scan()
             # No await between the check of the phase above and this mark: a scan that starts now is refused.
             self._progress_tracker.mark_last_scan_edit_started()
             try:
-                outcome = await asyncio.to_thread(self._apply_edit, plan, jpeg_quality)
+                outcome = await asyncio.to_thread(self._apply_edit, plan)
             except _SlotGoneError:
                 self._progress_tracker.replace_last_scan(
                     last_scan.scan_identifier, StoredScan(replace(last_scan, is_editable=False), thumbnail_jpeg)
@@ -159,7 +159,7 @@ class LastScanEditService:
         found_framing = framing.with_crops(framing.crops_from_master(detected.crops))
         return _PlannedFraming(found_framing, True, detected.ignored_region_count)
 
-    def _apply_edit(self, plan: Callable[[QuickScanSlot], _PlannedFraming], jpeg_quality: int) -> _EditOutcome:
+    def _apply_edit(self, plan: Callable[[QuickScanSlot], _PlannedFraming]) -> _EditOutcome:
         """The disk work of an edit, in a worker thread (7.3)."""
         try:
             slot = self._load_slot()
@@ -171,7 +171,7 @@ class LastScanEditService:
             self._ensure_files_to_rewrite_exist(current_scan, planned.framing.output_count)
             pending_slot = replace(slot, last_scan=current_scan.with_framing(planned.framing), render_pending=True)
             self._slot_repository.commit(pending_slot)
-            finished_slot, rendered = self._finish_render(pending_slot, jpeg_quality, slot)
+            finished_slot, rendered = self._finish_render(pending_slot, slot)
         except ScanFailedError as error:
             raise SavedScanUnreadableError(f"The master of the last scan could not be read: {error}") from error
         except MemoryError as error:
@@ -186,11 +186,11 @@ class LastScanEditService:
         return _EditOutcome(result, is_changed=True)
 
     def _finish_render(
-        self, pending_slot: QuickScanSlot, jpeg_quality: int, previous_slot: QuickScanSlot
+        self, pending_slot: QuickScanSlot, previous_slot: QuickScanSlot
     ) -> tuple[QuickScanSlot, _RenderedFiles]:
         """Renders the files and confirms them; if that fails the manifest goes back to the framing of before."""
         try:
-            rendered = self._render_outputs(pending_slot, jpeg_quality)
+            rendered = self._render_outputs(pending_slot)
             finished_scan = pending_slot.last_scan.with_saved_files(rendered.saved_files)
             finished_slot = replace(pending_slot, last_scan=finished_scan, render_pending=False)
             self._slot_repository.commit(finished_slot)
@@ -226,11 +226,11 @@ class LastScanEditService:
             if self._scan_output_repository.describe_saved_scan(last_scan.saved_file_path(saved_file)) is None:
                 raise LastScanFileMissingError(f"{saved_file.file_name} is not in the output folder any more")
 
-    def _render_outputs(self, slot: QuickScanSlot, jpeg_quality: int) -> _RenderedFiles:
+    def _render_outputs(self, slot: QuickScanSlot) -> _RenderedFiles:
         """Makes the files of the slot's framing from its master: rewrites, creates and deletes (7.3 step 4)."""
         last_scan = slot.last_scan
         identity = OutputIdentity(last_scan.scanned_at, slot.dots_per_inch, last_scan.output_format)
-        request = OutputsRequest(last_scan.framing, jpeg_quality, identity)
+        request = OutputsRequest(last_scan.framing, identity)
         try:
             with self._slot_repository.master_file_path(last_scan.scan_identifier).open("rb") as master:
                 outputs = self._output_renderer.render_outputs(master, request)
@@ -270,7 +270,7 @@ class LastScanEditService:
                 kept_file_names.append(saved_file.file_name)
         return tuple(deleted_file_names), tuple(kept_file_names)
 
-    def _restore_last_scan(self, jpeg_quality: int) -> None:
+    def _restore_last_scan(self) -> None:
         slot = self._slot_repository.load()
         if slot is None:
             self._slot_repository.delete_leftovers(None)
@@ -285,7 +285,7 @@ class LastScanEditService:
             self._slot_repository.discard()
             return
         if slot.render_pending:
-            slot = self._finish_interrupted_render(slot, jpeg_quality)
+            slot = self._finish_interrupted_render(slot)
         self._slot_repository.delete_leftovers(slot.last_scan.scan_identifier)
         thumbnail_jpeg = self._read_or_build_thumbnail(slot.last_scan.scan_identifier)
         self._progress_tracker.restore_last_scan(StoredScan(slot.last_scan, thumbnail_jpeg))
@@ -296,8 +296,8 @@ class LastScanEditService:
             for saved_file in last_scan.saved_files
         )
 
-    def _finish_interrupted_render(self, slot: QuickScanSlot, jpeg_quality: int) -> QuickScanSlot:
-        rendered = self._render_outputs(slot, jpeg_quality)
+    def _finish_interrupted_render(self, slot: QuickScanSlot) -> QuickScanSlot:
+        rendered = self._render_outputs(slot)
         finished_slot = replace(
             slot, last_scan=slot.last_scan.with_saved_files(rendered.saved_files), render_pending=False
         )

@@ -22,7 +22,6 @@ class SettingsRequestBody(BaseModel):
     color_mode: str | None = None
     auto_crop: StrictBool | None = None
     crop_margin: StrictBool | None = None
-    jpeg_quality: StrictInt | None = None
 
 
 class SettingsController:
@@ -52,7 +51,6 @@ class SettingsController:
             color_mode=body.color_mode,
             auto_crop=body.auto_crop,
             crop_margin=body.crop_margin,
-            jpeg_quality=body.jpeg_quality,
         )
         try:
             saved_settings = self._settings_service.update(update)

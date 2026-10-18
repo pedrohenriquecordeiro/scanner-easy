@@ -3,6 +3,7 @@ from typing import Any
 
 from PIL import Image, JpegImagePlugin
 
+from digitalizadora.domain.image_adjustment import REENCODING_JPEG_QUALITY
 from digitalizadora.domain.page_rotation import PageRotation
 
 NO_CHROMA_SUBSAMPLING = -1
@@ -21,10 +22,10 @@ def replace_with(image: Image.Image, transformation: Callable[[Image.Image], Ima
     return transformed
 
 
-def read_encoding_options(source: Image.Image, jpeg_quality: int) -> dict[str, Any]:
+def read_encoding_options(source: Image.Image) -> dict[str, Any]:
     """What the new JPEG must keep of the scanner's. The sampling is read before the transformations, because a
     transposed image loses its JPEG format and "keep" would then raise."""
-    options: dict[str, Any] = {"quality": jpeg_quality}
+    options: dict[str, Any] = {"quality": REENCODING_JPEG_QUALITY}
     subsampling = JpegImagePlugin.get_sampling(source)
     if subsampling != NO_CHROMA_SUBSAMPLING:
         options["subsampling"] = subsampling

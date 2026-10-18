@@ -4,7 +4,7 @@ from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment, rendered_size_factor
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, RENDERED_SIZE_FACTOR, ImageAdjustment
 from digitalizadora.domain.scan_quality import pixels_per_page
 from digitalizadora.domain.scan_settings import ScanSettings
 
@@ -24,7 +24,7 @@ def estimated_page_bytes(settings: ScanSettings, adjustment: ImageAdjustment = N
     unadjusted_bytes = round(pixels_per_page(settings.dots_per_inch) * ESTIMATED_BYTES_PER_PIXEL[settings.color_mode])
     if not adjustment.is_active:
         return unadjusted_bytes
-    return unadjusted_bytes * rendered_size_factor(adjustment.jpeg_quality)
+    return unadjusted_bytes * RENDERED_SIZE_FACTOR
 
 
 def read_free_space_in_bytes(folder: Path) -> int:
