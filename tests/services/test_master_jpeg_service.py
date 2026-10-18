@@ -11,6 +11,7 @@ from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
+from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from tests.fakes.synthetic_scans import build_marked_scan_jpeg, build_scan_jpeg, read_jpeg_size
 
 PAGE_SIZE = (80, 120)
@@ -24,7 +25,7 @@ SETTINGS = ScanSettings(600, ColorMode.COLOR)
 
 @pytest.fixture
 def master_jpeg_service() -> MasterJpegService:
-    return MasterJpegService(ImageAdjustmentService(), JpegResolutionService())
+    return MasterJpegService(ImageAdjustmentService(PageCropDetectionService()), JpegResolutionService())
 
 
 def build_request(adjustment: ImageAdjustment = NO_ADJUSTMENT) -> ScanRequest:

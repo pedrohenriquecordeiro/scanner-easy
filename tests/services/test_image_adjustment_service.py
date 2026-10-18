@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, JpegImagePlugin
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
+from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from tests.fakes.synthetic_scans import (
     build_marked_scan_jpeg,
     build_scan_jpeg,
@@ -25,7 +26,7 @@ CROP = ImageAdjustment(auto_crop=True)
 
 @pytest.fixture
 def service() -> ImageAdjustmentService:
-    return ImageAdjustmentService()
+    return ImageAdjustmentService(PageCropDetectionService())
 
 
 @pytest.fixture

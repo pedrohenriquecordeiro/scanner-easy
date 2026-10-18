@@ -45,6 +45,7 @@ from digitalizadora.services.image_adjustment_service import ImageAdjustmentServ
 from digitalizadora.services.image_pixel_limit import raise_decompression_limit_to_scanner_size
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
+from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
 from digitalizadora.services.scan_encoder import ScanEncoder
@@ -104,6 +105,7 @@ class _SharedServices:
     """A single clock, master JPEG service, scan encoder and storage guard for the whole container."""
 
     clock: Clock
+    crop_detection: PageCropDetectionService
     master_jpeg_service: MasterJpegService
     scan_encoder: ScanEncoder
     storage_guard: StorageGuardService
@@ -220,9 +222,11 @@ def _build_gateway_factory(scanner_access: _ScannerAccess) -> Callable[[ScannerE
 
 
 def _build_shared_services(clock: Clock, overrides: ContainerOverrides) -> _SharedServices:
-    master_jpeg_service = MasterJpegService(ImageAdjustmentService(), JpegResolutionService())
+    crop_detection = PageCropDetectionService()
+    master_jpeg_service = MasterJpegService(ImageAdjustmentService(crop_detection), JpegResolutionService())
     return _SharedServices(
         clock=clock,
+        crop_detection=crop_detection,
         master_jpeg_service=master_jpeg_service,
         scan_encoder=ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()),
         storage_guard=_build_storage_guard_service(overrides),

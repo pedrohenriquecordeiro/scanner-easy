@@ -20,6 +20,7 @@ from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
+from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.storage_guard_service import (
@@ -58,7 +59,7 @@ def free_space_reader() -> RecordingFreeSpaceReader:
 
 @pytest.fixture
 def scan_encoder() -> ScanEncoder:
-    master_jpeg_service = MasterJpegService(ImageAdjustmentService(), JpegResolutionService())
+    master_jpeg_service = MasterJpegService(ImageAdjustmentService(PageCropDetectionService()), JpegResolutionService())
     return ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService())
 
 
