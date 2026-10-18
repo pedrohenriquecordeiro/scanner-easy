@@ -2,7 +2,8 @@
 
 // Wires the Documento section of the page to the pure rules of document-page-policy.js; it decides nothing by itself.
 // build_scan_page (application.js) creates it with page_services = {send_request, format_byte_count, error_banner,
-// focus_scan_button, refresh_page_controls}. Uses IDLE_PHASE from scan-trigger-policy.js.
+// focus_scan_button, refresh_page_controls}. Uses IDLE_PHASE from scan-trigger-policy.js and DEFAULT_DOTS_PER_INCH from
+// scan-quality-policy.js.
 
 const DOCUMENT_PATH = "/api/document";
 const DOCUMENT_PAGES_PATH = `${DOCUMENT_PATH}/pages`;
@@ -27,12 +28,16 @@ const DAMAGED_PAGE_CLASS = "is-damaged";
 const DROP_BEFORE_CLASS = "is-drop-before";
 const DROP_AFTER_CLASS = "is-drop-after";
 const DECIMAL_RADIX = 10;
-const FINALIZE_ACCEPT_LABEL = "Finalizar";
+const SAVE_ACCEPT_LABEL = "Salvar";
 const CANCEL_ACCEPT_LABEL = "Cancelar documento";
 const DOCUMENT_CANCELLED_ANNOUNCEMENT = "Documento cancelado.";
 
 function build_page_path(page_identifier) {
   return `${DOCUMENT_PAGES_PATH}/${page_identifier}`;
+}
+
+function build_page_rotation_path(page_identifier) {
+  return `${build_page_path(page_identifier)}/rotation`;
 }
 
 function build_page_thumbnail_path(page_identifier) {
@@ -65,7 +70,7 @@ class DocumentPanel {
     this.previous_observation = null;
     this.last_event = DOCUMENT_EVENTS.NONE;
     this.scan_activity = { scan_phase: IDLE_PHASE, is_start_request_pending: false };
-    this.scan_preset = DEFAULT_SCAN_PRESET;
+    this.dots_per_inch = DEFAULT_DOTS_PER_INCH;
     this.is_edit_pending = false;
     this.is_finalizing = false;
     this.is_dialog_armed = true;
@@ -107,7 +112,7 @@ class DocumentPanel {
     this.elements.cancel_document_button.addEventListener("click", (event) =>
       this.request_cancel(read_action_origin(event)),
     );
-    this.elements.finalize_document_button.addEventListener("click", (event) =>
+    this.elements.save_document_button.addEventListener("click", (event) =>
       this.request_finalize(read_action_origin(event)),
     );
     this.bind_dialog_buttons(this.elements.confirmation_accept_button, this.elements.confirmation_reject_button);
@@ -177,7 +182,7 @@ class DocumentPanel {
     };
     this.last_event = next_document_event(this.previous_observation, observation, this.last_event);
     this.previous_observation = observation;
-    this.scan_preset = scan_observation.scan_preset;
+    this.dots_per_inch = scan_observation.dots_per_inch;
     const rendered_version = this.read_rendered_version();
     const is_rendered =
       rendered_version !== null &&
@@ -295,13 +300,20 @@ class DocumentPanel {
       move_left_button: this.build_tile_button("page-move-left", "◀"),
       move_right_button: this.build_tile_button("page-move-right", "▶"),
       delete_button: this.build_tile_button("page-delete", "×"),
+      rotate_button: this.build_tile_button("page-rotate", "Girar ↻"),
       move_to_button: this.build_tile_button("page-move-to", "Mover para…"),
     };
     const actions = document.createElement("div");
     actions.className = "page-actions";
-    // The DOM order is the Tab order, so it follows the visual order: ◀ ▶ × on the first row, then the full-width
+    // The DOM order is the Tab order, so it follows the visual order: ◀ ▶ × on the first row, then "Girar ↻" and
     // "Mover para…".
-    actions.append(tile.move_left_button, tile.move_right_button, tile.delete_button, tile.move_to_button);
+    actions.append(
+      tile.move_left_button,
+      tile.move_right_button,
+      tile.delete_button,
+      tile.rotate_button,
+      tile.move_to_button,
+    );
     item.append(thumbnail, placeholder, number, actions);
     this.bind_tile(tile);
     return tile;
@@ -333,6 +345,9 @@ class DocumentPanel {
     tile.delete_button.addEventListener("click", (event) =>
       this.delete_page(page_identifier, read_action_origin(event)),
     );
+    tile.rotate_button.addEventListener("click", (event) =>
+      this.rotate_page(page_identifier, read_action_origin(event)),
+    );
     item.addEventListener("dragstart", (event) => {
       event.dataTransfer.setData(DRAG_DATA_FORMAT, page_identifier);
       event.dataTransfer.effectAllowed = DRAG_EFFECT;
@@ -355,6 +370,7 @@ class DocumentPanel {
     tile.move_right_button.setAttribute("aria-label", `Mover a página ${position} para a direita`);
     tile.move_to_button.setAttribute("aria-label", `Mover a página ${position} para outra posição`);
     tile.delete_button.setAttribute("aria-label", `Excluir a página ${position}`);
+    tile.rotate_button.setAttribute("aria-label", `Girar a página ${position} 90 graus para a direita`);
   }
 
   render_notices(body) {
@@ -385,9 +401,10 @@ class DocumentPanel {
       tile.move_right_button.disabled = !can_edit || tile.position === page_count;
       tile.move_to_button.disabled = !can_edit || page_count === 1;
       tile.delete_button.disabled = !can_edit;
+      tile.rotate_button.disabled = !can_edit;
     }
-    const { discard_last_page_button, cancel_document_button, finalize_document_button } = this.elements;
-    for (const button of [discard_last_page_button, cancel_document_button, finalize_document_button]) {
+    const { discard_last_page_button, cancel_document_button, save_document_button } = this.elements;
+    for (const button of [discard_last_page_button, cancel_document_button, save_document_button]) {
       button.disabled = !can_edit || page_count === 0;
     }
   }
@@ -405,7 +422,7 @@ class DocumentPanel {
     return describe_document_status(scan_phase, {
       page_count: this.page_tiles.size,
       last_event: this.last_event,
-      scan_preset: this.scan_preset,
+      dots_per_inch: this.dots_per_inch,
       is_finalizing: this.is_finalizing,
     });
   }
@@ -512,6 +529,8 @@ class DocumentPanel {
       this.page_services.focus_scan_button();
     } else if (focus.target === FOCUS_TARGETS.DELETE_BUTTON) {
       tile.delete_button.focus();
+    } else if (focus.target === FOCUS_TARGETS.ROTATE_BUTTON) {
+      tile.rotate_button.focus();
     } else {
       // The arrow that was used, or the other one once the page reached that end of the grid.
       const used_button = action_context.offset === MOVE_LEFT_OFFSET ? tile.move_left_button : tile.move_right_button;
@@ -567,6 +586,27 @@ class DocumentPanel {
       acted_position: position,
       ...action_origin,
     });
+  }
+
+  async rotate_page(page_identifier, action_origin) {
+    if (!this.can_edit()) {
+      return;
+    }
+    const position = this.read_page_identifiers().indexOf(page_identifier) + 1;
+    const body = await this.run_edit({ method: "POST", path: build_page_rotation_path(page_identifier) });
+    if (body !== null) {
+      this.announce(describe_page_rotation(position));
+    }
+    // A damaged page already took the focus on its × (report_failure); otherwise the Girar button of this position
+    // gets it back, whose page has a new identifier after a rotation.
+    if (body !== null || this.damaged_page_identifier !== page_identifier) {
+      this.apply_focus({
+        action: DOCUMENT_ACTIONS.ROTATE,
+        acted_page_identifier: page_identifier,
+        acted_position: position,
+        ...action_origin,
+      });
+    }
   }
 
   async reorder_pages(page_reorder) {
@@ -691,8 +731,8 @@ class DocumentPanel {
       return;
     }
     const is_confirmed = await this.confirm_action({
-      question: `Finalizar o PDF com ${describe_page_count(this.page_tiles.size)}?`,
-      accept_label: FINALIZE_ACCEPT_LABEL,
+      question: `Salvar o PDF com ${describe_page_count(this.page_tiles.size)}?`,
+      accept_label: SAVE_ACCEPT_LABEL,
       initial_focus: DIALOG_INITIAL_FOCUS.ACCEPT,
       opened_by_keyboard: action_origin.is_keyboard_initiated,
     });
@@ -727,7 +767,7 @@ class DocumentPanel {
       this.notify_activity_change();
     }
     if (!is_name_saved) {
-      // The refused name is already in the banner; the field gets the focus to fix it before finalizing.
+      // The refused name is already in the banner; the field gets the focus to fix it before saving.
       this.elements.document_name_input.focus();
     } else if (failure !== null) {
       this.report_failure(failure);

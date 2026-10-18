@@ -10,6 +10,17 @@ HARNESS_PATH = Path(__file__).resolve().parent / "scan-page-harness.js"
 HARNESS_TIMEOUT_SECONDS = 30
 SCAN_ALREADY_RUNNING_MESSAGE = "Já existe uma digitalização em andamento."
 SCANNING_MESSAGE = "Digitalizando… (cerca de 15 s)"
+SLOW_RESOLUTION_WARNING = "1200 dpi pode levar vários minutos e gerar arquivos muito grandes."
+SETTINGS_BODY = {
+    "output_folder": "/Users/teste/Digitalizadora",
+    "output_format": "pdf",
+    "dots_per_inch": 300,
+    "color_mode": "color",
+    "scan_preset": "document",
+    "capture_mode": "single",
+    "rotation_degrees": 0,
+    "auto_crop": False,
+}
 OUTPUT_FOLDER_UNAVAILABLE_TEXT = "Pasta de saída indisponível. Se for um disco externo, confira se está conectado."
 
 pytestmark = pytest.mark.skipif(
@@ -49,6 +60,10 @@ def test_space_on_the_focused_scan_button_starts_one_scan(scenario_results: dict
         "space_on_the_preset_select",
         "space_on_a_format_option",
         "space_on_the_folder_save_button",
+        "space_on_the_resolution_select",
+        "space_on_the_color_mode_select",
+        "space_on_the_rotation_select",
+        "space_on_the_auto_crop_checkbox",
     ],
 )
 def test_space_keeps_its_own_meaning_in_other_controls(scenario_results: dict, scenario_name: str) -> None:
@@ -164,3 +179,90 @@ def test_pages_remaining_are_described_in_portuguese(
     scenario_results: dict, page_count: str, expected_text: str
 ) -> None:
     assert scenario_results["page_counts"][page_count] == expected_text
+
+
+@pytest.mark.parametrize(
+    ("scenario_name", "changes"),
+    [
+        ("change_the_resolution", {"dots_per_inch": 600}),
+        ("change_the_color_mode", {"color_mode": "grayscale"}),
+        ("change_the_rotation", {"rotation_degrees": 180}),
+        ("turn_auto_crop_on", {"auto_crop": True}),
+        ("choose_a_preset", {"scan_preset": "photo", "dots_per_inch": None, "color_mode": None}),
+    ],
+)
+def test_changing_a_setting_sends_all_the_saved_settings_with_the_change(
+    scenario_results: dict, scenario_name: str, changes: dict
+) -> None:
+    assert scenario_results[scenario_name]["settings_request_body"] == {**SETTINGS_BODY, **changes}
+
+
+@pytest.mark.parametrize(
+    "scenario_name",
+    ["change_the_resolution", "change_the_color_mode", "change_the_rotation", "turn_auto_crop_on", "choose_a_preset"],
+)
+def test_the_scan_button_gets_the_focus_after_a_setting_change(scenario_results: dict, scenario_name: str) -> None:
+    assert scenario_results[scenario_name]["scan_button_focused"] is True
+
+
+def test_a_rotation_value_that_is_not_an_angle_is_sent_as_no_rotation(scenario_results: dict) -> None:
+    assert scenario_results["rotation_value_that_is_not_an_angle"] == 0
+
+
+def test_saved_settings_fill_the_quality_controls(scenario_results: dict) -> None:
+    controls = scenario_results["default_settings_controls"]
+    assert (controls["preset"], controls["resolution"], controls["color_mode"]) == ("document", "300", "color")
+
+
+def test_saved_settings_fill_the_rotation_and_crop_controls(scenario_results: dict) -> None:
+    controls = scenario_results["default_settings_controls"]
+    assert (controls["rotation"], controls["auto_crop"]) == ("0", False)
+
+
+def test_a_named_preset_hides_the_custom_option(scenario_results: dict) -> None:
+    assert scenario_results["default_settings_controls"]["custom_option_hidden"] is True
+
+
+def test_a_custom_combination_selects_the_custom_option(scenario_results: dict) -> None:
+    controls = scenario_results["custom_combination_controls"]
+    assert (controls["preset"], controls["custom_option_hidden"], controls["resolution"]) == ("custom", False, "400")
+
+
+def test_the_resolution_warning_is_hidden_at_300_dpi(scenario_results: dict) -> None:
+    controls = scenario_results["default_settings_controls"]
+    assert (controls["warning_hidden"], controls["warning_text"]) == (True, "")
+
+
+def test_the_resolution_warning_is_shown_at_1200_dpi(scenario_results: dict) -> None:
+    controls = scenario_results["slow_and_turned_controls"]
+    assert (controls["warning_hidden"], controls["warning_text"]) == (False, SLOW_RESOLUTION_WARNING)
+
+
+def test_saved_rotation_and_crop_fill_their_controls(scenario_results: dict) -> None:
+    controls = scenario_results["slow_and_turned_controls"]
+    assert (controls["rotation"], controls["auto_crop"], controls["color_mode"]) == ("90", True, "grayscale")
+
+
+def test_a_server_without_the_new_settings_leaves_rotation_and_crop_off(scenario_results: dict) -> None:
+    controls = scenario_results["old_server_controls"]
+    assert (controls["preset"], controls["rotation"], controls["auto_crop"]) == ("document", "0", False)
+
+
+def test_a_server_without_the_new_settings_shows_no_resolution_warning(scenario_results: dict) -> None:
+    assert scenario_results["old_server_controls"]["warning_hidden"] is True
+
+
+def test_a_refused_setting_shows_the_server_message(scenario_results: dict) -> None:
+    assert scenario_results["refused_resolution"]["banner_text"] == "A resolução escolhida não é aceita."
+
+
+def test_a_refused_setting_puts_the_controls_back_to_the_saved_values(scenario_results: dict) -> None:
+    assert scenario_results["refused_resolution"]["controls"]["resolution"] == "300"
+
+
+def test_rotation_hint_for_the_document_mode_is_hidden_in_quick_mode(scenario_results: dict) -> None:
+    assert scenario_results["rotation_hint_in_quick_mode"]["hint_hidden"] is True
+
+
+def test_scanning_status_follows_the_resolution(scenario_results: dict) -> None:
+    assert scenario_results["scanning_at_a_high_resolution"]["status_text"] == "Digitalizando… (vários minutos)"

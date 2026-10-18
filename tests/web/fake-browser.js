@@ -13,6 +13,7 @@ const vm = require("node:vm");
 const STATIC_DIRECTORY = path.resolve(__dirname, "..", "..", "src", "digitalizadora", "web", "static");
 const PAGE_SCRIPT_FILE_NAMES = [
   "scan-trigger-policy.js",
+  "scan-quality-policy.js",
   "error-banner.js",
   "document-page-policy.js",
   "document-panel.js",
@@ -194,10 +195,12 @@ class FakeDialog extends FakeElement {
     super(DIALOG_TAG_NAME, page_document);
     this.open = false;
     this.returnValue = "";
+    this.show_count = 0;
   }
 
   showModal() {
     this.open = true;
+    this.show_count += 1;
   }
 
   close(return_value) {

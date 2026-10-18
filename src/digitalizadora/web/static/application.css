@@ -261,6 +261,41 @@ button:disabled {
   gap: 0.375rem;
 }
 
+.quality-group {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem var(--size-gutter) var(--size-gutter);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.quality-group legend {
+  padding: 0 0.5rem;
+  font-weight: 600;
+}
+
+.field-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: var(--size-touch-target);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  accent-color: var(--color-accent);
+}
+
 .field > label {
   font-weight: 600;
 }
@@ -451,7 +486,7 @@ button:disabled {
 
 .page-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 0.25rem;
 }
 
@@ -460,8 +495,15 @@ button:disabled {
   padding: 0.25rem;
 }
 
+.page-actions .page-move-left,
+.page-actions .page-move-right,
+.page-actions .page-delete {
+  grid-column: span 2;
+}
+
+.page-actions .page-rotate,
 .page-actions .page-move-to {
-  grid-column: 1 / -1;
+  grid-column: span 3;
 }
 
 .document-bar {

@@ -8,7 +8,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const STATIC_DIRECTORY = path.resolve(__dirname, "..", "..", "src", "digitalizadora", "web", "static");
-const SCRIPT_FILE_NAMES = ["scan-trigger-policy.js", "document-page-policy.js"];
+const SCRIPT_FILE_NAMES = ["scan-trigger-policy.js", "scan-quality-policy.js", "document-page-policy.js"];
 const STANDARD_INPUT_DESCRIPTOR = 0;
 
 const SCAN_BUTTON = Object.freeze({ tagName: "BUTTON" });
@@ -46,7 +46,7 @@ const DEFAULT_OBSERVATION = Object.freeze({
 const DEFAULT_DOCUMENT_PROGRESS = Object.freeze({
   page_count: 2,
   last_event: "none",
-  scan_preset: "document",
+  dots_per_inch: 300,
   is_finalizing: false,
 });
 const DEFAULT_RECOVERY = Object.freeze({

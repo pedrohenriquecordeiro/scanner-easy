@@ -14,9 +14,28 @@ const PAGE_COUNTS = [0, 1, 1234];
 const SETTINGS = {
   output_folder: "/Users/teste/Digitalizadora",
   output_format: "pdf",
+  dots_per_inch: 300,
+  color_mode: "color",
   scan_preset: "document",
   capture_mode: "single",
+  rotation_degrees: 0,
+  auto_crop: false,
 };
+const OLD_SERVER_SETTINGS = {
+  output_folder: "/Users/teste/Digitalizadora",
+  output_format: "pdf",
+  scan_preset: "document",
+};
+const CUSTOM_SETTINGS = { ...SETTINGS, dots_per_inch: 400, scan_preset: null };
+const TURNED_SETTINGS = {
+  ...SETTINGS,
+  dots_per_inch: 1200,
+  color_mode: "grayscale",
+  scan_preset: null,
+  rotation_degrees: 90,
+  auto_crop: true,
+};
+const INVALID_SETTINGS_BODY = { code: "invalid_settings", message: "A resolução escolhida não é aceita." };
 const AVAILABLE_STORAGE = { free_space_in_bytes: 12e9, estimated_pages_remaining: 4000, output_folder_available: true };
 const LOW_STORAGE = { free_space_in_bytes: 1e9, estimated_pages_remaining: 300, output_folder_available: true };
 const UNAVAILABLE_STORAGE = { free_space_in_bytes: 0, estimated_pages_remaining: 0, output_folder_available: false };
@@ -31,8 +50,15 @@ function build_default_responses() {
   };
 }
 
-function build_state(scan_phase, storage) {
-  return { scan_phase, scans_completed: 0, last_result: null, last_error: null, settings: SETTINGS, storage };
+function build_state(scan_phase, storage, settings) {
+  return {
+    scan_phase,
+    scans_completed: 0,
+    last_result: null,
+    last_error: null,
+    settings: settings ?? SETTINGS,
+    storage,
+  };
 }
 
 function build_printer(route) {
@@ -50,6 +76,37 @@ class PageUnderTest extends BrowserPage {
     return key_event;
   }
 
+  async choose_option(element_identifier, option_value) {
+    const select = this.element(element_identifier);
+    select.value = option_value;
+    this.dispatch_simple_event(select, "change");
+    await this.flush();
+  }
+
+  async set_auto_crop(is_checked) {
+    const checkbox = this.element("auto-crop-checkbox");
+    checkbox.checked = is_checked;
+    this.dispatch_simple_event(checkbox, "change");
+    await this.flush();
+  }
+
+  read_settings_controls() {
+    return {
+      preset: this.element("preset-select").value,
+      custom_option_hidden: this.element("preset-custom-option").hidden,
+      resolution: this.element("resolution-select").value,
+      color_mode: this.element("color-mode-select").value,
+      rotation: this.element("rotation-select").value,
+      auto_crop: this.element("auto-crop-checkbox").checked,
+      warning_hidden: this.element("resolution-warning").hidden,
+      warning_text: this.element("resolution-warning-text").textContent,
+    };
+  }
+
+  settings_request_body() {
+    return this.find_request("PUT /api/settings").body;
+  }
+
   count_scan_requests() {
     return this.count_requests("POST /api/scans");
   }
@@ -61,6 +118,15 @@ async function load_page(response_overrides) {
   const page = new PageUnderTest(response_overrides);
   await page.load();
   return page;
+}
+
+async function change_setting_through(control_change) {
+  const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
+  await control_change(page);
+  return {
+    settings_request_body: page.settings_request_body(),
+    scan_button_focused: page.active_element() === page.element("scan-button"),
+  };
 }
 
 async function count_scans_after_space_on(element_identifier) {
@@ -80,6 +146,54 @@ const SCENARIOS = {
   space_on_the_preset_select: () => count_scans_after_space_on("preset-select"),
   space_on_a_format_option: () => count_scans_after_space_on("output-format-jpg"),
   space_on_the_folder_save_button: () => count_scans_after_space_on("output-folder-save-button"),
+  space_on_the_resolution_select: () => count_scans_after_space_on("resolution-select"),
+  space_on_the_color_mode_select: () => count_scans_after_space_on("color-mode-select"),
+  space_on_the_rotation_select: () => count_scans_after_space_on("rotation-select"),
+  space_on_the_auto_crop_checkbox: () => count_scans_after_space_on("auto-crop-checkbox"),
+  change_the_resolution: () => change_setting_through((page) => page.choose_option("resolution-select", "600")),
+  change_the_color_mode: () => change_setting_through((page) => page.choose_option("color-mode-select", "grayscale")),
+  change_the_rotation: () => change_setting_through((page) => page.choose_option("rotation-select", "180")),
+  turn_auto_crop_on: () => change_setting_through((page) => page.set_auto_crop(true)),
+  choose_a_preset: () => change_setting_through((page) => page.choose_option("preset-select", "photo")),
+  async rotation_value_that_is_not_an_angle() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
+    await page.choose_option("rotation-select", "45");
+    return page.settings_request_body().rotation_degrees;
+  },
+  async default_settings_controls() {
+    const page = await load_page({});
+    return page.read_settings_controls();
+  },
+  async custom_combination_controls() {
+    const page = await load_page({ "GET /api/settings": build_json_response(200, CUSTOM_SETTINGS) });
+    return page.read_settings_controls();
+  },
+  async slow_and_turned_controls() {
+    const page = await load_page({ "GET /api/settings": build_json_response(200, TURNED_SETTINGS) });
+    return page.read_settings_controls();
+  },
+  async old_server_controls() {
+    const page = await load_page({ "GET /api/settings": build_json_response(200, OLD_SERVER_SETTINGS) });
+    return page.read_settings_controls();
+  },
+  async refused_resolution() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(422, INVALID_SETTINGS_BODY) });
+    await page.choose_option("resolution-select", "600");
+    return {
+      banner_text: page.element("error-banner-text").textContent,
+      controls: page.read_settings_controls(),
+    };
+  },
+  async rotation_hint_in_quick_mode() {
+    const page = await load_page({});
+    return { hint_hidden: page.element("rotation-document-hint").hidden };
+  },
+  async scanning_at_a_high_resolution() {
+    const page = await load_page({
+      "GET /api/state": build_json_response(200, build_state("scanning", AVAILABLE_STORAGE, TURNED_SETTINGS)),
+    });
+    return { status_text: page.element("status-line").textContent };
+  },
   async repeated_space_only() {
     const page = await load_page({});
     const key_event = await page.press_space(page.document.body, true);

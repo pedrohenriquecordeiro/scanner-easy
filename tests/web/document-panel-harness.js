@@ -17,12 +17,13 @@ const FIRST_PAGE = "0000000000000001";
 const SECOND_PAGE = "0000000000000002";
 const THIRD_PAGE = "0000000000000003";
 const FOURTH_PAGE = "0000000000000004";
+const ROTATED_PAGE = "0000000000000009";
 const THREE_PAGES = [FIRST_PAGE, SECOND_PAGE, THIRD_PAGE];
 const FOUR_PAGES = [...THREE_PAGES, FOURTH_PAGE];
 const PAGE_SIZE_IN_BYTES = 806123;
 const SCANNED_AT = "2026-10-17T10:00:00-03:00";
 const POLL_DELAYS_MILLISECONDS = [0, 500, 2000];
-const TILE_BUTTON_INDEXES = Object.freeze({ move_left: 0, move_right: 1, delete: 2, move_to: 3 });
+const TILE_BUTTON_INDEXES = Object.freeze({ move_left: 0, move_right: 1, delete: 2, rotate: 3, move_to: 4 });
 const RECOVERY_SWITCH_STORAGE_KEY = "digitalizadora.recovery_switch_session";
 const TILE_ACTIONS_INDEX = 3;
 const RIGHT_HALF_POSITION = 90;
@@ -30,8 +31,12 @@ const RIGHT_HALF_POSITION = 90;
 const QUICK_SETTINGS = {
   output_folder: "/Users/teste/Digitalizadora",
   output_format: "pdf",
+  dots_per_inch: 300,
+  color_mode: "color",
   scan_preset: "document",
   capture_mode: "single",
+  rotation_degrees: 0,
+  auto_crop: false,
 };
 const DOCUMENT_SETTINGS = { ...QUICK_SETTINGS, capture_mode: "document" };
 const AVAILABLE_STORAGE = { free_space_in_bytes: 12e9, estimated_pages_remaining: 4000, output_folder_available: true };
@@ -59,7 +64,7 @@ const SCAN_ALREADY_RUNNING_BODY = {
 };
 const DOCUMENT_BUSY_BODY = {
   code: "document_busy",
-  message: "O documento está sendo finalizado ou alterado. Aguarde um instante e tente de novo.",
+  message: "O documento está sendo salvo ou alterado. Aguarde um instante e tente de novo.",
 };
 const INVALID_PAGE_ORDER_BODY = {
   code: "invalid_page_order",
@@ -70,6 +75,13 @@ const INVALID_DOCUMENT_NAME_BODY = {
   message:
     "Nome de documento inválido: comprido demais ou só com pontos e caracteres invisíveis. " +
     "Use um nome mais curto, com letras ou números.",
+};
+const ROTATION_PATH_KEY = `POST /api/document/pages/${SECOND_PAGE}/rotation`;
+const IMAGE_ADJUSTMENT_FAILED_BODY = {
+  code: "image_adjustment_failed",
+  message:
+    "Não consegui girar ou cortar a imagem com a memória livre do Mac. " +
+    "Escolha uma resolução menor, desligue o corte automático e tente de novo.",
 };
 const DAMAGED_PAGE_BODY = {
   code: "damaged_document_page",
@@ -217,7 +229,7 @@ class DocumentPageUnderTest extends BrowserPage {
   }
 
   async open_and_accept_the_finalize_confirmation() {
-    await this.click(this.element("finalize-document-button"));
+    await this.click(this.element("save-document-button"));
     await this.click(this.element("confirmation-accept-button"));
   }
 
@@ -254,6 +266,7 @@ const SCENARIOS = {
       summary_text: page.element("document-summary").textContent,
       storage_line_hidden: page.element("storage-line").hidden,
       draft_storage_text: page.element("draft-storage-line").textContent,
+      rotation_hint_hidden: page.element("rotation-document-hint").hidden,
     };
   },
   async grid_tiles() {
@@ -269,6 +282,8 @@ const SCENARIOS = {
       first_left_disabled: page.tile_button(1, "move_left").disabled,
       last_right_disabled: page.tile_button(3, "move_right").disabled,
       delete_label: page.tile_button(2, "delete").getAttribute("aria-label"),
+      rotate_text: page.tile_button(2, "rotate").textContent,
+      rotate_class: page.tile_button(2, "rotate").className,
       draggable: first_tile.draggable,
       first_tile_action_labels: first_tile.children[TILE_ACTIONS_INDEX].children.map((button) =>
         button.getAttribute("aria-label"),
@@ -336,6 +351,100 @@ const SCENARIOS = {
       announcement: page.element("document-announcement").textContent,
     };
   },
+  async enter_on_the_save_button() {
+    const page = await load_page({});
+    await page.press_with_keyboard(page.element("save-document-button"));
+    const dialog = page.element("confirmation-dialog");
+    return {
+      dialog_shown_times: dialog.show_count,
+      accept_label: page.element("confirmation-accept-button").textContent,
+      finalize_requests: page.count_requests("POST /api/document/finalize"),
+    };
+  },
+  async enter_on_the_rotation_select() {
+    const page = await load_page({});
+    page.element("rotation-select").focus();
+    await page.press_key("Enter");
+    return {
+      dialog_shown_times: page.element("confirmation-dialog").show_count,
+      finalize_requests: page.count_requests("POST /api/document/finalize"),
+    };
+  },
+  async keyboard_rotate() {
+    const page = await load_page({
+      [ROTATION_PATH_KEY]: respond(
+        build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] }),
+      ),
+    });
+    await page.press_with_keyboard(page.tile_button(2, "rotate"));
+    return {
+      rotation_requests: page.count_requests(ROTATION_PATH_KEY),
+      request_headers: page.find_request(ROTATION_PATH_KEY).headers,
+      page_identifiers: page.grid_page_identifiers(),
+      thumbnail_source: page.tile_at(2).children[0].src,
+      focus: page.describe_focus(),
+      announcement: page.element("document-announcement").textContent,
+    };
+  },
+  async pointer_rotate() {
+    const page = await load_page({
+      [ROTATION_PATH_KEY]: respond(
+        build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] }),
+      ),
+    });
+    await page.click(page.tile_button(2, "rotate"));
+    return { scan_button_focused: page.is_focused("scan-button") };
+  },
+  async space_after_clicking_rotate() {
+    const page = await load_page({
+      [ROTATION_PATH_KEY]: respond(
+        build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] }),
+      ),
+    });
+    await page.click(page.tile_button(2, "rotate"));
+    await page.press_key("Space");
+    return {
+      rotation_requests: page.count_requests(ROTATION_PATH_KEY),
+      page_requests: page.count_requests("POST /api/document/pages"),
+    };
+  },
+  async rotate_while_a_page_scans() {
+    const page = await load_page({});
+    await page.poll(build_state({ revision: 1, page_count: 3, scans_completed: 3, scan_phase: "scanning" }));
+    const rotate_disabled = page.tile_button(2, "rotate").disabled;
+    await page.click(page.tile_button(2, "rotate"));
+    return { rotate_disabled, rotation_requests: page.count_requests(ROTATION_PATH_KEY) };
+  },
+  async rotate_while_the_request_is_pending() {
+    const rotation_answer = build_deferred_response();
+    const page = await load_page({ [ROTATION_PATH_KEY]: rotation_answer });
+    await page.click(page.tile_button(2, "rotate"));
+    const disabled_during = [1, 2, 3].map((position) => page.tile_button(position, "rotate").disabled);
+    rotation_answer.answer(
+      respond(build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] })),
+    );
+    await page.flush();
+    return { disabled_during, disabled_after: page.tile_button(2, "rotate").disabled };
+  },
+  async rotate_refused_by_a_conflict() {
+    const page = await load_page({ [ROTATION_PATH_KEY]: build_json_response(409, SCAN_ALREADY_RUNNING_BODY) });
+    await page.press_with_keyboard(page.tile_button(2, "rotate"));
+    return { banner: page.banner(), page_identifiers: page.grid_page_identifiers(), focus: page.describe_focus() };
+  },
+  async rotate_without_enough_memory() {
+    const page = await load_page({ [ROTATION_PATH_KEY]: build_json_response(500, IMAGE_ADJUSTMENT_FAILED_BODY) });
+    await page.click(page.tile_button(2, "rotate"));
+    return { banner: page.banner(), page_identifiers: page.grid_page_identifiers() };
+  },
+  async rotate_a_damaged_page() {
+    const page = await load_page({ [ROTATION_PATH_KEY]: build_json_response(409, DAMAGED_PAGE_BODY) });
+    await page.press_with_keyboard(page.tile_button(2, "rotate"));
+    const damaged_identifiers = page
+      .element("document-page-grid")
+      .children.filter((tile) => tile.classList.contains("is-damaged"))
+      .map((tile) => tile.dataset.pageIdentifier);
+    return { damaged_identifiers, focus: page.describe_focus(), banner: page.banner() };
+  },
   async held_backspace() {
     const page = await load_page({});
     const first_key_down = await page.key_down("Backspace");
@@ -377,14 +486,14 @@ const SCENARIOS = {
   },
   async space_opened_confirmation_takes_the_first_enter() {
     const page = await load_page({});
-    page.element("finalize-document-button").focus();
+    page.element("save-document-button").focus();
     await page.press_key("Space");
     await page.press_key("Enter");
     return { finalize_requests: page.count_requests("POST /api/document/finalize") };
   },
   async space_in_the_confirmation() {
     const page = await load_page({});
-    await page.click(page.element("finalize-document-button"));
+    await page.click(page.element("save-document-button"));
     await page.press_key("Space");
     return {
       dialog_open: page.element("confirmation-dialog").open,

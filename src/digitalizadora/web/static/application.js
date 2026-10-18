@@ -1,8 +1,9 @@
 "use strict";
 
-// Uses IDLE_PHASE, SPACE_KEY_ACTIONS, decide_space_key_action and can_start_scan from scan-trigger-policy.js,
-// ErrorBanner from error-banner.js, CAPTURE_MODES, ENTER_KEY_CODE and the can_, should_ and describe_ rules from
-// document-page-policy.js, and DocumentPanel from document-panel.js; index.html loads them first, in this order.
+// Uses IDLE_PHASE, SPACE_KEY_ACTIONS, decide_space_key_action and can_start_scan from scan-trigger-policy.js, the
+// quality, rotation and duration rules from scan-quality-policy.js, ErrorBanner from error-banner.js, CAPTURE_MODES,
+// ENTER_KEY_CODE and the can_, should_ and describe_ rules from document-page-policy.js, and DocumentPanel from
+// document-panel.js; index.html loads them first, in this order.
 
 const REQUIRED_HEADER_NAME = "X-Requested-With";
 const REQUIRED_HEADER_VALUE = "digitalizadora";
@@ -11,7 +12,7 @@ const RECOVERY_SWITCH_STORAGE_KEY = "digitalizadora.recovery_switch_session";
 const PREPARING_PHASE = "preparing";
 const PHASE_MESSAGES = {
   preparing: () => "Preparando…",
-  scanning: (scan_preset) => `Digitalizando… (${describe_expected_scan_duration(scan_preset)})`,
+  scanning: (dots_per_inch) => `Digitalizando… (${describe_expected_scan_duration(dots_per_inch)})`,
   saving: () => "Salvando…",
 };
 const SCAN_REQUEST_PATHS = Object.freeze({ single: "/api/scans", document: "/api/document/pages" });
@@ -25,7 +26,7 @@ const UNEXPECTED_ERROR_CODE = "unexpected_error";
 const SCAN_BUTTON_READY_LABEL = "Digitalizar";
 const SCAN_BUTTON_ADD_PAGE_LABEL = "Adicionar página";
 const SCAN_BUTTON_BUSY_LABEL = "Digitalizando…";
-const SCAN_BUTTON_FINALIZING_LABEL = "Finalizando…";
+const SCAN_BUTTON_SAVING_LABEL = "Salvando…";
 
 const ACTIVE_POLL_INTERVAL_MILLISECONDS = 500;
 const IDLE_POLL_INTERVAL_MILLISECONDS = 2000;
@@ -126,7 +127,7 @@ function format_scan_time(scanned_at) {
 function describe_scan_status(state) {
   if (state.scan_phase !== IDLE_PHASE) {
     const describe_phase = PHASE_MESSAGES[state.scan_phase];
-    return describe_phase === undefined ? "" : describe_phase(state.settings.scan_preset);
+    return describe_phase === undefined ? "" : describe_phase(state.settings.dots_per_inch);
   }
   if (state.last_error !== null) {
     return LAST_SCAN_FAILED_MESSAGE;
@@ -142,7 +143,7 @@ function choose_scan_button_label(scan_button_state) {
     return SCAN_BUTTON_BUSY_LABEL;
   }
   if (scan_button_state.is_finalizing) {
-    return SCAN_BUTTON_FINALIZING_LABEL;
+    return SCAN_BUTTON_SAVING_LABEL;
   }
   const is_document_mode = scan_button_state.capture_mode === CAPTURE_MODES.DOCUMENT;
   return is_document_mode ? SCAN_BUTTON_ADD_PAGE_LABEL : SCAN_BUTTON_READY_LABEL;
@@ -228,7 +229,7 @@ function collect_elements() {
     document_large_warning: document.getElementById("document-large-warning"),
     discard_last_page_button: document.getElementById("discard-last-page-button"),
     cancel_document_button: document.getElementById("cancel-document-button"),
-    finalize_document_button: document.getElementById("finalize-document-button"),
+    save_document_button: document.getElementById("save-document-button"),
     draft_storage_line: document.getElementById("draft-storage-line"),
     draft_storage_warning: document.getElementById("draft-storage-warning"),
     document_announcement: document.getElementById("document-announcement"),
@@ -238,6 +239,14 @@ function collect_elements() {
       jpg: document.getElementById("output-format-jpg"),
     },
     preset_select: document.getElementById("preset-select"),
+    preset_custom_option: document.getElementById("preset-custom-option"),
+    resolution_select: document.getElementById("resolution-select"),
+    color_mode_select: document.getElementById("color-mode-select"),
+    resolution_warning: document.getElementById("resolution-warning"),
+    resolution_warning_text: document.getElementById("resolution-warning-text"),
+    rotation_select: document.getElementById("rotation-select"),
+    rotation_document_hint: document.getElementById("rotation-document-hint"),
+    auto_crop_checkbox: document.getElementById("auto-crop-checkbox"),
     output_folder_input: document.getElementById("output-folder-input"),
     output_folder_save_button: document.getElementById("output-folder-save-button"),
     output_folder_message: document.getElementById("output-folder-message"),
@@ -297,7 +306,7 @@ class ScanPage {
   }
 
   bind_events() {
-    const { scan_button, preset_select, output_folder_input, output_folder_save_button, format_inputs } = this.elements;
+    const { scan_button, output_folder_input, output_folder_save_button, format_inputs } = this.elements;
     scan_button.addEventListener("click", () => this.start_scan());
     document.addEventListener("keydown", (event) => this.handle_key_down(event));
     document.addEventListener("keyup", (event) => this.handle_key_up(event));
@@ -310,7 +319,7 @@ class ScanPage {
     this.elements.return_to_document_button.addEventListener("click", () =>
       this.change_setting({ capture_mode: CAPTURE_MODES.DOCUMENT }),
     );
-    preset_select.addEventListener("change", () => this.change_setting({ scan_preset: preset_select.value }));
+    this.bind_quality_events();
     output_folder_save_button.addEventListener("click", () => this.save_output_folder());
     output_folder_input.addEventListener("keydown", (event) => {
       if (event.code === ENTER_KEY_CODE) {
@@ -318,6 +327,21 @@ class ScanPage {
       }
     });
     this.document_panel.bind_events();
+  }
+
+  bind_quality_events() {
+    const { preset_select, resolution_select, color_mode_select, rotation_select, auto_crop_checkbox } = this.elements;
+    preset_select.addEventListener("change", () => this.change_setting(build_preset_changes(preset_select.value)));
+    resolution_select.addEventListener("change", () =>
+      this.change_setting({ dots_per_inch: Number(resolution_select.value) }),
+    );
+    color_mode_select.addEventListener("change", () => this.change_setting({ color_mode: color_mode_select.value }));
+    rotation_select.addEventListener("change", () =>
+      this.change_setting({ rotation_degrees: parse_rotation_degrees(rotation_select.value) }),
+    );
+    auto_crop_checkbox.addEventListener("change", () =>
+      this.change_setting({ auto_crop: auto_crop_checkbox.checked }),
+    );
   }
 
   capture_mode() {
@@ -417,7 +441,7 @@ class ScanPage {
         scans_completed: state.scans_completed,
         last_error_code: state.last_error === null ? null : state.last_error.code,
         capture_mode: this.capture_mode(),
-        scan_preset: state.settings.scan_preset,
+        dots_per_inch: state.settings.dots_per_inch,
       });
     }
     this.render_activity();
@@ -554,6 +578,7 @@ class ScanPage {
     const capture_mode = this.capture_mode();
     this.elements.capture_mode_inputs[capture_mode].checked = true;
     this.elements.output_format_group.hidden = capture_mode === CAPTURE_MODES.DOCUMENT;
+    this.elements.rotation_document_hint.hidden = capture_mode !== CAPTURE_MODES.DOCUMENT;
     if (capture_mode === CAPTURE_MODES.DOCUMENT) {
       this.document_panel.show();
     } else {
@@ -611,9 +636,32 @@ class ScanPage {
   apply_saved_settings(settings) {
     this.saved_settings = settings;
     this.elements.format_inputs[settings.output_format].checked = true;
-    this.elements.preset_select.value = settings.scan_preset;
     this.elements.output_folder_input.value = settings.output_folder;
+    this.render_quality_controls(settings);
+    this.render_adjustment_controls(settings);
     this.render_capture_mode();
+  }
+
+  render_quality_controls(settings) {
+    const { preset_select, preset_custom_option, resolution_select, color_mode_select } = this.elements;
+    preset_select.value = choose_preset_option(settings);
+    // "Personalizada" shows up only while the combination is not one of the presets, and it cannot be picked.
+    preset_custom_option.hidden = preset_select.value !== CUSTOM_PRESET_VALUE;
+    // A server from before these settings sends neither: the lists stay as they are.
+    resolution_select.value = String(settings.dots_per_inch ?? resolution_select.value);
+    color_mode_select.value = settings.color_mode ?? color_mode_select.value;
+    this.render_resolution_warning(settings.dots_per_inch);
+  }
+
+  render_resolution_warning(dots_per_inch) {
+    const warning_text = describe_resolution_warning(dots_per_inch);
+    this.elements.resolution_warning.hidden = warning_text === null;
+    this.elements.resolution_warning_text.textContent = warning_text ?? "";
+  }
+
+  render_adjustment_controls(settings) {
+    this.elements.rotation_select.value = String(settings.rotation_degrees ?? NO_ROTATION_DEGREES);
+    this.elements.auto_crop_checkbox.checked = settings.auto_crop === true;
   }
 
   async send_settings(settings) {

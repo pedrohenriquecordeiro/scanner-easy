@@ -5,8 +5,18 @@ from tests.web.panel_scenario_runner import NODE_EXECUTABLE, run_panel_scenarios
 FIRST_PAGE = "0000000000000001"
 SECOND_PAGE = "0000000000000002"
 THIRD_PAGE = "0000000000000003"
-NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter finaliza."
+NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter salva."
 FINISHED_TEXT = "Pronto! Salvo como Contrato.pdf (3 páginas)"
+SAVED_SETTINGS = {
+    "output_folder": "/Users/teste/Digitalizadora",
+    "output_format": "pdf",
+    "dots_per_inch": 300,
+    "color_mode": "color",
+    "scan_preset": "document",
+    "capture_mode": "single",
+    "rotation_degrees": 0,
+    "auto_crop": False,
+}
 
 SCENARIO_NAMES = (
     "idle_document_page",
@@ -105,17 +115,18 @@ def test_tile_buttons_follow_the_visual_order_for_the_tab_key(scenario_results: 
         "Mover a página 1 para a esquerda",
         "Mover a página 1 para a direita",
         "Excluir a página 1",
+        "Girar a página 1 90 graus para a direita",
         "Mover a página 1 para outra posição",
     ]
 
 
-def test_big_button_is_disabled_while_finalizing(scenario_results: dict) -> None:
+def test_big_button_is_disabled_while_saving(scenario_results: dict) -> None:
     result = scenario_results["during_finalization"]
-    assert (result["button_disabled"], result["button_label"]) == (True, "Finalizando…")
+    assert (result["button_disabled"], result["button_label"]) == (True, "Salvando…")
 
 
-def test_status_line_reports_the_finalization(scenario_results: dict) -> None:
-    assert scenario_results["during_finalization"]["status_text"] == "Finalizando o PDF (3 páginas)…"
+def test_status_line_reports_the_saving(scenario_results: dict) -> None:
+    assert scenario_results["during_finalization"]["status_text"] == "Salvando o PDF (3 páginas)…"
 
 
 def test_space_while_finalizing_adds_no_page(scenario_results: dict) -> None:
@@ -128,9 +139,7 @@ def test_older_document_answer_after_a_newer_one_is_ignored(scenario_results: di
 
 def test_recovered_draft_switches_the_saved_mode_to_document(scenario_results: dict) -> None:
     assert scenario_results["recovered_draft_in_quick_mode"]["settings_request_body"] == {
-        "output_folder": "/Users/teste/Digitalizadora",
-        "output_format": "pdf",
-        "scan_preset": "document",
+        **SAVED_SETTINGS,
         "capture_mode": "document",
     }
 
@@ -184,13 +193,8 @@ def test_return_button_sends_no_settings_during_a_quick_scan(scenario_results: d
     assert scenario_results["return_button_during_a_quick_scan"]["settings_requests"] == 0
 
 
-def test_mode_selector_saves_all_four_settings(scenario_results: dict) -> None:
-    assert scenario_results["mode_selector"]["settings_request_body"] == {
-        "output_folder": "/Users/teste/Digitalizadora",
-        "output_format": "pdf",
-        "scan_preset": "document",
-        "capture_mode": "single",
-    }
+def test_mode_selector_saves_all_the_settings(scenario_results: dict) -> None:
+    assert scenario_results["mode_selector"]["settings_request_body"] == {**SAVED_SETTINGS, "capture_mode": "single"}
 
 
 def test_quick_mode_hides_the_document_section(scenario_results: dict) -> None:
@@ -221,3 +225,12 @@ def test_status_line_drops_the_added_page_event_after_an_edit(scenario_results: 
     assert scenario_results["status_after_discarding_an_added_page"]["status_text"] == (
         f"3 páginas no documento. {NEXT_SHEET_TEXT}"
     )
+
+
+def test_rotation_hint_is_shown_in_document_mode(scenario_results: dict) -> None:
+    assert scenario_results["idle_document_page"]["rotation_hint_hidden"] is False
+
+
+def test_tile_has_a_rotate_button_with_its_own_style_class(scenario_results: dict) -> None:
+    result = scenario_results["grid_tiles"]
+    assert (result["rotate_text"], result["rotate_class"]) == ("Girar ↻", "page-rotate")

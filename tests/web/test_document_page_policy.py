@@ -1,14 +1,8 @@
-import json
-import shutil
-import subprocess
-from pathlib import Path
-
 import pytest
 
-NODE_EXECUTABLE = shutil.which("node")
-HARNESS_PATH = Path(__file__).resolve().parent / "document-page-policy-harness.js"
-HARNESS_TIMEOUT_SECONDS = 30
-NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter finaliza."
+from tests.web.policy_expression_runner import NODE_EXECUTABLE, evaluate_policy_expressions
+
+NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter salva."
 FOCUS_ON_SCAN_BUTTON = {"target": "scan_button", "page_identifier": None}
 
 pytestmark = pytest.mark.skipif(
@@ -182,6 +176,22 @@ FOCUS_CASES = [
     pytest.param("decide_focus_after_action(action_context({}))", {"target": "same_button", "page_identifier": "b"},
                  id="move-by-keyboard"),
     pytest.param(
+        "decide_focus_after_action(action_context("
+        "{action: 'rotate', page_identifiers_after: ['a', 'x', 'c'], acted_page_identifier: 'b'}))",
+        {"target": "rotate_button", "page_identifier": "x"},
+        id="rotate-by-keyboard-follows-the-position",
+    ),
+    pytest.param(
+        "decide_focus_after_action(action_context({action: 'rotate', is_keyboard_initiated: false}))",
+        FOCUS_ON_SCAN_BUTTON,
+        id="rotate-by-pointer",
+    ),
+    pytest.param(
+        "decide_focus_after_action(action_context({action: 'rotate', page_identifiers_after: []}))",
+        FOCUS_ON_SCAN_BUTTON,
+        id="rotate-without-pages-left",
+    ),
+    pytest.param(
         "decide_focus_after_action(action_context({action: 'delete', page_identifiers_after: ['a', 'c']}))",
         {"target": "delete_button", "page_identifier": "c"},
         id="delete-in-the-middle-by-keyboard",
@@ -295,10 +305,6 @@ WARNING_CASES = [
 ]
 
 DURATION_AND_COUNT_CASES = [
-    pytest.param("describe_expected_scan_duration('document')", "cerca de 15 s", id="text-preset"),
-    pytest.param("describe_expected_scan_duration('document_economy')", "cerca de 15 s", id="economy-preset"),
-    pytest.param("describe_expected_scan_duration('photo')", "cerca de 75 s", id="photo-preset"),
-    pytest.param("describe_expected_scan_duration('poster')", "cerca de 15 s", id="unknown-preset"),
     pytest.param("describe_page_count(0)", "0 páginas", id="no-pages"),
     pytest.param("describe_page_count(1)", "1 página", id="one-page"),
     pytest.param("describe_page_count(2)", "2 páginas", id="two-pages"),
@@ -308,13 +314,15 @@ DURATION_AND_COUNT_CASES = [
 STATUS_CASES = [
     pytest.param("describe_document_status('preparing', document_progress({}))", "Preparando a página 3…",
                  id="preparing"),
-    pytest.param("describe_document_status('scanning', document_progress({scan_preset: 'photo'}))",
-                 "Digitalizando a página 3… (cerca de 75 s)", id="scanning-a-photo"),
+    pytest.param("describe_document_status('scanning', document_progress({dots_per_inch: 600}))",
+                 "Digitalizando a página 3… (cerca de 75 s)", id="scanning-at-600-dpi"),
+    pytest.param("describe_document_status('scanning', document_progress({dots_per_inch: 1200}))",
+                 "Digitalizando a página 3… (vários minutos)", id="scanning-at-1200-dpi"),
     pytest.param("describe_document_status('saving', document_progress({}))", "Guardando a página 3…", id="saving"),
     pytest.param("describe_document_status('idle', document_progress({is_finalizing: true}))",
-                 "Finalizando o PDF (2 páginas)…", id="finalizing"),
+                 "Salvando o PDF (2 páginas)…", id="finalizing"),
     pytest.param("describe_document_status('idle', document_progress({page_count: 1, is_finalizing: true}))",
-                 "Finalizando o PDF (1 página)…", id="finalizing-one-page"),
+                 "Salvando o PDF (1 página)…", id="finalizing-one-page"),
     pytest.param(
         "describe_document_status('idle', document_progress({last_event: 'page_failed'}))",
         "A última página não foi adicionada. Coloque a folha de novo e aperte Espaço.",
@@ -343,6 +351,7 @@ REMOVAL_AND_MOVE_CASES = [
     pytest.param("describe_page_removal({action: 'delete', position: 1, remaining_page_count: 0})",
                  "Página 1 excluída. O documento foi encerrado.", id="document-ended"),
     pytest.param("describe_page_move(3, 2)", "Página 3 movida para a posição 2", id="moved"),
+    pytest.param("describe_page_rotation(3)", "Página 3 girada 90° para a direita.", id="rotated"),
 ]
 
 RECOVERY_CASES = [
@@ -402,13 +411,13 @@ DOCUMENT_TEXT_CASES = [
     pytest.param(
         "describe_possible_previous_save(draft_document({finished_document_path: '/Volumes/Arquivo/Contrato.pdf'}))",
         "Este documento talvez já tenha sido salvo como /Volumes/Arquivo/Contrato.pdf. "
-        "Confira antes de finalizar de novo.",
+        "Confira antes de salvar de novo.",
         id="possibly-saved",
     ),
     pytest.param(
         "describe_possible_previous_save(draft_document({finalization_started_at: '2026-10-17T10:05:00-03:00'}))",
         "Uma finalização deste documento foi interrompida às 10:05. "
-        "Confira na pasta de saída se o PDF já existe antes de finalizar de novo.",
+        "Confira na pasta de saída se o PDF já existe antes de salvar de novo.",
         id="finalization-interrupted",
     ),
     pytest.param("describe_possible_previous_save(draft_document({}))", None, id="no-marker"),
@@ -446,17 +455,7 @@ ALL_CASES = (
 
 @pytest.fixture(scope="module")
 def policy_results() -> dict:
-    expressions = [case.values[0] for case in ALL_CASES]
-    completed = subprocess.run(
-        [NODE_EXECUTABLE, str(HARNESS_PATH)],
-        input=json.dumps(expressions),
-        capture_output=True,
-        text=True,
-        timeout=HARNESS_TIMEOUT_SECONDS,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stderr
-    return json.loads(completed.stdout)
+    return evaluate_policy_expressions([case.values[0] for case in ALL_CASES])
 
 
 @pytest.mark.parametrize(("expression", "expected"), MOVE_CASES)

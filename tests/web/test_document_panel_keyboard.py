@@ -21,6 +21,8 @@ SCENARIO_NAMES = (
     "space_opened_confirmation_takes_the_first_enter",
     "escape_in_the_confirmation",
     "move_to_dialog",
+    "enter_on_the_save_button",
+    "enter_on_the_rotation_select",
 )
 
 pytestmark = pytest.mark.skipif(
@@ -105,7 +107,7 @@ def test_finalize_confirmation_opens_on_its_accept_button(scenario_results: dict
 
 
 def test_finalize_confirmation_asks_with_the_page_count(scenario_results: dict) -> None:
-    assert scenario_results["enter_on_the_scan_button"]["question"] == "Finalizar o PDF com 3 páginas?"
+    assert scenario_results["enter_on_the_scan_button"]["question"] == "Salvar o PDF com 3 páginas?"
 
 
 def test_held_enter_opens_the_confirmation_without_finalizing(scenario_results: dict) -> None:
@@ -143,3 +145,19 @@ def test_move_dialog_opens_with_the_current_position(scenario_results: dict) -> 
 
 def test_move_dialog_selects_the_position_so_typing_replaces_it(scenario_results: dict) -> None:
     assert scenario_results["move_to_dialog"]["is_position_selected"] is True
+
+
+def test_enter_on_the_save_button_opens_the_confirmation_once(scenario_results: dict) -> None:
+    assert scenario_results["enter_on_the_save_button"]["dialog_shown_times"] == 1
+
+
+def test_enter_on_the_save_button_does_not_save_by_itself(scenario_results: dict) -> None:
+    assert scenario_results["enter_on_the_save_button"]["finalize_requests"] == 0
+
+
+def test_confirmation_accept_button_says_save(scenario_results: dict) -> None:
+    assert scenario_results["enter_on_the_save_button"]["accept_label"] == "Salvar"
+
+
+def test_enter_on_the_rotation_select_opens_no_confirmation(scenario_results: dict) -> None:
+    assert scenario_results["enter_on_the_rotation_select"] == {"dialog_shown_times": 0, "finalize_requests": 0}

@@ -3,9 +3,14 @@ from pathlib import Path
 
 import pytest
 
+from digitalizadora.domain.color_mode import ColorMode
+from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scan_quality import SUPPORTED_DOTS_PER_INCH
+
 STATIC_DIRECTORY = Path(__file__).resolve().parents[2] / "src" / "digitalizadora" / "web" / "static"
 SCRIPT_FILE_NAMES = [
     "scan-trigger-policy.js",
+    "scan-quality-policy.js",
     "error-banner.js",
     "document-page-policy.js",
     "document-panel.js",
@@ -43,7 +48,7 @@ DOCUMENT_ELEMENT_IDENTIFIERS = [
     "draft-storage-warning",
     "discard-last-page-button",
     "cancel-document-button",
-    "finalize-document-button",
+    "save-document-button",
     "document-finished-message",
     "document-announcement",
     "confirmation-dialog",
@@ -55,6 +60,32 @@ DOCUMENT_ELEMENT_IDENTIFIERS = [
     "move-page-accept-button",
     "move-page-reject-button",
 ]
+SETTINGS_ELEMENT_IDENTIFIERS = [
+    "preset-select",
+    "preset-custom-option",
+    "resolution-select",
+    "color-mode-select",
+    "resolution-warning",
+    "resolution-warning-text",
+    "rotation-select",
+    "rotation-document-hint",
+    "auto-crop-checkbox",
+    "auto-crop-hint",
+    "output-folder-save-button",
+]
+SUPPORTED_DOTS_PER_INCH_VALUES = ("75", "100", "150", "200", "300", "400", "600", "1200")
+ROTATION_OPTIONS = (("0", "Sem girar"), ("90", "90° à direita"), ("180", "180°"), ("270", "90° à esquerda"))
+COLOR_OPTIONS = (("color", "Colorido"), ("grayscale", "Tons de cinza"))
+PRESET_OPTION_PATTERN = re.compile(r"""<option value="([a-z_]+)">[^<(]*\((\d+) dpi, (cor|cinza)\)</option>""")
+COLOR_MODES_BY_PRESET_TEXT = {"cor": ColorMode.COLOR, "cinza": ColorMode.GRAYSCALE}
+SELECT_OPTION_PATTERN = re.compile(r"""<option value="([^"]+)"[^>]*>([^<]+)</option>""")
+SAVE_DOCUMENT_BUTTON_PATTERN = (
+    r'<button id="save-document-button"[^>]*aria-label="Salvar documento"[^>]*>\s*Salvar <kbd>Enter</kbd>'
+)
+SAVE_FOLDER_BUTTON_PATTERN = (
+    r'<button id="output-folder-save-button"[^>]*aria-label="Salvar pasta de saída"[^>]*>Salvar pasta</button>'
+)
+SELECT_PATTERN = re.compile(r"""<select id="([^"]+)"[^>]*>(.*?)</select>""", re.DOTALL)
 
 
 def read_static_file(file_name: str) -> str:
@@ -136,7 +167,7 @@ def test_page_loads_the_trigger_policy_before_the_application_script() -> None:
     assert page.index(POLICY_SCRIPT_PATH) < page.index(APPLICATION_SCRIPT_PATH)
 
 
-def test_page_loads_the_five_scripts_in_dependency_order() -> None:
+def test_page_loads_the_six_scripts_in_dependency_order() -> None:
     assert SCRIPT_SOURCE_PATTERN.findall(read_static_file("index.html")) == SCRIPT_FILE_NAMES
 
 
@@ -148,7 +179,7 @@ def test_script_calls_api_path(api_path: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "path_text", ['"/api/document"', "/pages", "/last", "/page-order", "/name", "/finalize", "/thumbnail"]
+    "path_text", ['"/api/document"', "/pages", "/last", "/page-order", "/name", "/finalize", "/thumbnail", "/rotation"]
 )
 def test_document_panel_calls_document_route(path_text: str) -> None:
     assert path_text in read_static_file("document-panel.js")
@@ -184,3 +215,80 @@ def test_page_declares_accessible_region(role: str) -> None:
 def test_document_name_field_has_no_length_limit() -> None:
     # The server refuses a name that is too long with a clear message (R4); a maxlength would cut it silently.
     assert re.search(r'<input id="document-name-input"[^>]*\bmaxlength', read_static_file("index.html")) is None
+
+
+@pytest.mark.parametrize("element_identifier", SETTINGS_ELEMENT_IDENTIFIERS)
+def test_page_declares_settings_element(element_identifier: str) -> None:
+    assert element_identifier in PAGE_IDENTIFIER_PATTERN.findall(read_static_file("index.html"))
+
+
+def test_page_no_longer_declares_the_finalize_document_button() -> None:
+    assert "finalize-document-button" not in read_static_file("index.html")
+
+
+def read_select_options(select_identifier: str) -> list[tuple[str, str]]:
+    selects = dict(SELECT_PATTERN.findall(read_static_file("index.html")))
+    return SELECT_OPTION_PATTERN.findall(selects[select_identifier])
+
+
+def test_resolution_list_offers_every_resolution_of_the_printer() -> None:
+    offered_values = tuple(value for value, _ in read_select_options("resolution-select"))
+    assert offered_values == SUPPORTED_DOTS_PER_INCH_VALUES
+
+
+def test_resolution_values_match_the_supported_resolutions_of_the_server() -> None:
+    offered_values = tuple(int(value) for value, _ in read_select_options("resolution-select"))
+    assert offered_values == SUPPORTED_DOTS_PER_INCH
+
+
+def test_resolution_options_say_dpi() -> None:
+    assert [text for _, text in read_select_options("resolution-select")] == [
+        f"{value} dpi" for value in SUPPORTED_DOTS_PER_INCH_VALUES
+    ]
+
+
+def test_colour_list_offers_colour_and_grayscale_only() -> None:
+    assert tuple(read_select_options("color-mode-select")) == COLOR_OPTIONS
+
+
+def test_rotation_list_offers_the_four_turns() -> None:
+    assert tuple(read_select_options("rotation-select")) == ROTATION_OPTIONS
+
+
+def test_preset_list_ends_with_the_custom_option_that_cannot_be_chosen() -> None:
+    page = read_static_file("index.html")
+    assert re.search(r'<option id="preset-custom-option" value="custom" disabled', page)
+
+
+def test_preset_options_of_the_page_match_the_presets_of_the_server() -> None:
+    page_presets = {
+        value: (int(dots_per_inch), COLOR_MODES_BY_PRESET_TEXT[color_text])
+        for value, dots_per_inch, color_text in PRESET_OPTION_PATTERN.findall(read_static_file("index.html"))
+    }
+    server_presets = {
+        preset.value: (preset.settings.dots_per_inch, preset.settings.color_mode) for preset in ScanPreset
+    }
+    assert page_presets == server_presets
+
+
+def test_auto_crop_checkbox_is_off_by_default_and_has_its_label() -> None:
+    page = read_static_file("index.html")
+    assert re.search(r'<input id="auto-crop-checkbox" type="checkbox"(?![^>]*\bchecked)[^>]*>', page)
+
+
+def test_auto_crop_label_names_the_background_removal() -> None:
+    assert "Cortar automaticamente e remover o fundo" in read_static_file("index.html")
+
+
+def test_save_document_button_has_the_accessible_name_and_the_enter_hint() -> None:
+    page = read_static_file("index.html")
+    assert re.search(SAVE_DOCUMENT_BUTTON_PATTERN, page)
+
+
+def test_folder_button_is_renamed_to_save_folder() -> None:
+    page = read_static_file("index.html")
+    assert re.search(SAVE_FOLDER_BUTTON_PATTERN, page)
+
+
+def test_page_has_no_finalize_wording_left_for_the_user() -> None:
+    assert "Finalizar" not in read_static_file("index.html")

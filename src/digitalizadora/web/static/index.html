@@ -8,6 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/application.css">
   <script src="/static/scan-trigger-policy.js" defer></script>
+  <script src="/static/scan-quality-policy.js" defer></script>
   <script src="/static/error-banner.js" defer></script>
   <script src="/static/document-page-policy.js" defer></script>
   <script src="/static/document-panel.js" defer></script>
@@ -80,13 +81,13 @@
         <p id="document-summary" class="document-summary" hidden></p>
         <p id="document-large-warning" class="storage-warning" hidden>
           <span aria-hidden="true">⚠</span>
-          Documento grande: finalizar pode levar alguns segundos e usar bastante memória.
+          Documento grande: salvar pode levar alguns segundos e usar bastante memória.
         </p>
         <div class="document-actions">
           <button id="discard-last-page-button" type="button">Descartar última <kbd>Backspace</kbd></button>
           <button id="cancel-document-button" type="button">Cancelar documento</button>
-          <button id="finalize-document-button" class="finalize-button" type="button">
-            Finalizar PDF <kbd>Enter</kbd>
+          <button id="save-document-button" class="finalize-button" type="button" aria-label="Salvar documento">
+            Salvar <kbd>Enter</kbd>
           </button>
         </div>
       </div>
@@ -112,20 +113,71 @@
         </label>
       </fieldset>
 
-      <div class="field">
-        <label for="preset-select">Qualidade</label>
-        <select id="preset-select" name="scan-preset">
-          <option value="document">Texto (300 dpi, cor)</option>
-          <option value="document_economy">Texto econômico (200 dpi, cinza)</option>
-          <option value="photo">Foto (600 dpi, cor)</option>
+      <fieldset class="quality-group">
+        <legend>Qualidade</legend>
+        <div class="field">
+          <label for="preset-select">Predefinição</label>
+          <select id="preset-select" name="scan-preset">
+            <option value="document">Texto (300 dpi, cor)</option>
+            <option value="document_economy">Texto econômico (200 dpi, cinza)</option>
+            <option value="photo">Foto (600 dpi, cor)</option>
+            <option id="preset-custom-option" value="custom" disabled hidden>Personalizada</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="resolution-select">Resolução</label>
+          <select id="resolution-select" name="resolution" aria-describedby="resolution-warning">
+            <option value="75">75 dpi</option>
+            <option value="100">100 dpi</option>
+            <option value="150">150 dpi</option>
+            <option value="200">200 dpi</option>
+            <option value="300" selected>300 dpi</option>
+            <option value="400">400 dpi</option>
+            <option value="600">600 dpi</option>
+            <option value="1200">1200 dpi</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="color-mode-select">Cor</label>
+          <select id="color-mode-select" name="color-mode">
+            <option value="color">Colorido</option>
+            <option value="grayscale">Tons de cinza</option>
+          </select>
+        </div>
+        <p id="resolution-warning" class="storage-warning" role="status" hidden>
+          <span aria-hidden="true">⚠</span>
+          <span id="resolution-warning-text"></span>
+        </p>
+      </fieldset>
+
+      <div class="field rotation-field">
+        <label for="rotation-select">Girar</label>
+        <select id="rotation-select" name="rotation">
+          <option value="0">Sem girar</option>
+          <option value="90">90° à direita</option>
+          <option value="180">180°</option>
+          <option value="270">90° à esquerda</option>
         </select>
+        <p id="rotation-document-hint" class="field-hint" hidden>
+          Vale para as próximas digitalizações. Para girar uma página que já está no documento, use Girar na miniatura.
+        </p>
+      </div>
+
+      <div class="field crop-field">
+        <label class="checkbox-label" for="auto-crop-checkbox">
+          <input id="auto-crop-checkbox" type="checkbox" name="auto-crop" aria-describedby="auto-crop-hint">
+          <span>Cortar automaticamente e remover o fundo</span>
+        </label>
+        <p id="auto-crop-hint" class="field-hint">
+          Use para fotos e folhas menores que o vidro. Se a folha e a tampa forem brancas, a imagem fica inteira.
+        </p>
       </div>
 
       <div class="field">
         <label for="output-folder-input">Pasta de saída</label>
         <div class="folder-row">
           <input id="output-folder-input" type="text" name="output-folder" autocomplete="off" spellcheck="false">
-          <button id="output-folder-save-button" type="button">Salvar</button>
+          <button id="output-folder-save-button" type="button" aria-label="Salvar pasta de saída">Salvar pasta</button>
         </div>
         <p id="output-folder-message" class="field-message" hidden></p>
         <p id="storage-line" class="storage-line">Espaço livre: calculando…</p>

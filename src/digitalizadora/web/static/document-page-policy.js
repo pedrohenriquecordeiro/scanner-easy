@@ -2,7 +2,7 @@
 
 // Pure rules of the Documento mode (no DOM); document-panel.js and application.js wire them to the page.
 // Uses IDLE_PHASE, SPACE_KEY_CODE, BUTTON_TAG_NAME, KEYBOARD_RESERVED_TAG_NAMES and can_start_scan from
-// scan-trigger-policy.js, which index.html loads first.
+// scan-trigger-policy.js and describe_expected_scan_duration from scan-quality-policy.js, which index.html loads first.
 
 const CAPTURE_MODES = Object.freeze({ SINGLE: "single", DOCUMENT: "document" });
 const LARGE_DOCUMENT_PAGE_COUNT = 300;
@@ -28,6 +28,7 @@ const DOCUMENT_ACTIONS = Object.freeze({
   MOVE: "move",
   DELETE: "delete",
   DISCARD_LAST: "discard_last",
+  ROTATE: "rotate",
   DROP: "drop",
   NAME_SAVED: "name_saved",
   DIALOG_CLOSED: "dialog_closed",
@@ -38,6 +39,7 @@ const FOCUS_TARGETS = Object.freeze({
   SCAN_BUTTON: "scan_button",
   SAME_BUTTON: "same_button",
   DELETE_BUTTON: "delete_button",
+  ROTATE_BUTTON: "rotate_button",
 });
 const DRAFT_ENDINGS = Object.freeze({
   FINALIZED: "finalized",
@@ -52,12 +54,6 @@ const RECOVERY_OUTCOMES = Object.freeze({
   SET_ASIDE: "set_aside",
   FAILED: "failed",
 });
-const EXPECTED_SCAN_DURATION_TEXTS = Object.freeze({
-  document: "cerca de 15 s",
-  document_economy: "cerca de 15 s",
-  photo: "cerca de 75 s",
-});
-const DEFAULT_SCAN_PRESET = "document";
 const DOCUMENT_RELOAD_ERROR_CODES = Object.freeze(["invalid_page_order", "page_not_found", "no_open_document"]);
 
 const BACKSPACE_KEY_CODE = "Backspace";
@@ -80,12 +76,12 @@ const CLOCK_TIME_PATTERN = /T(\d{2}):(\d{2})/;
 const NUMBER_LOCALE = "pt-BR";
 const ACTIVE_PAGE_PHASE_TEXTS = Object.freeze({
   preparing: (page_number) => `Preparando a página ${page_number}…`,
-  scanning: (page_number, scan_preset) =>
-    `Digitalizando a página ${page_number}… (${describe_expected_scan_duration(scan_preset)})`,
+  scanning: (page_number, dots_per_inch) =>
+    `Digitalizando a página ${page_number}… (${describe_expected_scan_duration(dots_per_inch)})`,
   saving: (page_number) => `Guardando a página ${page_number}…`,
 });
 const PAGE_REMOVAL_VERBS = Object.freeze({ discard_last: "descartada", delete: "excluída" });
-const NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter finaliza.";
+const NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter salva.";
 
 function move_page(page_identifiers, page_identifier, target_index) {
   const moved_order = page_identifiers.filter((identifier) => identifier !== page_identifier);
@@ -211,7 +207,10 @@ function decide_focus_after_action(action_context) {
   }
   const focused_position = Math.min(acted_position, page_identifiers_after.length);
   const focused_page_identifier = page_identifiers_after[focused_position - FIRST_POSITION];
-  return { target: FOCUS_TARGETS.DELETE_BUTTON, page_identifier: focused_page_identifier };
+  // A rotated page takes a new identifier but keeps its position, so the focus follows the position.
+  const is_rotation = action === DOCUMENT_ACTIONS.ROTATE;
+  const focused_target = is_rotation ? FOCUS_TARGETS.ROTATE_BUTTON : FOCUS_TARGETS.DELETE_BUTTON;
+  return { target: focused_target, page_identifier: focused_page_identifier };
 }
 
 function next_document_event(previous_observation, observation, previous_event) {
@@ -275,10 +274,6 @@ function should_reload_document_after_error(error_code) {
   return DOCUMENT_RELOAD_ERROR_CODES.includes(error_code);
 }
 
-function describe_expected_scan_duration(scan_preset) {
-  return EXPECTED_SCAN_DURATION_TEXTS[scan_preset] ?? EXPECTED_SCAN_DURATION_TEXTS[DEFAULT_SCAN_PRESET];
-}
-
 function describe_page_count(page_count) {
   if (page_count === SINGLE_PAGE) {
     return `${SINGLE_PAGE} página`;
@@ -287,13 +282,13 @@ function describe_page_count(page_count) {
 }
 
 function describe_document_status(scan_phase, document_progress) {
-  const { page_count, last_event, scan_preset, is_finalizing } = document_progress;
+  const { page_count, last_event, dots_per_inch, is_finalizing } = document_progress;
   const describe_active_phase = ACTIVE_PAGE_PHASE_TEXTS[scan_phase];
   if (describe_active_phase !== undefined) {
-    return describe_active_phase(page_count + 1, scan_preset);
+    return describe_active_phase(page_count + 1, dots_per_inch);
   }
   if (is_finalizing) {
-    return `Finalizando o PDF (${describe_page_count(page_count)})…`;
+    return `Salvando o PDF (${describe_page_count(page_count)})…`;
   }
   if (last_event === DOCUMENT_EVENTS.PAGE_FAILED) {
     return "A última página não foi adicionada. Coloque a folha de novo e aperte Espaço.";
@@ -318,6 +313,10 @@ function describe_page_removal(page_removal) {
 
 function describe_page_move(position_before, position_after) {
   return `Página ${position_before} movida para a posição ${position_after}`;
+}
+
+function describe_page_rotation(position) {
+  return `Página ${position} girada 90° para a direita.`;
 }
 
 function join_positions(positions) {
@@ -379,14 +378,14 @@ function describe_possible_previous_save(document) {
   if (document.finished_document_path !== null) {
     return (
       `Este documento talvez já tenha sido salvo como ${document.finished_document_path}. ` +
-      "Confira antes de finalizar de novo."
+      "Confira antes de salvar de novo."
     );
   }
   if (document.finalization_started_at !== null) {
     // The server's local time, as written in the manifest, so the text matches what the user saw on the clock.
     return (
       `Uma finalização deste documento foi interrompida às ${format_clock_time(document.finalization_started_at)}. ` +
-      "Confira na pasta de saída se o PDF já existe antes de finalizar de novo."
+      "Confira na pasta de saída se o PDF já existe antes de salvar de novo."
     );
   }
   return null;
