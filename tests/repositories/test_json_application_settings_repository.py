@@ -321,14 +321,45 @@ def test_an_invalid_quality_pair_is_reported_with_a_warning(tmp_path, caplog):
     assert [record.levelno for record in caplog.records] == [logging.WARNING]
 
 
-def test_an_invalid_quality_pair_without_a_preset_makes_the_file_unusable(tmp_path):
+NEW_FORMAT_DOCUMENT_WITH_INVALID_PAIR = {
+    "output_folder": "/Volumes/Archive",
+    "output_format": "jpg",
+    "dots_per_inch": 301,
+    "color_mode": "color",
+    "capture_mode": "document",
+    "rotation_degrees": 90,
+    "auto_crop": True,
+}
+
+
+def test_an_invalid_quality_pair_without_a_preset_keeps_the_other_fields(tmp_path):
     storage_file = tmp_path / "settings.json"
-    write_document(
-        storage_file,
-        {"output_folder": "/Volumes/Archive", "output_format": "jpg", "dots_per_inch": 301, "color_mode": "color"},
+    write_document(storage_file, NEW_FORMAT_DOCUMENT_WITH_INVALID_PAIR)
+
+    assert build_repository(storage_file).load() == ApplicationSettings(
+        output_folder=Path("/Volumes/Archive"),
+        output_format=OutputFormat.JPEG,
+        scan_settings=ScanPreset.DOCUMENT.settings,
+        capture_mode=CaptureMode.DOCUMENT,
+        adjustment=ImageAdjustment(PageRotation.CLOCKWISE_90, auto_crop=True),
     )
 
-    assert build_repository(storage_file).load() == DEFAULT_SETTINGS
+
+def test_an_invalid_quality_pair_without_a_preset_is_reported_with_a_warning(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, NEW_FORMAT_DOCUMENT_WITH_INVALID_PAIR)
+
+    with caplog.at_level(logging.WARNING):
+        build_repository(storage_file).load()
+
+    assert [record.levelno for record in caplog.records] == [logging.WARNING]
+
+
+def test_an_invalid_quality_pair_with_an_unknown_preset_keeps_the_other_fields(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT_WITH_INVALID_PAIR, "scan_preset": "poster"})
+
+    assert build_repository(storage_file).load().output_folder == Path("/Volumes/Archive")
 
 
 @pytest.mark.parametrize("invalid_rotation", [45, "90", None, True, False, 90.0, 360, -90, [90]])

@@ -14,7 +14,7 @@ from digitalizadora.services.paper_region_detection import PREVIEW_MAXIMUM_EDGE_
 LOGGER = logging.getLogger(__name__)
 ADJUSTED_JPEG_QUALITY = 95
 CROP_MARGIN_RATIO = 0.01
-PREVIEW_COLOR_MODE = "L"
+PREVIEW_COLOR_MODE = "RGB"
 NO_CHROMA_SUBSAMPLING = -1
 # Pillow turns counterclockwise, the page turns clockwise.
 TRANSPOSE_BY_ROTATION = {

@@ -212,3 +212,16 @@ def test_a_decompression_bomb_becomes_a_scan_failure(service, marked_page, monke
 
     with pytest.raises(ScanFailedError):
         service.adjust(marked_page, ROTATE)
+
+
+def test_the_crop_keeps_a_dark_cover_around_a_bright_picture(service):
+    cover_box = (30, 30, 169, 249)
+    scan = build_scan_jpeg(
+        LID_SIZE,
+        [(cover_box, (25, 30, 70)), ((60, 90, 139, 189), (220, 200, 120))],
+        background=(40, 40, 40),
+    )
+
+    cropped_size = read_jpeg_size(service.adjust(scan, CROP))
+
+    assert cropped_size[0] >= 140

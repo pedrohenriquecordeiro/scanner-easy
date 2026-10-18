@@ -7,8 +7,10 @@ from tests.fakes.synthetic_previews import (
     PAPER_LEVEL,
     PREVIEW_SIZE,
     WHITE_LEVEL,
+    ColoredRectangle,
     FilledRectangle,
     add_noise,
+    build_color_preview,
     build_horizontal_gradient,
     build_preview,
 )
@@ -134,3 +136,46 @@ def test_text_blocks_that_look_light_grey_on_a_white_lid_are_not_a_sheet():
     blocks = [FilledRectangle((30, top, 170, top + 6), 225) for top in range(40, 240, 12)]
 
     assert detect_paper_region(build_preview(background_level=WHITE_LEVEL, rectangles=blocks)) is None
+
+
+DARK_LID_COLOR = (40, 40, 40)
+WHITE_COLOR = (255, 255, 255)
+NAVY_COLOR = (25, 30, 70)
+BLACK_COLOR = (5, 5, 5)
+BRIGHT_PICTURE_COLOR = (220, 200, 120)
+NEAR_LID_COLOR = (55, 55, 55)
+PAGE_BOX = (30, 30, 169, 249)
+PAGE_REGION = PixelRegion(30, 30, 170, 250)
+
+
+def test_a_navy_cover_with_a_bright_picture_is_found_as_a_whole():
+    cover = ColoredRectangle(PAGE_BOX, NAVY_COLOR)
+    picture = ColoredRectangle((60, 90, 139, 189), BRIGHT_PICTURE_COLOR)
+
+    region = detect_paper_region(build_color_preview(DARK_LID_COLOR, [cover, picture]))
+
+    assert_region_close_to(region, PAGE_REGION)
+
+
+def test_a_page_with_a_black_half_is_found_as_a_whole():
+    page = ColoredRectangle(PAGE_BOX, WHITE_COLOR)
+    black_half = ColoredRectangle((30, 140, 169, 249), BLACK_COLOR)
+
+    region = detect_paper_region(build_color_preview(DARK_LID_COLOR, [page, black_half]))
+
+    assert_region_close_to(region, PAGE_REGION)
+
+
+def test_a_region_whose_surroundings_are_not_the_background_is_rejected():
+    page = ColoredRectangle(PAGE_BOX, WHITE_COLOR)
+    dark_half_close_to_the_lid = ColoredRectangle((30, 140, 169, 249), NEAR_LID_COLOR)
+
+    preview = build_color_preview(DARK_LID_COLOR, [page, dark_half_close_to_the_lid])
+
+    assert detect_paper_region(preview) is None
+
+
+def test_a_colour_preview_of_a_white_sheet_on_a_dark_lid_is_found():
+    page = ColoredRectangle(PAGE_BOX, WHITE_COLOR)
+
+    assert_region_close_to(detect_paper_region(build_color_preview(DARK_LID_COLOR, [page])), PAGE_REGION)

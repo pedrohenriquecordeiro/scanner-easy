@@ -1,4 +1,4 @@
-"""Small grayscale previews drawn with Pillow, to exercise the paper detection without a scanner."""
+"""Small previews (grayscale or colour) drawn with Pillow, to exercise the paper detection without a scanner."""
 
 import random
 from collections.abc import Sequence
@@ -18,6 +18,12 @@ class FilledRectangle:
     level: int
 
 
+@dataclass(frozen=True)
+class ColoredRectangle:
+    box: tuple[int, int, int, int]
+    color: tuple[int, int, int]
+
+
 def build_preview(
     size: tuple[int, int] = PREVIEW_SIZE,
     background_level: int = DARK_LID_LEVEL,
@@ -28,6 +34,19 @@ def build_preview(
     drawing = ImageDraw.Draw(preview)
     for rectangle in rectangles:
         drawing.rectangle(rectangle.box, fill=rectangle.level)
+    return preview
+
+
+def build_color_preview(
+    background_color: tuple[int, int, int],
+    rectangles: Sequence[ColoredRectangle],
+    size: tuple[int, int] = PREVIEW_SIZE,
+) -> Image.Image:
+    """Same as build_preview, in RGB: the rectangles are painted in order over the background."""
+    preview = Image.new("RGB", size, background_color)
+    drawing = ImageDraw.Draw(preview)
+    for rectangle in rectangles:
+        drawing.rectangle(rectangle.box, fill=rectangle.color)
     return preview
 
 

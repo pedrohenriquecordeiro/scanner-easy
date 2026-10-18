@@ -78,6 +78,7 @@ class PageUnderTest extends BrowserPage {
 
   async choose_option(element_identifier, option_value) {
     const select = this.element(element_identifier);
+    select.focus();
     select.value = option_value;
     this.dispatch_simple_event(select, "change");
     await this.flush();
@@ -85,6 +86,7 @@ class PageUnderTest extends BrowserPage {
 
   async set_auto_crop(is_checked) {
     const checkbox = this.element("auto-crop-checkbox");
+    checkbox.focus();
     checkbox.checked = is_checked;
     this.dispatch_simple_event(checkbox, "change");
     await this.flush();
@@ -120,12 +122,13 @@ async function load_page(response_overrides) {
   return page;
 }
 
-async function change_setting_through(control_change) {
+async function change_setting_through(control_identifier, control_change) {
   const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
   await control_change(page);
   return {
     settings_request_body: page.settings_request_body(),
     scan_button_focused: page.active_element() === page.element("scan-button"),
+    control_focused: page.active_element() === page.element(control_identifier),
   };
 }
 
@@ -150,11 +153,11 @@ const SCENARIOS = {
   space_on_the_color_mode_select: () => count_scans_after_space_on("color-mode-select"),
   space_on_the_rotation_select: () => count_scans_after_space_on("rotation-select"),
   space_on_the_auto_crop_checkbox: () => count_scans_after_space_on("auto-crop-checkbox"),
-  change_the_resolution: () => change_setting_through((page) => page.choose_option("resolution-select", "600")),
-  change_the_color_mode: () => change_setting_through((page) => page.choose_option("color-mode-select", "grayscale")),
-  change_the_rotation: () => change_setting_through((page) => page.choose_option("rotation-select", "180")),
-  turn_auto_crop_on: () => change_setting_through((page) => page.set_auto_crop(true)),
-  choose_a_preset: () => change_setting_through((page) => page.choose_option("preset-select", "photo")),
+  change_the_resolution: () => change_setting_through("resolution-select", (page) => page.choose_option("resolution-select", "600")),
+  change_the_color_mode: () => change_setting_through("color-mode-select", (page) => page.choose_option("color-mode-select", "grayscale")),
+  change_the_rotation: () => change_setting_through("rotation-select", (page) => page.choose_option("rotation-select", "180")),
+  turn_auto_crop_on: () => change_setting_through("auto-crop-checkbox", (page) => page.set_auto_crop(true)),
+  choose_a_preset: () => change_setting_through("preset-select", (page) => page.choose_option("preset-select", "photo")),
   async rotation_value_that_is_not_an_angle() {
     const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
     await page.choose_option("rotation-select", "45");
@@ -175,6 +178,11 @@ const SCENARIOS = {
   async old_server_controls() {
     const page = await load_page({ "GET /api/settings": build_json_response(200, OLD_SERVER_SETTINGS) });
     return page.read_settings_controls();
+  },
+  async refused_resolution_focus() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(422, INVALID_SETTINGS_BODY) });
+    await page.choose_option("resolution-select", "600");
+    return { control_focused: page.active_element() === page.element("resolution-select") };
   },
   async refused_resolution() {
     const page = await load_page({ "PUT /api/settings": build_json_response(422, INVALID_SETTINGS_BODY) });

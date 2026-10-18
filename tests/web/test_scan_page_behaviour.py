@@ -197,12 +197,22 @@ def test_changing_a_setting_sends_all_the_saved_settings_with_the_change(
     assert scenario_results[scenario_name]["settings_request_body"] == {**SETTINGS_BODY, **changes}
 
 
-@pytest.mark.parametrize(
-    "scenario_name",
-    ["change_the_resolution", "change_the_color_mode", "change_the_rotation", "turn_auto_crop_on", "choose_a_preset"],
-)
-def test_the_scan_button_gets_the_focus_after_a_setting_change(scenario_results: dict, scenario_name: str) -> None:
-    assert scenario_results[scenario_name]["scan_button_focused"] is True
+SELECT_SCENARIOS = ["change_the_resolution", "change_the_color_mode", "change_the_rotation", "choose_a_preset"]
+
+
+@pytest.mark.parametrize("scenario_name", SELECT_SCENARIOS)
+def test_a_select_keeps_the_focus_after_its_change_so_the_arrows_can_go_on(
+    scenario_results: dict, scenario_name: str
+) -> None:
+    assert scenario_results[scenario_name]["control_focused"] is True
+
+
+def test_a_refused_select_change_keeps_the_focus_on_the_select(scenario_results: dict) -> None:
+    assert scenario_results["refused_resolution_focus"]["control_focused"] is True
+
+
+def test_the_scan_button_gets_the_focus_after_toggling_the_auto_crop(scenario_results: dict) -> None:
+    assert scenario_results["turn_auto_crop_on"]["scan_button_focused"] is True
 
 
 def test_a_rotation_value_that_is_not_an_angle_is_sent_as_no_rotation(scenario_results: dict) -> None:

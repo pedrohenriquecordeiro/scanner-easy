@@ -24,6 +24,7 @@ AUTO_CROP_KEY = "auto_crop"
 SCAN_QUALITY_KEY = "scan_quality"
 KNOWN_CAPTURE_MODE_VALUES = frozenset(capture_mode.value for capture_mode in CaptureMode)
 KNOWN_COLOR_MODE_VALUES = frozenset(color_mode.value for color_mode in ColorMode)
+KNOWN_SCAN_PRESET_VALUES = frozenset(scan_preset.value for scan_preset in ScanPreset)
 KNOWN_ROTATION_VALUES = frozenset(rotation.value for rotation in PageRotation)
 DEFAULT_ADJUSTMENT = ImageAdjustment()
 
@@ -85,17 +86,26 @@ def _read_quality_pair(document: dict[str, object]) -> ScanSettings | None:
     return ScanSettings(raw_dots_per_inch, ColorMode(raw_color_mode))
 
 
+def _read_fallback_preset(document: dict[str, object]) -> ScanPreset | None:
+    raw_scan_preset = document.get(SCAN_PRESET_KEY)
+    if isinstance(raw_scan_preset, str) and raw_scan_preset in KNOWN_SCAN_PRESET_VALUES:
+        return ScanPreset(raw_scan_preset)
+    return None
+
+
 def _read_scan_settings(document: dict[str, object]) -> tuple[ScanSettings, RejectedValue | None]:
-    """The pair of keys wins; an invalid pair falls back to the preset of an older file, which must then be valid."""
+    """The pair of keys wins. An invalid pair falls back to the preset of an older file, or to the document preset
+    when the file has none (a file written by this version); either way the other settings are kept. Without a
+    pair, the preset of an older file is required."""
     quality_pair = _read_quality_pair(document)
     if quality_pair is not None:
         return quality_pair, None
-    scan_preset = ScanPreset(document[SCAN_PRESET_KEY])
     pair_is_present = DOTS_PER_INCH_KEY in document or COLOR_MODE_KEY in document
     if not pair_is_present:
-        return scan_preset.settings, None
+        return ScanPreset(document[SCAN_PRESET_KEY]).settings, None
+    fallback_preset = _read_fallback_preset(document) or ScanPreset.DOCUMENT
     pair_text = repr((document.get(DOTS_PER_INCH_KEY), document.get(COLOR_MODE_KEY)))
-    return scan_preset.settings, RejectedValue(SCAN_QUALITY_KEY, pair_text, f"the {scan_preset.value} preset")
+    return fallback_preset.settings, RejectedValue(SCAN_QUALITY_KEY, pair_text, f"the {fallback_preset.value} preset")
 
 
 def read_application_settings(document: object) -> SettingsReading:

@@ -311,13 +311,17 @@ class ScanPage {
     document.addEventListener("keydown", (event) => this.handle_key_down(event));
     document.addEventListener("keyup", (event) => this.handle_key_up(event));
     Object.values(format_inputs).forEach((input) => {
-      input.addEventListener("change", (event) => this.change_setting({ output_format: event.target.value }));
+      input.addEventListener("change", (event) =>
+        this.change_setting_then_focus_scan_button({ output_format: event.target.value }),
+      );
     });
     Object.values(this.elements.capture_mode_inputs).forEach((input) => {
-      input.addEventListener("change", (event) => this.change_setting({ capture_mode: event.target.value }));
+      input.addEventListener("change", (event) =>
+        this.change_setting_then_focus_scan_button({ capture_mode: event.target.value }),
+      );
     });
     this.elements.return_to_document_button.addEventListener("click", () =>
-      this.change_setting({ capture_mode: CAPTURE_MODES.DOCUMENT }),
+      this.change_setting_then_focus_scan_button({ capture_mode: CAPTURE_MODES.DOCUMENT }),
     );
     this.bind_quality_events();
     output_folder_save_button.addEventListener("click", () => this.save_output_folder());
@@ -340,7 +344,7 @@ class ScanPage {
       this.change_setting({ rotation_degrees: parse_rotation_degrees(rotation_select.value) }),
     );
     auto_crop_checkbox.addEventListener("change", () =>
-      this.change_setting({ auto_crop: auto_crop_checkbox.checked }),
+      this.change_setting_then_focus_scan_button({ auto_crop: auto_crop_checkbox.checked }),
     );
   }
 
@@ -604,7 +608,7 @@ class ScanPage {
     };
     if (should_switch_to_document_mode(switch_check)) {
       this.remember_switched_draft_session(document_body.draft_session);
-      await this.change_setting({ capture_mode: CAPTURE_MODES.DOCUMENT });
+      await this.change_setting_then_focus_scan_button({ capture_mode: CAPTURE_MODES.DOCUMENT });
     }
   }
 
@@ -677,6 +681,10 @@ class ScanPage {
       this.error_banner.report_action_error(error.message);
       this.apply_saved_settings(this.saved_settings);
     }
+  }
+
+  async change_setting_then_focus_scan_button(changes) {
+    await this.change_setting(changes);
     this.elements.scan_button.focus();
   }
 
