@@ -25,6 +25,7 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import WHOLE_PAGE, PageCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
@@ -522,15 +523,20 @@ def test_describe_draft_storage_counts_the_adjustment(service):
     assert adjusted_storage.estimated_pages_remaining < unadjusted_storage.estimated_pages_remaining
 
 
-TURNED_PAGE_IDENTIFIER = page_identifier_at(3)
-
-
-async def test_rotate_page_gives_the_page_a_new_identifier_at_the_same_position(service):
+async def test_rotate_page_keeps_the_identifier_and_the_position(service):
     await add_pages(service, 2)
 
     draft = await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
-    assert draft.page_identifiers == (TURNED_PAGE_IDENTIFIER, SECOND_PAGE_IDENTIFIER)
+    assert draft.page_identifiers == (FIRST_PAGE_IDENTIFIER, SECOND_PAGE_IDENTIFIER)
+
+
+async def test_rotate_page_turns_the_page_a_quarter_clockwise(service):
+    await add_pages(service, 2)
+
+    draft = await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+    assert draft.pages[0].framing.rotation is PageRotation.CLOCKWISE_90
 
 
 async def test_rotate_page_replaces_the_snapshot(service):
@@ -541,13 +547,23 @@ async def test_rotate_page_replaces_the_snapshot(service):
     assert service.snapshot().draft == draft
 
 
-async def test_rotate_page_swaps_the_dimensions_of_the_stored_page(service, parts):
+async def test_rotate_page_raises_the_revision(service):
     await add_pages(service, 1)
-    page_size_before = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
+    revision_before = service.snapshot().revision
 
     await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
-    assert read_page_size(parts.draft_folder / page_file_name(SECOND_PAGE_IDENTIFIER)) == page_size_before[::-1]
+    assert service.snapshot().revision == revision_before + 1
+
+
+async def test_rotate_page_leaves_the_stored_page_as_the_scanner_made_it(service, parts):
+    await add_pages(service, 1)
+    page_file = parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER)
+    page_bytes_before = page_file.read_bytes()
+
+    await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+    assert page_file.read_bytes() == page_bytes_before
 
 
 async def test_rotate_page_of_an_unknown_page_raises_page_not_found(service):
@@ -562,13 +578,79 @@ async def test_rotate_page_without_a_draft_raises_no_open_document(service):
         await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
 
-async def test_a_rotated_page_goes_into_the_saved_pdf_with_its_new_orientation(service, parts):
+SAMPLE_CROP = PageCrop(0.125, 0.115, 0.9, 0.925)
+
+
+async def test_set_page_crop_stores_the_crop_in_the_page(service):
+    await add_pages(service, 2)
+
+    draft = await service.set_page_crop(SECOND_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert [page.framing.crop for page in draft.pages] == [None, SAMPLE_CROP]
+
+
+async def test_set_page_crop_replaces_the_snapshot_and_raises_the_revision(service):
     await add_pages(service, 1)
-    page_size = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
+    revision_before = service.snapshot().revision
+
+    draft = await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert (service.snapshot().draft, service.snapshot().revision) == (draft, revision_before + 1)
+
+
+async def test_set_page_crop_to_the_same_crop_keeps_the_revision(service):
+    await add_pages(service, 1)
+    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    revision_before = service.snapshot().revision
+
+    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert service.snapshot().revision == revision_before
+
+
+async def test_set_page_crop_to_the_whole_page_removes_the_crop(service):
+    await add_pages(service, 1)
+    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    draft = await service.set_page_crop(FIRST_PAGE_IDENTIFIER, WHOLE_PAGE)
+
+    assert draft.pages[0].framing.crop is None
+
+
+async def test_set_page_crop_is_saved_in_the_manifest_on_disk(service, parts):
+    await add_pages(service, 1)
+
+    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert parts.read_manifest_on_disk().pages[0].framing.crop == SAMPLE_CROP
+
+
+async def test_set_page_crop_leaves_the_stored_page_as_the_scanner_made_it(service, parts):
+    await add_pages(service, 1)
+    page_file = parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER)
+    page_bytes_before = page_file.read_bytes()
+
+    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert page_file.read_bytes() == page_bytes_before
+
+
+async def test_set_page_crop_of_an_unknown_page_raises_page_not_found(service):
+    await add_pages(service, 1)
+
+    with pytest.raises(PageNotFoundError):
+        await service.set_page_crop(UNKNOWN_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+
+async def test_set_page_crop_without_a_draft_raises_no_open_document(service):
+    with pytest.raises(NoOpenDocumentError):
+        await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+
+async def test_an_edit_of_the_framing_removes_the_finalization_marks(service, parts):
+    await add_pages(service, 1)
     await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
-    finalization = await service.finalize()
+    manifest = parts.read_manifest_on_disk()
 
-    with pikepdf.open(finalization.result.output_path) as document:
-        media_box = [float(value) for value in document.pages[0].mediabox]
-    assert (media_box[2] > media_box[3]) is (page_size[1] > page_size[0])
+    assert (manifest.finalization_started_at, manifest.finished_document) == (None, None)

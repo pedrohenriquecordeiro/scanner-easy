@@ -27,6 +27,7 @@ from digitalizadora.domain.errors import (
     as_draft_storage_error,
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.ports import DocumentDraftRepository
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import StorageGuardService
@@ -34,7 +35,6 @@ from digitalizadora.services.storage_guard_service import StorageGuardService
 LOGGER = logging.getLogger(__name__)
 
 INITIAL_REVISION = 0
-REPLACEMENT_SPACE_FACTOR = 2
 
 
 @dataclass(frozen=True)
@@ -177,18 +177,6 @@ class DocumentDraftStore:
             # aside, so new pages wait for the next start, which recovers again (R13).
             raise DraftStorageUnavailableError("The draft folder could not be recovered at start-up")
 
-    def ensure_capacity_for_replacement(self, page_identifier: str) -> None:
-        """The new file lives beside the old one for an instant, and re-encoding may make it bigger."""
-        self._ensure_recovered()
-        draft = self._require_draft()
-        page = draft.pages[draft.position_of(page_identifier) - FIRST_PAGE_POSITION]
-        try:
-            self._storage_guard_service.ensure_space_for_file(
-                self._draft_repository.storage_folder(), REPLACEMENT_SPACE_FACTOR * page.size_in_bytes
-            )
-        except (InsufficientStorageError, OutputFolderUnavailableError) as error:
-            raise as_draft_storage_error(error) from error
-
     def read_page_content(self, page_identifier: str) -> StoredPage:
         draft = self._require_draft()
         position = draft.position_of(page_identifier)
@@ -198,27 +186,19 @@ class DocumentDraftStore:
             raise DamagedDocumentPageError(page_identifier, position)
         return StoredPage(page, position, jpeg_content)
 
-    def replace_page(self, page_identifier: str, replacement: CapturedPage) -> DocumentDraft:
-        """A new identifier at the same position (6.4): files first, manifest next, old files last.
-
-        A crash leaves either the old page or the new one in the manifest, never a size that does not match,
-        and the files left without an owner are the ones the recovery deletes.
-        """
+    def turn_page_clockwise(self, page_identifier: str) -> DocumentDraft:
+        """Only the manifest changes: the page keeps its identifier and the JPEG of the scanner (D2)."""
         draft = self._require_draft()
-        draft.position_of(page_identifier)
-        new_identifier = self._identity_source.page_identifier_factory()
-        self._draft_repository.write_page_files(
-            DocumentPageFiles(new_identifier, replacement.jpeg_content, replacement.thumbnail_jpeg)
-        )
-        new_draft = draft.with_page_replaced(page_identifier, _page_from_capture(new_identifier, replacement))
-        try:
-            self._draft_repository.save_manifest(new_draft)
-        except DigitalizadoraError:
-            self._draft_repository.delete_page_files(new_identifier)
-            raise
-        self._replace_snapshot(new_draft)
-        self._draft_repository.delete_page_files(page_identifier)
-        return new_draft
+        page = draft.pages[draft.position_of(page_identifier) - FIRST_PAGE_POSITION]
+        return self._save_and_replace(draft.with_page_framing(page_identifier, page.framing.turned_clockwise()))
+
+    def set_page_crop(self, page_identifier: str, crop: PageCrop | None) -> DocumentDraft:
+        draft = self._require_draft()
+        page = draft.pages[draft.position_of(page_identifier) - FIRST_PAGE_POSITION]
+        framing = page.framing.with_crop(crop)
+        if framing == page.framing:
+            return draft
+        return self._save_and_replace(draft.with_page_framing(page_identifier, framing))
 
     def rename(self, raw_name: str) -> DocumentDraft:
         document_name = clean_document_name(raw_name)

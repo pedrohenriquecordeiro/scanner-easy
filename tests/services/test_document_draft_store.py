@@ -24,6 +24,8 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import WHOLE_PAGE, PageCrop
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -836,22 +838,6 @@ def test_describe_storage_estimates_fewer_pages_when_the_pages_are_adjusted(draf
     assert draft_store.describe_storage(SETTINGS, ADJUSTED).estimated_pages_remaining == 5
 
 
-REPLACEMENT_PAGE_IDENTIFIER = page_identifier_at(3)
-REPLACEMENT_PAGE_FILE_NAME = f"page-{REPLACEMENT_PAGE_IDENTIFIER}.jpg"
-REPLACEMENT_THUMBNAIL_FILE_NAME = f"thumbnail-{REPLACEMENT_PAGE_IDENTIFIER}.jpg"
-REPLACEMENT_JPEG = b"the same page, turned"
-REPLACEMENT_THUMBNAIL_JPEG = b"turned thumbnail"
-
-
-def build_replacement_page(settings: ScanSettings = SETTINGS) -> CapturedPage:
-    return CapturedPage(
-        jpeg_content=REPLACEMENT_JPEG,
-        thumbnail_jpeg=REPLACEMENT_THUMBNAIL_JPEG,
-        scanned_at=DRAFT_CREATED_AT,
-        settings=settings,
-    )
-
-
 def test_read_page_content_returns_the_page_its_position_and_its_file(draft_store):
     add_pages(draft_store, 2)
 
@@ -894,185 +880,209 @@ def test_read_page_content_of_a_file_with_another_size_raises_damaged_document_p
         draft_store.read_page_content(FIRST_PAGE_IDENTIFIER)
 
 
-def test_capacity_for_a_replacement_accepts_exactly_twice_the_page_size_above_the_minimum(draft_repository):
-    free_space = MINIMUM_FREE_SPACE_BYTES + 2 * len(FIRST_PAGE_JPEG)
-    draft_store = build_store(draft_repository, RecordingFreeSpaceReader(free_space))
+SAMPLE_CROP = PageCrop(0.125, 0.115, 0.9, 0.925)
+TURNED_SAMPLE_CROP = PageCrop(0.075, 0.125, 0.885, 0.9)
+
+
+def test_turning_a_page_adds_a_quarter_turn_to_its_rotation(draft_store):
+    add_pages(draft_store, 2)
+
+    draft_store.turn_page_clockwise(SECOND_PAGE_IDENTIFIER)
+
+    assert [page.framing.rotation for page in draft_store.snapshot().draft.pages] == [
+        PageRotation.NONE,
+        PageRotation.CLOCKWISE_90,
+    ]
+
+
+def test_turning_a_page_turns_its_crop_with_it(draft_store):
+    add_pages(draft_store, 1)
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+    assert draft_store.snapshot().draft.pages[0].framing.crop == TURNED_SAMPLE_CROP
+
+
+def test_turning_a_page_keeps_its_identifier_and_position(draft_store):
+    add_pages(draft_store, 2)
+
+    turned_draft = draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+    assert turned_draft.page_identifiers == (FIRST_PAGE_IDENTIFIER, SECOND_PAGE_IDENTIFIER)
+
+
+def test_turning_a_page_returns_the_draft_of_the_new_snapshot(draft_store):
     add_pages(draft_store, 1)
 
-    assert draft_store.ensure_capacity_for_replacement(FIRST_PAGE_IDENTIFIER) is None
+    assert draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER) == draft_store.snapshot().draft
 
 
-def test_capacity_for_a_replacement_refuses_one_byte_less(draft_repository):
-    free_space = MINIMUM_FREE_SPACE_BYTES + 2 * len(FIRST_PAGE_JPEG) - 1
-    draft_store = build_store(draft_repository, RecordingFreeSpaceReader(free_space))
+def test_turning_a_page_increases_the_revision_by_one(draft_store):
     add_pages(draft_store, 1)
 
-    with pytest.raises(InsufficientDraftStorageError):
-        draft_store.ensure_capacity_for_replacement(FIRST_PAGE_IDENTIFIER)
+    draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+    assert draft_store.snapshot().revision == 2
 
 
-def test_capacity_for_a_replacement_reads_the_free_space_of_the_drafts_disk(
-    draft_store, free_space_reader, drafts_folder
-):
+def test_turning_a_page_saves_the_rotation_in_the_manifest(draft_store, drafts_folder):
     add_pages(draft_store, 1)
-    free_space_reader.requested_folders.clear()
 
-    draft_store.ensure_capacity_for_replacement(FIRST_PAGE_IDENTIFIER)
+    draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
-    assert free_space_reader.requested_folders == [drafts_folder]
+    assert reopen_manifest(drafts_folder).pages[0].framing.rotation is PageRotation.CLOCKWISE_90
 
 
-def test_unreadable_free_space_for_a_replacement_raises_draft_storage_unavailable(draft_store, free_space_reader):
+def read_page_and_thumbnail_files(draft_folder: Path) -> dict[str, bytes]:
+    return {entry.name: entry.read_bytes() for entry in draft_folder.iterdir() if entry.name != MANIFEST_FILE_NAME}
+
+
+def test_turning_a_page_leaves_its_files_as_the_scanner_made_them(draft_store, draft_folder):
     add_pages(draft_store, 1)
-    free_space_reader.failure = OutputFolderUnavailableError("Cannot read the free space")
+    files_before = read_page_and_thumbnail_files(draft_folder)
 
-    with pytest.raises(DraftStorageUnavailableError):
-        draft_store.ensure_capacity_for_replacement(FIRST_PAGE_IDENTIFIER)
+    draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+    assert read_page_and_thumbnail_files(draft_folder) == files_before
 
 
-def test_capacity_for_a_replacement_of_an_unknown_page_raises_page_not_found(draft_store):
+def test_turning_a_page_writes_only_the_manifest(draft_store, file_writer):
+    add_pages(draft_store, 1)
+    written_before = len(file_writer.written_file_names)
+
+    draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+    assert file_writer.written_file_names[written_before:] == [MANIFEST_FILE_NAME]
+
+
+def test_turning_a_page_without_a_draft_raises_no_open_document(draft_store):
+    with pytest.raises(NoOpenDocumentError):
+        draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+
+@pytest.mark.parametrize("page_identifier", [UNKNOWN_PAGE_IDENTIFIER, "last", "../x"])
+def test_turning_a_page_outside_the_draft_raises_page_not_found(draft_store, page_identifier):
     add_pages(draft_store, 1)
 
     with pytest.raises(PageNotFoundError):
-        draft_store.ensure_capacity_for_replacement(UNKNOWN_PAGE_IDENTIFIER)
+        draft_store.turn_page_clockwise(page_identifier)
 
 
-def test_replace_page_puts_a_new_identifier_at_the_same_position(draft_store):
-    add_pages(draft_store, 2)
-
-    draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert draft_store.snapshot().draft.page_identifiers == (REPLACEMENT_PAGE_IDENTIFIER, SECOND_PAGE_IDENTIFIER)
-
-
-def test_replace_page_records_the_size_of_the_new_file(draft_store, draft_folder):
-    add_pages(draft_store, 2)
-
-    draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    recorded_page = draft_store.snapshot().draft.pages[0]
-    assert recorded_page.size_in_bytes == (draft_folder / REPLACEMENT_PAGE_FILE_NAME).stat().st_size
-
-
-def test_replace_page_records_the_settings_and_time_of_the_captured_page(draft_store):
-    add_pages(draft_store, 1)
-
-    draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page(ScanSettings(600, ColorMode.GRAYSCALE)))
-
-    recorded_page = draft_store.snapshot().draft.pages[0]
-    assert (recorded_page.dots_per_inch, recorded_page.color_mode, recorded_page.scanned_at) == (
-        600,
-        ColorMode.GRAYSCALE,
-        DRAFT_CREATED_AT,
-    )
-
-
-def test_replace_page_returns_the_draft_of_the_new_snapshot(draft_store):
-    add_pages(draft_store, 2)
-
-    new_draft = draft_store.replace_page(SECOND_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert new_draft == draft_store.snapshot().draft
-
-
-def test_replace_page_keeps_the_name_of_the_document(draft_store):
-    add_pages(draft_store, 1)
-    draft_store.rename("Contrato")
-
-    draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert draft_store.snapshot().draft.name == "Contrato"
-
-
-def test_replace_page_advances_the_revision_by_one(draft_store):
-    add_pages(draft_store, 1)
-    revision_before = draft_store.snapshot().revision
-
-    draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert draft_store.snapshot().revision == revision_before + 1
-
-
-def test_replace_page_leaves_only_the_new_files_beside_the_other_pages(draft_store, draft_folder):
-    add_pages(draft_store, 2)
-
-    draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert list_file_names(draft_folder) == sorted(
-        [
-            MANIFEST_FILE_NAME,
-            SECOND_PAGE_FILE_NAME,
-            SECOND_THUMBNAIL_FILE_NAME,
-            REPLACEMENT_PAGE_FILE_NAME,
-            REPLACEMENT_THUMBNAIL_FILE_NAME,
-        ]
-    )
-
-
-def test_replace_page_saves_to_disk_the_manifest_that_lists_the_new_page(draft_store, drafts_folder):
-    add_pages(draft_store, 2)
-
-    draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert reopen_manifest(drafts_folder).page_identifiers == (REPLACEMENT_PAGE_IDENTIFIER, SECOND_PAGE_IDENTIFIER)
-
-
-def test_replace_page_writes_the_files_then_the_manifest_then_deletes_the_old_files(
-    observed_store, observed_repository
-):
+def test_turning_a_page_manifest_failure_keeps_the_previous_snapshot(observed_store, observed_repository):
     add_pages(observed_store, 1)
-    observed_repository.used_method_names.clear()
-
-    observed_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert observed_repository.used_method_names == ["write_page_files", "save_manifest", "delete_page_files"]
-
-
-def test_replace_page_manifest_failure_keeps_the_old_page_and_removes_the_new_files(
-    observed_store, observed_repository, draft_folder
-):
-    add_pages(observed_store, 1)
-    observed_repository.failures_by_method_name["save_manifest"] = DISK_FAILURE
-
-    with pytest.raises(DraftStorageUnavailableError):
-        observed_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert list_file_names(draft_folder) == [MANIFEST_FILE_NAME, FIRST_PAGE_FILE_NAME, FIRST_THUMBNAIL_FILE_NAME]
-
-
-def test_replace_page_manifest_failure_keeps_the_previous_snapshot(observed_store, observed_repository):
-    add_pages(observed_store, 2)
     snapshot_before = observed_store.snapshot()
     observed_repository.failures_by_method_name["save_manifest"] = DISK_FAILURE
 
     with pytest.raises(DraftStorageUnavailableError):
-        observed_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
+        observed_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
     assert observed_store.snapshot() == snapshot_before
 
 
-def test_replace_page_file_failure_keeps_the_previous_snapshot(drafts_folder):
-    new_page_file_name = SECOND_PAGE_FILE_NAME
-    draft_store = build_store_writing_with(drafts_folder, ScriptedFileWriter({new_page_file_name: FULL_DISK_ERROR}))
+def test_setting_a_crop_stores_it_in_the_page(draft_store):
+    add_pages(draft_store, 2)
+
+    draft_store.set_page_crop(SECOND_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert [page.framing.crop for page in draft_store.snapshot().draft.pages] == [None, SAMPLE_CROP]
+
+
+def test_setting_a_crop_returns_the_draft_of_the_new_snapshot(draft_store):
     add_pages(draft_store, 1)
-    snapshot_before = draft_store.snapshot()
 
-    with pytest.raises(InsufficientDraftStorageError):
-        draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert draft_store.snapshot() == snapshot_before
+    assert draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP) == draft_store.snapshot().draft
 
 
-def test_replace_page_of_an_unknown_page_raises_page_not_found_and_writes_nothing(draft_store, draft_folder):
+def test_setting_a_crop_increases_the_revision_by_one(draft_store):
     add_pages(draft_store, 1)
-    files_before = list_file_names(draft_folder)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert draft_store.snapshot().revision == 2
+
+
+def test_setting_a_crop_saves_it_in_the_manifest(draft_store, drafts_folder):
+    add_pages(draft_store, 1)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert reopen_manifest(drafts_folder).pages[0].framing.crop == SAMPLE_CROP
+
+
+def test_setting_a_crop_keeps_the_rotation_of_the_page(draft_store):
+    add_pages(draft_store, 1)
+    draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert draft_store.snapshot().draft.pages[0].framing.rotation is PageRotation.CLOCKWISE_90
+
+
+def test_setting_no_crop_removes_the_crop(draft_store):
+    add_pages(draft_store, 1)
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, None)
+
+    assert draft_store.snapshot().draft.pages[0].framing.crop is None
+
+
+def test_setting_a_crop_of_the_whole_page_removes_the_crop(draft_store):
+    add_pages(draft_store, 1)
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, WHOLE_PAGE)
+
+    assert draft_store.snapshot().draft.pages[0].framing.crop is None
+
+
+def test_setting_the_same_crop_keeps_the_revision(draft_store):
+    add_pages(draft_store, 1)
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert draft_store.snapshot().revision == 2
+
+
+def test_setting_the_same_crop_writes_nothing(draft_store, file_writer):
+    add_pages(draft_store, 1)
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    written_before = list(file_writer.written_file_names)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert file_writer.written_file_names == written_before
+
+
+def test_removing_a_crop_that_is_not_there_keeps_the_revision(draft_store):
+    add_pages(draft_store, 1)
+
+    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, None)
+
+    assert draft_store.snapshot().revision == 1
+
+
+def test_setting_a_crop_without_a_draft_raises_no_open_document(draft_store):
+    with pytest.raises(NoOpenDocumentError):
+        draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+
+@pytest.mark.parametrize("page_identifier", [UNKNOWN_PAGE_IDENTIFIER, "last", "../x"])
+def test_setting_a_crop_outside_the_draft_raises_page_not_found(draft_store, page_identifier):
+    add_pages(draft_store, 1)
 
     with pytest.raises(PageNotFoundError):
-        draft_store.replace_page(UNKNOWN_PAGE_IDENTIFIER, build_replacement_page())
-
-    assert list_file_names(draft_folder) == files_before
+        draft_store.set_page_crop(page_identifier, SAMPLE_CROP)
 
 
-def test_replace_page_without_a_draft_raises_no_open_document(draft_store):
-    with pytest.raises(NoOpenDocumentError):
-        draft_store.replace_page(FIRST_PAGE_IDENTIFIER, build_replacement_page())
+def test_setting_a_crop_manifest_failure_keeps_the_previous_snapshot(observed_store, observed_repository):
+    add_pages(observed_store, 1)
+    snapshot_before = observed_store.snapshot()
+    observed_repository.failures_by_method_name["save_manifest"] = DISK_FAILURE
+
+    with pytest.raises(DraftStorageUnavailableError):
+        observed_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+
+    assert observed_store.snapshot() == snapshot_before

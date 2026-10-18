@@ -17,13 +17,13 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftStorageState
 from digitalizadora.services.document_finalizer import DocumentAssemblyInput, DocumentFinalizer
-from digitalizadora.services.document_page_rotator import DocumentPageRotator
 from digitalizadora.services.scan_service import ScanService
 
 
@@ -34,7 +34,6 @@ class DocumentDraftCollaborators:
     draft_store: DocumentDraftStore
     page_scanner: Callable[[ScanRequest], Awaitable[DocumentPage]]
     finalizer: DocumentFinalizer
-    page_rotator: DocumentPageRotator
 
 
 class DocumentDraftService:
@@ -49,7 +48,6 @@ class DocumentDraftService:
         self._draft_store = collaborators.draft_store
         self._page_scanner = collaborators.page_scanner
         self._finalizer = collaborators.finalizer
-        self._page_rotator = collaborators.page_rotator
         self._clock = clock
         self._lock = asyncio.Lock()
         # Edits waiting for the lock: right after a release, locked() is False while a woken waiter has
@@ -95,7 +93,10 @@ class DocumentDraftService:
         return await self._run_edit(functools.partial(self._draft_store.delete_page, page_identifier))
 
     async def rotate_page(self, page_identifier: str) -> DocumentDraft:
-        return await self._run_edit(functools.partial(self._page_rotator.rotate_clockwise, page_identifier))
+        return await self._run_edit(functools.partial(self._draft_store.turn_page_clockwise, page_identifier))
+
+    async def set_page_crop(self, page_identifier: str, crop: PageCrop | None) -> DocumentDraft:
+        return await self._run_edit(functools.partial(self._draft_store.set_page_crop, page_identifier, crop))
 
     async def discard_last_page(self) -> DocumentDraft | None:
         return await self._run_edit(self._draft_store.discard_last_page)

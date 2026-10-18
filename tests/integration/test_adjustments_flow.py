@@ -225,7 +225,7 @@ def rotate_first_page(client: TestClient) -> dict:
     return {"previous_identifier": first_page["page_identifier"], "body": response.json()}
 
 
-def test_rotating_a_page_of_the_draft_answers_it_under_a_new_identifier(
+def test_rotating_a_page_of_the_draft_keeps_its_identifier(
     configuration: ApplicationConfiguration,
 ) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
@@ -234,29 +234,19 @@ def test_rotating_a_page_of_the_draft_answers_it_under_a_new_identifier(
         wait_for_state(client, has_document_pages(1))
         rotation = rotate_first_page(client)
     turned_identifier = rotation["body"]["document"]["pages"][0]["page_identifier"]
-    assert turned_identifier != rotation["previous_identifier"]
+    assert turned_identifier == rotation["previous_identifier"]
 
 
-def test_rotating_a_page_of_the_draft_swaps_its_dimensions(configuration: ApplicationConfiguration) -> None:
+def test_rotating_a_page_of_the_draft_records_the_rotation_and_leaves_the_scanner_image(
+    configuration: ApplicationConfiguration,
+) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         save_settings(client, configuration.default_output_folder)
         client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
         wait_for_state(client, has_document_pages(1))
-        rotate_first_page(client)
-        assert read_draft_page_size(configuration, 1, client) == GLASS_SIZE[::-1]
-
-
-def test_a_page_rotated_in_the_draft_is_saved_turned_in_the_pdf(configuration: ApplicationConfiguration) -> None:
-    with build_client(configuration, LidBackground.WHITE) as client:
-        save_settings(client, configuration.default_output_folder)
-        client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
-        wait_for_state(client, has_document_pages(1))
-        rotate_first_page(client)
-        finalization = client.post("/api/document/finalize", headers=STATE_CHANGING_HEADERS).json()
-    with pikepdf.open(Path(finalization["output_folder"]) / finalization["file_name"]) as document:
-        media_box = [float(value) for value in document.pages[0].mediabox]
-    points_per_pixel = POINTS_PER_INCH / DOTS_PER_INCH
-    assert media_box[2:] == pytest.approx([GLASS_SIZE[1] * points_per_pixel, GLASS_SIZE[0] * points_per_pixel], abs=1.0)
+        rotation = rotate_first_page(client)
+        assert read_draft_page_size(configuration, 1, client) == GLASS_SIZE
+    assert rotation["body"]["document"]["pages"][0]["rotation_degrees"] == 90
 
 
 def test_rotating_a_page_that_is_not_in_the_draft_answers_page_not_found(

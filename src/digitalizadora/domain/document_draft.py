@@ -101,16 +101,6 @@ class DocumentDraft:
     def with_page_appended(self, page: DocumentPage) -> "DocumentDraft":
         return self._with_content(self.name, (*self.pages, page))
 
-    def with_page_replaced(self, page_identifier: str, replacement: DocumentPage) -> "DocumentDraft":
-        replaced_position = self.position_of(page_identifier)
-        return self._with_content(
-            self.name,
-            tuple(
-                replacement if position == replaced_position else page
-                for position, page in enumerate(self.pages, FIRST_PAGE_POSITION)
-            ),
-        )
-
     def with_page_framing(self, page_identifier: str, framing: PageFraming) -> "DocumentDraft":
         framed_position = self.position_of(page_identifier)
         return self._with_content(
