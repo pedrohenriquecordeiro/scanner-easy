@@ -8,7 +8,12 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const STATIC_DIRECTORY = path.resolve(__dirname, "..", "..", "src", "digitalizadora", "web", "static");
-const SCRIPT_FILE_NAMES = ["scan-trigger-policy.js", "scan-quality-policy.js", "document-page-policy.js"];
+const SCRIPT_FILE_NAMES = [
+  "scan-trigger-policy.js",
+  "scan-quality-policy.js",
+  "document-page-policy.js",
+  "page-frame-geometry.js",
+];
 const STANDARD_INPUT_DESCRIPTOR = 0;
 
 const SCAN_BUTTON = Object.freeze({ tagName: "BUTTON" });
