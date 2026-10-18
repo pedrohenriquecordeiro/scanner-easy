@@ -7,7 +7,7 @@ SETUP_MARKER := $(VIRTUAL_ENVIRONMENT)/digitalizadora-setup-complete
 SIMULATOR_SCANNER_ADDRESS := http://127.0.0.1:8080/eSCL
 SIMULATED_HOME ?= $(HOME)/Digitalizadora-simulador
 
-.PHONY: setup run simulator run-simulated test test-hardware lint
+.PHONY: setup run simulator run-simulated test test-hardware lint check
 
 setup:
 	$(PYTHON) -m venv --clear $(VIRTUAL_ENVIRONMENT)
@@ -32,3 +32,5 @@ test-hardware:
 
 lint:
 	$(VIRTUAL_RUFF) check src tests
+
+check: lint test

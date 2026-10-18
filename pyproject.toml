@@ -26,6 +26,7 @@ development = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["digitalizadora", "digitalizadora.*"]
 
 [tool.setuptools.package-data]
 digitalizadora = ["web/static/*"]
