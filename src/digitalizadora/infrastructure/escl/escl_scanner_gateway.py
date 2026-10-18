@@ -20,6 +20,7 @@ from digitalizadora.domain.errors import (
     ScanRejectedError,
     ScanTimedOutError,
 )
+from digitalizadora.domain.scan_quality import scan_timeout_multiplier
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.domain.scanned_image import ScannedImage
 from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
@@ -64,6 +65,10 @@ class EsclGatewayTiming:
     busy_wait_seconds: float = 30.0
     scan_timeout_seconds: float = 300.0
     cleanup_timeout_seconds: float = 10.0
+
+    def scan_timeout_for(self, dots_per_inch: int) -> float:
+        """The page takes longer as the area grows: 300 s up to the measured 600 dpi, four times that at 1200."""
+        return self.scan_timeout_seconds * scan_timeout_multiplier(dots_per_inch)
 
 
 def _linked_exceptions(error: BaseException) -> Iterator[BaseException]:
@@ -150,7 +155,7 @@ class EsclScannerGateway:
         await self._wait_until_ready()
         job_path = await self._post_job(settings_document)
         try:
-            return await self._download_page(job_path)
+            return await self._download_page(job_path, self._timing.scan_timeout_for(settings.dots_per_inch))
         finally:
             await self._delete_job(job_path)
 
@@ -171,16 +176,16 @@ class EsclScannerGateway:
             raise ScanFailedError(f"POST {SCAN_JOBS_PATH} answered 201 without a {LOCATION_HEADER} header")
         return extract_job_path(location).rstrip("/")
 
-    async def _download_page(self, job_path: str) -> ScannedImage:
+    async def _download_page(self, job_path: str, scan_timeout_seconds: float) -> ScannedImage:
         started_at = self._timing.monotonic_clock()
         not_found_count = 0
         while True:
-            response = await self._request_next_document(job_path)
+            response = await self._request_next_document(job_path, scan_timeout_seconds)
             if response is not None and response.status_code == HTTPStatus.OK:
                 return _build_scanned_image(response)
             if response is not None:
                 not_found_count = _next_not_found_count(response.status_code, not_found_count)
-            if self._timing.monotonic_clock() - started_at >= self._timing.scan_timeout_seconds:
+            if self._timing.monotonic_clock() - started_at >= scan_timeout_seconds:
                 raise ScanTimedOutError("The scanner took too long to deliver the page")
             await self._timing.sleep(self._timing.document_poll_interval_seconds)
 
@@ -223,9 +228,9 @@ class EsclScannerGateway:
                 raise ScannerBusyError("The scanner stayed busy past the waiting limit")
             await self._timing.sleep(READINESS_POLL_INTERVAL_SECONDS)
 
-    async def _request_next_document(self, job_path: str) -> httpx.Response | None:
+    async def _request_next_document(self, job_path: str, scan_timeout_seconds: float) -> httpx.Response | None:
         """Ask for the page once; None means the read timed out before the page was ready."""
-        read_timeout_seconds = max(MINIMUM_NEXT_DOCUMENT_READ_TIMEOUT_SECONDS, self._timing.scan_timeout_seconds)
+        read_timeout_seconds = max(MINIMUM_NEXT_DOCUMENT_READ_TIMEOUT_SECONDS, scan_timeout_seconds)
         request = self._http_client.build_request(
             "GET",
             f"{self._origin}{job_path}/{NEXT_DOCUMENT_PATH}",

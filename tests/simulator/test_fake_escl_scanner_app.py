@@ -20,8 +20,10 @@ from digitalizadora.simulator.fake_escl_scanner_app import (
     PLATEN_MAXIMUM_HEIGHT,
     PLATEN_MAXIMUM_WIDTH,
     FakeScannerBehavior,
+    LidBackground,
     create_fake_escl_scanner_app,
     frame_margins_in_pixels,
+    parse_lid_background,
 )
 
 SCANNER_BASE_ADDRESS = "http://scanner.test"
@@ -351,3 +353,76 @@ async def test_processing_after_the_delivery_outlasts_the_delete() -> None:
         await client.get(f"{job_path}{NEXT_DOCUMENT_SUFFIX}")
         await client.delete(job_path)
         assert await read_state(client) is ScannerState.PROCESSING
+
+
+DARK_LID = FakeScannerBehavior(lid_background=LidBackground.DARK)
+
+
+def test_the_lid_is_white_by_default() -> None:
+    assert FakeScannerBehavior().lid_background is LidBackground.WHITE
+
+
+@pytest.mark.parametrize("corner", ["top-left", "top-right", "bottom-left", "bottom-right"])
+async def test_the_dark_lid_page_is_dark_at_every_corner(corner: str) -> None:
+    async with build_client(DARK_LID) as client:
+        image = (await read_scanned_page(client)).convert("L")
+    width_pixels, height_pixels = image.size
+    corner_pixels = {
+        "top-left": (1, 1),
+        "top-right": (width_pixels - 2, 1),
+        "bottom-left": (1, height_pixels - 2),
+        "bottom-right": (width_pixels - 2, height_pixels - 2),
+    }
+    assert image.getpixel(corner_pixels[corner]) < DARK_LEVEL_LIMIT
+
+
+async def test_the_dark_lid_page_has_a_white_sheet_inside() -> None:
+    async with build_client(DARK_LID) as client:
+        image = (await read_scanned_page(client)).convert("L")
+    width_pixels, height_pixels = image.size
+    sheet_centre = (round(0.475 * width_pixels), round(0.475 * height_pixels))
+    assert image.getpixel(sheet_centre) > LIGHT_LEVEL_LIMIT
+
+
+@pytest.mark.parametrize(
+    ("relative_position", "expected_to_be_sheet"),
+    [
+        ((0.14, 0.5), False),
+        ((0.16, 0.5), True),
+        ((0.5, 0.09), False),
+        ((0.5, 0.11), True),
+        ((0.81, 0.5), False),
+        ((0.79, 0.5), True),
+        ((0.5, 0.86), False),
+        ((0.5, 0.84), True),
+    ],
+)
+async def test_the_dark_lid_sheet_spans_fifteen_to_eighty_percent_of_the_width_and_ten_to_eighty_five_of_the_height(
+    relative_position: tuple[float, float], expected_to_be_sheet: bool
+) -> None:
+    async with build_client(DARK_LID) as client:
+        image = (await read_scanned_page(client)).convert("L")
+    width_pixels, height_pixels = image.size
+    pixel = image.getpixel((round(relative_position[0] * width_pixels), round(relative_position[1] * height_pixels)))
+    assert (pixel > LIGHT_LEVEL_LIMIT) is expected_to_be_sheet
+
+
+async def test_the_dark_lid_page_is_a_jpeg_of_the_requested_size() -> None:
+    async with build_client(DARK_LID) as client:
+        image = await read_scanned_page(client)
+    assert image.size == (2550 * FAST_RESOLUTION // 300, 3508 * FAST_RESOLUTION // 300)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_background"),
+    [
+        ("dark", LidBackground.DARK),
+        ("white", LidBackground.WHITE),
+        ("", LidBackground.WHITE),
+        (None, LidBackground.WHITE),
+        ("purple", LidBackground.WHITE),
+        ("DARK", LidBackground.WHITE),
+    ],
+)
+def test_the_lid_background_is_read_from_text(text: str | None, expected_background: LidBackground) -> None:
+    assert parse_lid_background(text) is expected_background

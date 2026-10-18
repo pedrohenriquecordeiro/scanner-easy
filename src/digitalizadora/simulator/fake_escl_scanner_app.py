@@ -11,6 +11,7 @@ import uuid
 import xml.etree.ElementTree as ElementTree
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum
 from http import HTTPStatus
 
 from fastapi import FastAPI, Request, Response
@@ -40,6 +41,19 @@ JPEG_MEDIA_TYPE = "image/jpeg"
 SCAN_JOBS_PATH = f"{SCANNER_PATH_PREFIX}/ScanJobs"
 
 
+class LidBackground(str, Enum):
+    WHITE = "white"  # the white page fills the glass
+    DARK = "dark"  # open lid: a dark background and a smaller light sheet, off centre
+
+
+def parse_lid_background(text: str | None) -> LidBackground:
+    """Absent or unknown text means the white page of the first simulator."""
+    try:
+        return LidBackground(text)
+    except ValueError:
+        return LidBackground.WHITE
+
+
 @dataclass
 class FakeScannerBehavior:
     busy_polls_before_document: int = 0
@@ -47,6 +61,7 @@ class FakeScannerBehavior:
     post_status_code: int = HTTPStatus.CREATED
     document_status_code: int = HTTPStatus.OK
     processing_polls_after_document: int = 0
+    lid_background: LidBackground = LidBackground.WHITE
 
 
 def build_capabilities_document(color_modes: Sequence[str]) -> bytes:
@@ -138,6 +153,12 @@ LABEL_OFFSET_IN_MARGINS = 2
 PAGE_LABEL_PREFIX = "Pagina"
 JPEG_QUALITY = 85
 MINIMUM_PAGE_SIZE_PIXELS = 1
+DARK_LID_COLOR = "#1e1e1e"
+# Where the sheet lies on a dark lid, as shares of the glass: off centre and smaller than the glass.
+DARK_LID_SHEET_LEFT_SHARE = 0.15
+DARK_LID_SHEET_RIGHT_SHARE = 0.80
+DARK_LID_SHEET_TOP_SHARE = 0.10
+DARK_LID_SHEET_BOTTOM_SHARE = 0.85
 
 
 def page_size_in_pixels(requested_scan: RequestedScan) -> tuple[int, int]:
@@ -175,14 +196,35 @@ def _draw_label(draw: ImageDraw.ImageDraw, size_in_pixels: tuple[int, int], page
     draw.text(label_position, f"{PAGE_LABEL_PREFIX} {page_number}", fill=INK_COLOR, font=font)
 
 
-def build_synthetic_page(requested_scan: RequestedScan, page_number: int) -> bytes:
+def _build_white_sheet(requested_scan: RequestedScan, size_in_pixels: tuple[int, int], page_number: int) -> Image.Image:
+    sheet = Image.new(PILLOW_MODE_BY_COLOR_MODE[requested_scan.color_mode], size_in_pixels, "white")
+    drawing = ImageDraw.Draw(sheet)
+    _draw_frame(drawing, size_in_pixels)
+    _draw_label(drawing, size_in_pixels, page_number)
+    return sheet
+
+
+def _dark_lid_sheet_box(size_in_pixels: tuple[int, int]) -> tuple[int, int, int, int]:
+    width_pixels, height_pixels = size_in_pixels
+    return (
+        int(width_pixels * DARK_LID_SHEET_LEFT_SHARE),
+        int(height_pixels * DARK_LID_SHEET_TOP_SHARE),
+        int(width_pixels * DARK_LID_SHEET_RIGHT_SHARE),
+        int(height_pixels * DARK_LID_SHEET_BOTTOM_SHARE),
+    )
+
+
+def build_synthetic_page(requested_scan: RequestedScan, page_number: int, lid_background: LidBackground) -> bytes:
     size_in_pixels = page_size_in_pixels(requested_scan)
-    image = Image.new(PILLOW_MODE_BY_COLOR_MODE[requested_scan.color_mode], size_in_pixels, "white")
-    draw = ImageDraw.Draw(image)
-    _draw_frame(draw, size_in_pixels)
-    _draw_label(draw, size_in_pixels, page_number)
+    if lid_background is LidBackground.WHITE:
+        page = _build_white_sheet(requested_scan, size_in_pixels, page_number)
+    else:
+        left, top, right, bottom = _dark_lid_sheet_box(size_in_pixels)
+        sheet = _build_white_sheet(requested_scan, (right - left, bottom - top), page_number)
+        page = Image.new(PILLOW_MODE_BY_COLOR_MODE[requested_scan.color_mode], size_in_pixels, DARK_LID_COLOR)
+        page.paste(sheet, (left, top))
     buffer = io.BytesIO()
-    image.save(buffer, format="JPEG", quality=JPEG_QUALITY)
+    page.save(buffer, format="JPEG", quality=JPEG_QUALITY)
     return buffer.getvalue()
 
 
@@ -233,7 +275,7 @@ class FakeEsclScanner:
             return Response(status_code=self._behavior.document_status_code)
         job.page_delivered = True
         self._processing_polls_remaining = self._behavior.processing_polls_after_document
-        page = build_synthetic_page(job.requested_scan, job.page_number)
+        page = build_synthetic_page(job.requested_scan, job.page_number, self._behavior.lid_background)
         return Response(content=page, media_type=JPEG_MEDIA_TYPE)
 
     async def delete_job(self, job_identifier: str) -> Response:

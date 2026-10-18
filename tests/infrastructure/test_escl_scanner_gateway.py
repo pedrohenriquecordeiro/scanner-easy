@@ -633,3 +633,54 @@ async def test_invalid_page_still_sends_the_delete() -> None:
     with pytest.raises(ScanFailedError):
         await harness.gateway.scan_page(SCAN_SETTINGS)
     assert harness.transport.count(DELETE_ROUTE) == 1
+
+
+def settings_at(dots_per_inch: int) -> ScanSettings:
+    return ScanSettings(dots_per_inch=dots_per_inch, color_mode=ColorMode.COLOR)
+
+
+@pytest.mark.parametrize(("dots_per_inch", "expected_multiplier"), [(75, 1), (300, 1), (600, 1), (1200, 4)])
+def test_the_scan_timeout_grows_with_the_page_area_above_600_dots_per_inch(
+    dots_per_inch: int, expected_multiplier: int
+) -> None:
+    timing = EsclGatewayTiming(scan_timeout_seconds=TEST_SCAN_TIMEOUT_SECONDS)
+
+    assert timing.scan_timeout_for(dots_per_inch) == expected_multiplier * TEST_SCAN_TIMEOUT_SECONDS
+
+
+async def test_1200_dots_per_inch_waits_four_times_the_base_timeout_before_giving_up() -> None:
+    harness = scripted_harness({DOCUMENT_ROUTE: [Reply(HTTPStatus.SERVICE_UNAVAILABLE)]})
+    with pytest.raises(ScanTimedOutError):
+        await harness.gateway.scan_page(settings_at(1200))
+    assert harness.sleep.delays == [POLL_INTERVAL_SECONDS] * 16
+
+
+@pytest.mark.parametrize("dots_per_inch", [300, 600])
+async def test_up_to_600_dots_per_inch_the_base_timeout_is_kept(dots_per_inch: int) -> None:
+    harness = scripted_harness({DOCUMENT_ROUTE: [Reply(HTTPStatus.SERVICE_UNAVAILABLE)]})
+    with pytest.raises(ScanTimedOutError):
+        await harness.gateway.scan_page(settings_at(dots_per_inch))
+    assert harness.sleep.delays == [POLL_INTERVAL_SECONDS] * 4
+
+
+async def test_a_read_timeout_at_1200_dots_per_inch_is_retried_until_the_longer_timeout() -> None:
+    harness = scripted_harness({DOCUMENT_ROUTE: [httpx.ReadTimeout("scanner went silent")]})
+    with pytest.raises(ScanTimedOutError):
+        await harness.gateway.scan_page(settings_at(1200))
+    assert harness.sleep.delays == [POLL_INTERVAL_SECONDS] * 16
+
+
+async def test_next_document_read_timeout_at_1200_dots_per_inch_is_four_times_the_base_timeout() -> None:
+    scripted_transport = httpx.MockTransport(ScriptedResponses(healthy_scripts()))
+    harness = build_harness(scripted_transport, TEST_BUSY_WAIT_SECONDS, PRODUCTION_SCAN_TIMEOUT_SECONDS)
+    await harness.gateway.scan_page(settings_at(1200))
+    timeout = harness.transport.find(DOCUMENT_ROUTE).extensions["timeout"]
+    assert timeout["read"] == 4 * PRODUCTION_SCAN_TIMEOUT_SECONDS
+
+
+async def test_next_document_read_timeout_at_600_dots_per_inch_follows_the_base_timeout() -> None:
+    scripted_transport = httpx.MockTransport(ScriptedResponses(healthy_scripts()))
+    harness = build_harness(scripted_transport, TEST_BUSY_WAIT_SECONDS, PRODUCTION_SCAN_TIMEOUT_SECONDS)
+    await harness.gateway.scan_page(settings_at(600))
+    timeout = harness.transport.find(DOCUMENT_ROUTE).extensions["timeout"]
+    assert timeout["read"] == PRODUCTION_SCAN_TIMEOUT_SECONDS

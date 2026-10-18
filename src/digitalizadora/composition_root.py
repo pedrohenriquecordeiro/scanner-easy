@@ -62,6 +62,8 @@ STATIC_DIRECTORY = Path(__file__).parent / "web" / "static"
 SCANNER_DEFAULT_TIMEOUT_SECONDS = 30.0
 SCANNER_CONNECT_TIMEOUT_SECONDS = 5.0
 # Gate 0: this printer's NextDocument blocks until the page is ready (72 s at 600 dpi in colour); 180 s leaves margin.
+# It is only the default of the HTTP client: the gateway sets the read timeout of NextDocument on every request,
+# from the page area (EsclGatewayTiming.scan_timeout_for), so 1200 dpi is not cut at 180 s.
 SCANNER_READ_TIMEOUT_SECONDS = 180.0
 NO_IDLE_CONNECTIONS = 0
 
