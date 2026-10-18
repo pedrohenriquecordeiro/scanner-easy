@@ -163,7 +163,7 @@ def scan_once(client: TestClient, output_folder: Path, output_format: str) -> di
 
 def saved_file_path(state: dict) -> Path:
     last_result = state["last_result"]
-    return Path(last_result["output_folder"]) / last_result["file_name"]
+    return Path(last_result["output_folder"]) / last_result["file_names"][0]
 
 
 def find_job_path(scanner_app: InstrumentedScannerApp) -> str:
@@ -210,7 +210,7 @@ def test_scan_request_is_accepted(client: TestClient, output_folder: Path) -> No
 
 def test_state_reports_the_completed_pdf_scan(client: TestClient, output_folder: Path) -> None:
     state = scan_once(client, output_folder, "pdf")
-    assert FIRST_PDF_NAME_PATTERN.match(state["last_result"]["file_name"])
+    assert FIRST_PDF_NAME_PATTERN.match(state["last_result"]["file_names"][0])
 
 
 def test_completed_scan_leaves_the_application_idle_with_one_scan(client: TestClient, output_folder: Path) -> None:
@@ -227,7 +227,7 @@ def test_saved_pdf_has_exactly_one_page(client: TestClient, output_folder: Path)
 def test_second_scan_as_jpg_continues_the_day_sequence(client: TestClient, output_folder: Path) -> None:
     scan_once(client, output_folder, "pdf")
     state = scan_once(client, output_folder, "jpg")
-    assert SECOND_JPG_NAME_PATTERN.match(state["last_result"]["file_name"])
+    assert SECOND_JPG_NAME_PATTERN.match(state["last_result"]["file_names"][0])
 
 
 def test_second_scan_waits_until_the_printer_is_idle_again(

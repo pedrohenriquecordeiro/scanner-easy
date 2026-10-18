@@ -103,13 +103,6 @@ def test_the_two_frames_are_where_the_photos_are_in_reading_order(configuration)
     assert worst_corner_error(page["crops"][1], 1) < CORNER_TOLERANCE
 
 
-def test_the_frames_of_tilted_photos_leave_no_provisional_box(configuration):
-    with build_client(configuration, TWO_PHOTOS) as client:
-        page = scan_two_photos_with_the_crop(client, configuration)
-
-    assert page["crop"] is None
-
-
 def test_the_stored_master_never_changes_with_the_frames_the_rotation_and_the_detection(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
         page = scan_two_photos_with_the_crop(client, configuration)

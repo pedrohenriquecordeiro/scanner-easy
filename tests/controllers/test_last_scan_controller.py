@@ -102,8 +102,6 @@ def test_rotating_the_last_scan_answers_the_scan_and_the_lists_of_files(client: 
                 "rotation_degrees": 0,
                 "crops": [],
                 "is_editable": True,
-                "file_name": "2026-10-13_00001.pdf",
-                "size_in_bytes": 1234,
             },
             "deleted_file_names": [],
             "kept_file_names": [],

@@ -81,7 +81,6 @@ def test_document_describes_the_draft_and_its_pages_in_order() -> None:
                 "size_in_bytes": 3,
                 "rotation_degrees": 0,
                 "crops": [],
-                "crop": None,
             },
             {
                 "page_identifier": page_identifier_at(2),
@@ -91,7 +90,6 @@ def test_document_describes_the_draft_and_its_pages_in_order() -> None:
                 "size_in_bytes": 3,
                 "rotation_degrees": 0,
                 "crops": [],
-                "crop": None,
             },
         ],
     }
@@ -118,28 +116,14 @@ def test_a_framed_page_reports_its_crops_with_the_four_corners() -> None:
     ]
 
 
-def test_a_tilted_crop_has_no_provisional_box() -> None:
-    draft = TWO_PAGE_SNAPSHOT.draft.with_page_framing(
-        page_identifier_at(2),
-        PageFraming(PageRotation.NONE, (quadrilateral((0.04, 0.28), (0.65, 0.02), (0.89, 0.32), (0.28, 0.58)),)),
-    )
-
-    page = build_document_body(replace(TWO_PAGE_SNAPSHOT, draft=draft))["document"]["pages"][1]
-
-    assert page["crop"] is None
-
-
-def test_a_framed_page_reports_its_rotation_and_provisional_box() -> None:
+def test_a_framed_page_reports_its_rotation() -> None:
     draft = TWO_PAGE_SNAPSHOT.draft.with_page_framing(
         page_identifier_at(2), PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.13, 0.115, 0.924, 0.925),))
     )
 
     page = build_document_body(replace(TWO_PAGE_SNAPSHOT, draft=draft))["document"]["pages"][1]
 
-    assert (page["rotation_degrees"], page["crop"]) == (
-        90,
-        {"left": 0.13, "top": 0.115, "right": 0.924, "bottom": 0.925},
-    )
+    assert page["rotation_degrees"] == 90
 
 
 def test_document_keys_come_in_the_documented_order() -> None:

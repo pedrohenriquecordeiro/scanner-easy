@@ -10,7 +10,6 @@ from digitalizadora.domain.document_draft import (
     DraftSnapshot,
 )
 from digitalizadora.domain.page_crop import CROP_CORNER_ROLES, PageCrop
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.document_draft_store import DraftStorageState
 
 EMPTY_PAGE_COUNT = 0
@@ -76,7 +75,6 @@ def _describe_page(page: DocumentPage) -> dict[str, Any]:
         "size_in_bytes": page.size_in_bytes,
         "rotation_degrees": page.framing.rotation.value,
         "crops": [describe_crop(crop) for crop in page.framing.crops],
-        "crop": _describe_provisional_crop(page.framing.crops),
     }
 
 
@@ -86,14 +84,6 @@ def describe_crop(crop: PageCrop) -> dict[str, dict[str, float]]:
         corner_key: {"x": corner.x, "y": corner.y}
         for corner_key, corner in zip(CROP_CORNER_ROLES, crop.corners, strict=True)
     }
-
-
-def _describe_provisional_crop(crops: tuple[PageCrop, ...]) -> dict[str, float] | None:
-    """Until the page learns the frames: the box of the only crop, when it is a plain rectangle."""
-    if len(crops) != 1 or not crops[0].is_rectangle or crops[0].rotation_to_upright is not PageRotation.NONE:
-        return None
-    edges = crops[0].bounding_edges
-    return {"left": edges.left, "top": edges.top, "right": edges.right, "bottom": edges.bottom}
 
 
 def _describe_recovery(recovery_report: DraftRecoveryReport | None) -> dict[str, Any] | None:

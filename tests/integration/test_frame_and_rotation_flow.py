@@ -27,6 +27,7 @@ from digitalizadora.simulator.fake_escl_scanner_app import (
 from tests.fakes.configuration_builder import TEST_PORT, build_application_configuration
 from tests.fakes.document_drafts import seed_draft_folder
 from tests.fakes.sample_images import build_sample_jpeg
+from tests.integration.flow_support import corners_of, crop_body
 
 BASE_ADDRESS = f"http://127.0.0.1:{TEST_PORT}"
 SCANNER_ADDRESS = "http://scanner.test/eSCL"
@@ -91,7 +92,7 @@ def has_document_pages(expected_count: int) -> Callable[[dict], bool]:
 
 def read_scanned_file_size(client: TestClient) -> tuple[int, int]:
     last_result = client.get("/api/state").json()["last_result"]
-    with Image.open(Path(last_result["output_folder"]) / last_result["file_name"]) as image:
+    with Image.open(Path(last_result["output_folder"]) / last_result["file_names"][0]) as image:
         return image.size
 
 
@@ -166,10 +167,41 @@ def read_pages(client: TestClient) -> list[dict]:
     return client.get("/api/document").json()["document"]["pages"]
 
 
-def put_crop(client: TestClient, page_identifier: str, crop: dict | None) -> object:
+def box_of(page: dict) -> dict | None:
+    """The bounding box of the only frame of a page; None when the page has no frame."""
+    if not page["crops"]:
+        return None
+    corners = corners_of(page["crops"][0])
+    horizontal_positions = [x for x, _ in corners]
+    vertical_positions = [y for _, y in corners]
+    return {
+        "left": min(horizontal_positions),
+        "top": min(vertical_positions),
+        "right": max(horizontal_positions),
+        "bottom": max(vertical_positions),
+    }
+
+
+def rectangle_crops(box: dict | None) -> list[dict]:
+    if box is None:
+        return []
+    corners = [
+        (box["left"], box["top"]),
+        (box["right"], box["top"]),
+        (box["right"], box["bottom"]),
+        (box["left"], box["bottom"]),
+    ]
+    return [crop_body(corners)]
+
+
+def put_crops(client: TestClient, page_identifier: str, crops: list[object]) -> object:
     return client.put(
-        f"/api/document/pages/{page_identifier}/crop", json={"crop": crop}, headers=STATE_CHANGING_HEADERS
+        f"/api/document/pages/{page_identifier}/crops", json={"crops": crops}, headers=STATE_CHANGING_HEADERS
     )
+
+
+def put_crop(client: TestClient, page_identifier: str, box: dict | None) -> object:
+    return put_crops(client, page_identifier, rectangle_crops(box))
 
 
 def read_page_file_bytes(configuration: ApplicationConfiguration, page_identifier: str) -> bytes:
@@ -196,7 +228,7 @@ def test_document_page_against_the_dark_lid_gets_the_frame_of_the_sheet(
     with build_client(configuration, LidBackground.DARK) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         add_document_page(client, 1)
-        crop = read_pages(client)[0]["crop"]
+        crop = box_of(read_pages(client)[0])
     margin = CROP_MARGIN_PIXELS / GLASS_SIZE[0]
     assert crop["left"] == pytest.approx(0.15 - margin, abs=0.03)
     assert crop["right"] == pytest.approx(0.80 + margin, abs=0.03)
@@ -221,7 +253,7 @@ def test_document_page_without_the_crop_checkbox_has_no_frame(configuration: App
     with build_client(configuration, LidBackground.DARK) as client:
         save_settings(client, configuration.default_output_folder)
         add_document_page(client, 1)
-        assert read_pages(client)[0]["crop"] is None
+        assert box_of(read_pages(client)[0]) is None
 
 
 def test_document_page_on_a_white_page_with_the_crop_checkbox_has_no_frame(
@@ -230,7 +262,7 @@ def test_document_page_on_a_white_page_with_the_crop_checkbox_has_no_frame(
     with build_client(configuration, LidBackground.WHITE) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         add_document_page(client, 1)
-        assert read_pages(client)[0]["crop"] is None
+        assert box_of(read_pages(client)[0]) is None
 
 
 def test_a_framed_page_is_saved_with_the_physical_size_of_its_frame(configuration: ApplicationConfiguration) -> None:
@@ -268,7 +300,7 @@ def test_the_frame_turns_with_the_page(configuration: ApplicationConfiguration) 
         put_crop(client, page_identifier, {"left": 0.0, "top": 0.0, "right": 0.5, "bottom": 1.0})
         client.post(f"/api/document/pages/{page_identifier}/rotation", headers=STATE_CHANGING_HEADERS)
         page = read_pages(client)[0]
-    assert (page["rotation_degrees"], page["crop"]) == (90, {"left": 0.0, "top": 0.0, "right": 1.0, "bottom": 0.5})
+    assert (page["rotation_degrees"], box_of(page)) == (90, {"left": 0.0, "top": 0.0, "right": 1.0, "bottom": 0.5})
 
 
 def test_four_turns_bring_the_page_and_its_frame_back(configuration: ApplicationConfiguration) -> None:
@@ -281,7 +313,7 @@ def test_four_turns_bring_the_page_and_its_frame_back(configuration: Application
         for _ in range(4):
             client.post(f"/api/document/pages/{page_identifier}/rotation", headers=STATE_CHANGING_HEADERS)
         page = read_pages(client)[0]
-    assert (page["rotation_degrees"], page["crop"]) == (0, crop)
+    assert (page["rotation_degrees"], box_of(page)) == (0, crop)
 
 
 def test_the_stored_page_never_changes_with_the_frame_and_the_rotation(configuration: ApplicationConfiguration) -> None:
@@ -292,7 +324,7 @@ def test_the_stored_page_never_changes_with_the_frame_and_the_rotation(configura
         page_before = read_page_file_bytes(configuration, page_identifier)
         put_crop(client, page_identifier, {"left": 0.1, "top": 0.1, "right": 0.9, "bottom": 0.9})
         client.post(f"/api/document/pages/{page_identifier}/rotation", headers=STATE_CHANGING_HEADERS)
-        client.post(f"/api/document/pages/{page_identifier}/crop/detect", headers=STATE_CHANGING_HEADERS)
+        client.post(f"/api/document/pages/{page_identifier}/crops/detect", headers=STATE_CHANGING_HEADERS)
         page_after = read_page_file_bytes(configuration, page_identifier)
     assert page_after == page_before
 
@@ -333,10 +365,10 @@ def test_detecting_the_crop_of_a_page_against_the_dark_lid_stores_the_frame(
         save_settings(client, configuration.default_output_folder)
         add_document_page(client, 1)
         page_identifier = read_pages(client)[0]["page_identifier"]
-        response = client.post(f"/api/document/pages/{page_identifier}/crop/detect", headers=STATE_CHANGING_HEADERS)
+        response = client.post(f"/api/document/pages/{page_identifier}/crops/detect", headers=STATE_CHANGING_HEADERS)
     body = response.json()
-    assert (response.status_code, body["crop_detected"]) == (200, True)
-    assert body["document"]["pages"][0]["crop"]["left"] == pytest.approx(0.15, abs=0.03)
+    assert (response.status_code, body["crops_detected"]) == (200, True)
+    assert box_of(body["document"]["pages"][0])["left"] == pytest.approx(0.15, abs=0.03)
 
 
 def test_detecting_the_crop_of_a_white_page_finds_nothing_and_changes_nothing(
@@ -347,8 +379,8 @@ def test_detecting_the_crop_of_a_white_page_finds_nothing_and_changes_nothing(
         add_document_page(client, 1)
         page_identifier = read_pages(client)[0]["page_identifier"]
         revision_before = client.get("/api/document").json()["revision"]
-        response = client.post(f"/api/document/pages/{page_identifier}/crop/detect", headers=STATE_CHANGING_HEADERS)
-    assert (response.json()["crop_detected"], response.json()["revision"]) == (False, revision_before)
+        response = client.post(f"/api/document/pages/{page_identifier}/crops/detect", headers=STATE_CHANGING_HEADERS)
+    assert (response.json()["crops_detected"], response.json()["revision"]) == (False, revision_before)
 
 
 def test_a_frame_of_the_whole_page_removes_the_frame(configuration: ApplicationConfiguration) -> None:
@@ -358,29 +390,29 @@ def test_a_frame_of_the_whole_page_removes_the_frame(configuration: ApplicationC
         page_identifier = read_pages(client)[0]["page_identifier"]
         put_crop(client, page_identifier, {"left": 0.1, "top": 0.1, "right": 0.9, "bottom": 0.9})
         put_crop(client, page_identifier, {"left": 0, "top": 0, "right": 1, "bottom": 1})
-        assert read_pages(client)[0]["crop"] is None
+        assert box_of(read_pages(client)[0]) is None
 
 
 @pytest.mark.parametrize(
-    "invalid_crop",
+    "invalid_crops",
     [
-        {"left": 0.6, "top": 0, "right": 0.4, "bottom": 1},
-        {"left": 0, "top": 0, "right": 1.2, "bottom": 1},
-        {"left": 0, "top": 0, "right": 0.01, "bottom": 1},
-        {"left": 0, "top": 0, "right": 1},
-        {"left": 10**400, "top": 0, "right": 1, "bottom": 1},
+        rectangle_crops({"left": 0.6, "top": 0, "right": 0.4, "bottom": 1}),
+        rectangle_crops({"left": 0, "top": 0, "right": 1.2, "bottom": 1}),
+        rectangle_crops({"left": 0, "top": 0, "right": 0.01, "bottom": 1}),
+        [{"top_left": {"x": 0, "y": 0}, "top_right": {"x": 1, "y": 0}, "bottom_right": {"x": 1, "y": 1}}],
+        rectangle_crops({"left": 10**400, "top": 0, "right": 1, "bottom": 1}),
         "whole",
     ],
 )
 def test_an_invalid_frame_answers_invalid_crop_and_changes_nothing(
-    configuration: ApplicationConfiguration, invalid_crop: object
+    configuration: ApplicationConfiguration, invalid_crops: object
 ) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         save_settings(client, configuration.default_output_folder)
         add_document_page(client, 1)
         page_identifier = read_pages(client)[0]["page_identifier"]
-        response = put_crop(client, page_identifier, invalid_crop)
-        assert read_pages(client)[0]["crop"] is None
+        response = put_crops(client, page_identifier, invalid_crops)
+        assert box_of(read_pages(client)[0]) is None
     assert (response.status_code, response.json()["code"]) == (422, "invalid_crop")
 
 
@@ -449,8 +481,8 @@ def test_the_frame_and_the_rotation_survive_a_restart(configuration: Application
         )
     with build_client(restarted_configuration, LidBackground.DARK) as restarted_client:
         resumed_page = read_pages(restarted_client)[0]
-    assert (resumed_page["rotation_degrees"], resumed_page["crop"]) == (90, framed_page["crop"])
-    assert resumed_page["crop"] is not None
+    assert (resumed_page["rotation_degrees"], box_of(resumed_page)) == (90, box_of(framed_page))
+    assert box_of(resumed_page) is not None
 
 
 def test_a_restart_leaves_no_temporary_file_of_the_manifest(configuration: ApplicationConfiguration) -> None:
@@ -482,8 +514,8 @@ def test_rotating_without_the_request_header_is_refused(configuration: Applicati
 
 def test_the_new_routes_refuse_a_request_without_the_header(configuration: ApplicationConfiguration) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
-        crop_response = client.put("/api/document/pages/00000000000000ff/crop", json={"crop": None})
-        detect_response = client.post("/api/document/pages/00000000000000ff/crop/detect")
+        crop_response = client.put("/api/document/pages/00000000000000ff/crops", json={"crops": []})
+        detect_response = client.post("/api/document/pages/00000000000000ff/crops/detect")
         last_scan_response = client.post("/api/scans/last/rotation")
     assert [response.status_code for response in (crop_response, detect_response, last_scan_response)] == [403] * 3
 
@@ -501,16 +533,16 @@ def rotate_last_scan(client: TestClient) -> object:
 
 def read_last_file(client: TestClient) -> Path:
     last_result = client.get("/api/state").json()["last_result"]
-    return Path(last_result["output_folder"]) / last_result["file_name"]
+    return Path(last_result["output_folder"]) / last_result["file_names"][0]
 
 
 def test_a_quick_jpg_is_turned_in_its_own_file(configuration: ApplicationConfiguration) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         scan_once(client, configuration, "jpg")
-        file_name = client.get("/api/state").json()["last_result"]["file_name"]
+        file_name = client.get("/api/state").json()["last_result"]["file_names"][0]
         response = rotate_last_scan(client)
         turned_size = read_page_size_of(read_last_file(client).read_bytes())
-    assert (response.status_code, response.json()["last_result"]["file_name"]) == (200, file_name)
+    assert (response.status_code, response.json()["last_result"]["file_names"][0]) == (200, file_name)
     assert turned_size == GLASS_SIZE[::-1]
 
 
@@ -585,7 +617,7 @@ def test_the_state_reports_the_new_size_of_the_turned_file(configuration: Applic
     with build_client(configuration, LidBackground.WHITE) as client:
         scan_once(client, configuration, "jpg")
         rotate_last_scan(client)
-        reported_size = client.get("/api/state").json()["last_result"]["size_in_bytes"]
+        reported_size = client.get("/api/state").json()["last_result"]["total_size_in_bytes"]
         actual_size = read_last_file(client).stat().st_size
     assert reported_size == actual_size
 

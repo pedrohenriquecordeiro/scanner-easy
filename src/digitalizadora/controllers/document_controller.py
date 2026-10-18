@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, StrictFloat, StrictInt
+from pydantic import BaseModel
 
 from digitalizadora.controllers.crop_request_body import PageCropsRequestBody
 from digitalizadora.controllers.document_body import build_document_body
@@ -18,7 +18,7 @@ from digitalizadora.domain.errors import (
     InvalidCropError,
     InvalidPageRotationError,
 )
-from digitalizadora.domain.page_crop import CROP_PRECISION_DIGITS, PageCrop, RectangleEdges
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.document_draft_service import DocumentDraftService
@@ -50,25 +50,6 @@ DOCUMENT_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
 THUMBNAIL_CACHE_HEADERS: Mapping[str, str] = MappingProxyType(
     {"Cache-Control": "private, max-age=31536000, immutable"}
 )
-
-
-class ProvisionalCropEdgesRequestBody(BaseModel):
-    left: StrictInt | StrictFloat
-    top: StrictInt | StrictFloat
-    right: StrictInt | StrictFloat
-    bottom: StrictInt | StrictFloat
-
-
-class ProvisionalCropRequestBody(BaseModel):
-    """The old {"crop": {...} | null} of one rectangle, until the page sends the crops."""
-
-    crop: ProvisionalCropEdgesRequestBody | None
-
-    def to_page_crops(self) -> list[PageCrop]:
-        if self.crop is None:
-            return []
-        edges = (self.crop.left, self.crop.top, self.crop.right, self.crop.bottom)
-        return [PageCrop.from_rectangle(RectangleEdges(*(round(edge, CROP_PRECISION_DIGITS) for edge in edges)))]
 
 
 def parse_page_rotation(rotation_degrees: int) -> PageRotation:
@@ -113,11 +94,6 @@ class DocumentController:
         router.add_api_route(
             "/api/document/pages/{page_identifier}/crops/detect", self.detect_page_crops, methods=["POST"]
         )
-        # Provisional alias of the old route, until the page sends the crops.
-        router.add_api_route("/api/document/pages/{page_identifier}/crop", self.set_page_crop, methods=["PUT"])
-        router.add_api_route(
-            "/api/document/pages/{page_identifier}/crop/detect", self.detect_page_crops, methods=["POST"]
-        )
         router.add_api_route("/api/document/page-order", self.reorder_pages, methods=["PUT"])
         router.add_api_route("/api/document/name", self.rename_document, methods=["PUT"])
         router.add_api_route("/api/document/finalize", self.finalize_document, methods=["POST"])
@@ -148,9 +124,6 @@ class DocumentController:
     async def set_page_crops(self, page_identifier: str, body: PageCropsRequestBody) -> JSONResponse:
         return await self._respond_to_crops_edit(page_identifier, body.to_page_crops)
 
-    async def set_page_crop(self, page_identifier: str, body: ProvisionalCropRequestBody) -> JSONResponse:
-        return await self._respond_to_crops_edit(page_identifier, body.to_page_crops)
-
     async def _respond_to_crops_edit(
         self, page_identifier: str, build_crops: Callable[[], list[PageCrop]]
     ) -> JSONResponse:
@@ -171,7 +144,6 @@ class DocumentController:
                 **body,
                 "crops_detected": detection.crops_detected,
                 "ignored_region_count": detection.ignored_region_count,
-                "crop_detected": detection.crops_detected,
             }
         )
 

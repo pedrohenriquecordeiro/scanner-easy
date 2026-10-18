@@ -76,8 +76,8 @@ EDIT_REQUESTS = [
     EditRequest("DELETE", "/api/document/pages/last"),
     EditRequest("DELETE", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}"),
     EditRequest("POST", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/rotation"),
-    EditRequest("PUT", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop", {"crop": None}),
-    EditRequest("POST", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop/detect"),
+    EditRequest("PUT", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crops", {"crops": []}),
+    EditRequest("POST", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crops/detect"),
     EditRequest("PUT", "/api/document/page-order", {"page_identifiers": REVERSED_PAGE_ORDER}),
     EditRequest("PUT", "/api/document/name", {"name": "Contrato"}),
     EditRequest("POST", "/api/document/finalize"),
@@ -543,7 +543,6 @@ def test_rotation_is_a_post_only_route(client: TestClient) -> None:
 
 CROPS_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crops"
 DETECT_PATH = f"{CROPS_PATH}/detect"
-PROVISIONAL_CROP_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop"
 UPPER_CROP_BODY = {
     "top_left": {"x": 0.039, "y": 0.28},
     "top_right": {"x": 0.65, "y": 0.019},
@@ -715,25 +714,6 @@ def test_set_page_crops_is_a_put_only_route(client: TestClient) -> None:
     assert client.post(CROPS_PATH, json=SAMPLE_CROPS_BODY).status_code == HTTPStatus.METHOD_NOT_ALLOWED
 
 
-def test_the_provisional_crop_route_still_sets_one_rectangle(
-    client: TestClient, document_service: StubDocumentDraftService
-) -> None:
-    client.put(PROVISIONAL_CROP_PATH, json={"crop": {"left": 0.125, "top": 0.115, "right": 0.9, "bottom": 0.925}})
-
-    assert document_service.received_arguments["set_page_crops"] == (
-        SECOND_PAGE_IDENTIFIER,
-        [rectangle(0.125, 0.115, 0.9, 0.925)],
-    )
-
-
-def test_the_provisional_crop_route_removes_the_crops_with_null(
-    client: TestClient, document_service: StubDocumentDraftService
-) -> None:
-    client.put(PROVISIONAL_CROP_PATH, json={"crop": None})
-
-    assert document_service.received_arguments["set_page_crops"] == (SECOND_PAGE_IDENTIFIER, [])
-
-
 def test_detect_page_crops_passes_the_identifier_of_the_path(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
@@ -772,7 +752,6 @@ def test_detect_page_crops_answers_the_document_body_with_the_flags(
             **build_document_body(build_stub_snapshot(3)),
             "crops_detected": True,
             "ignored_region_count": 0,
-            "crop_detected": True,
         },
     )
 

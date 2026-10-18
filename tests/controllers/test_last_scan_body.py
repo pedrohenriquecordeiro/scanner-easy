@@ -29,8 +29,6 @@ def test_a_last_scan_is_described_for_the_page() -> None:
         "rotation_degrees": 0,
         "crops": [],
         "is_editable": True,
-        "file_name": "2026-10-18_00001.jpg",
-        "size_in_bytes": 42,
     }
 
 
@@ -45,8 +43,6 @@ def test_the_keys_come_in_the_documented_order() -> None:
         "rotation_degrees",
         "crops",
         "is_editable",
-        "file_name",
-        "size_in_bytes",
     ]
 
 

@@ -125,8 +125,6 @@ def test_state_describes_the_last_result(
         "rotation_degrees": 0,
         "crops": [],
         "is_editable": True,
-        "file_name": "2026-10-13_00007.pdf",
-        "size_in_bytes": 734003,
     }
 
 
