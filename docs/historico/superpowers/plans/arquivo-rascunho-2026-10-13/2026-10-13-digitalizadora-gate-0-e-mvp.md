@@ -1,6 +1,6 @@
 # Digitalizadora — Gate 0 + MVP: plano de implementação
 
-> **RASCUNHO NÃO REVISADO (2026-10-13).** Escrito por 5 agentes e conferido por um verificador estático. A revisão adversarial já foi feita, **mas nada dela foi aplicado a este texto**. Antes de executar qualquer tarefa, aplique as [mudanças de contrato pendentes](2026-10-13-mudancas-de-contrato-pendentes.md) e os [achados da revisão](2026-10-13-achados-da-revisao.md) (2 bloqueantes e 15 graves). O spec manda: onde este plano divergir dele, o plano está errado.
+> **RASCUNHO NÃO REVISADO (2026-10-13).** Escrito por 5 agentes e conferido por um verificador estático. A revisão adversarial já foi feita, **mas nada dela foi aplicado a este texto**. Antes de executar qualquer tarefa, aplique as [mudanças de contrato pendentes](../2026-10-13-mudancas-de-contrato-pendentes.md) e os [achados da revisão](../2026-10-13-achados-da-revisao.md) (2 bloqueantes e 15 graves). O spec manda: onde este plano divergir dele, o plano está errado.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
@@ -12,7 +12,7 @@
 
 **Tecnologias:** Python 3.12 (venv do projeto), FastAPI, uvicorn, httpx, python-zeroconf, Pillow, img2pdf, pikepdf; pytest + pytest-asyncio; ruff; HTML, CSS e JavaScript sem etapa de build.
 
-**Spec:** [docs/superpowers/specs/2026-10-13-digitalizadora-design.md](../specs/2026-10-13-digitalizadora-design.md). Os contratos da seção 6 do spec são a autoridade para nomes e assinaturas; se um passo deste plano divergir deles, o spec vence e o plano deve ser corrigido.
+**Spec:** [docs/superpowers/specs/2026-10-13-digitalizadora-design.md](../../specs/2026-10-13-digitalizadora-design.md). Os contratos da seção 6 do spec são a autoridade para nomes e assinaturas; se um passo deste plano divergir deles, o spec vence e o plano deve ser corrigido.
 
 ## Rastreabilidade com o seu pedido (md.md)
 

@@ -2,7 +2,7 @@
 
 Used by the automated tests through httpx.ASGITransport and by `make simulator`. The platen, the
 resolutions, the absolute job Location, the end-of-job 404 and the Processing state after a delivery
-mirror what the HP DeskJet 2800 series answered in Gate 0 (docs/gate-0-resultado-2026-10-17.md).
+mirror what the HP DeskJet 2800 series answered in Gate 0 (docs/historico/gate-0-resultado-2026-10-17.md).
 """
 
 import io

@@ -1,6 +1,6 @@
 # Digitalizadora: relatório do levantamento
 
-**Data:** 2026-10-13 · **Pedido:** [md.md](../md.md) · **Situação:** levantamento e design concluídos, plano em rascunho, **nada implementado**
+**Data:** 2026-10-13 · **Pedido:** [md.md](../../md.md) · **Situação:** levantamento e design concluídos, plano em rascunho, **nada implementado**
 
 Documentos relacionados: [spec (design)](superpowers/specs/2026-10-13-digitalizadora-design.md) · [plano Gate 0 + MVP (rascunho)](superpowers/plans/2026-10-17-digitalizadora-plano-final.md) · [achados da revisão](superpowers/plans/2026-10-13-achados-da-revisao.md) · [mudanças de contrato pendentes](superpowers/plans/2026-10-13-mudancas-de-contrato-pendentes.md) · [digest da pesquisa, em inglês](pesquisa/digest-da-pesquisa-2026-10-13.md)
 

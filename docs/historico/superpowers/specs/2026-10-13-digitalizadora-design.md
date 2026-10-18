@@ -2,7 +2,7 @@
 
 **Data:** 2026-10-13 · **Atualizado em:** 2026-10-17 · **Status:** direção aprovada por você; **Gate 0 concluído em 2026-10-17** ([resultado](../../gate-0-resultado-2026-10-17.md)) · **Modo Documento (várias páginas num PDF) incluído nesta versão em 2026-10-17** ([design](2026-10-17-documento-de-varias-paginas.md)) · **Nada foi implementado ainda**
 
-**Entrada:** [md.md](../../../md.md) · **Pesquisa:** [digest da pesquisa](../../pesquisa/digest-da-pesquisa-2026-10-13.md) (em inglês, com fontes) · **Gate 0:** [resultado](../../gate-0-resultado-2026-10-17.md) e [capturas reais](../../gate-0-capturas/) · **Mudanças de contrato:** [ACC-1 a ACC-13](../plans/2026-10-13-mudancas-de-contrato-pendentes.md) e [G0C-1 a G0C-16](../plans/2026-10-17-mudancas-de-contrato-do-gate-0.md) (já aplicadas abaixo; G0C-14 a G0C-16 prevalecem sobre G0C-3 e G0C-4 onde houver conflito) · **Plano:** [Gate 0 + MVP](../plans/2026-10-17-digitalizadora-plano-final.md)
+**Entrada:** [md.md](../../../../md.md) · **Pesquisa:** [digest da pesquisa](../../pesquisa/digest-da-pesquisa-2026-10-13.md) (em inglês, com fontes) · **Gate 0:** [resultado](../../gate-0-resultado-2026-10-17.md) e [capturas reais](../../gate-0-capturas/) · **Mudanças de contrato:** [ACC-1 a ACC-13](../plans/2026-10-13-mudancas-de-contrato-pendentes.md) e [G0C-1 a G0C-16](../plans/2026-10-17-mudancas-de-contrato-do-gate-0.md) (já aplicadas abaixo; G0C-14 a G0C-16 prevalecem sobre G0C-3 e G0C-4 onde houver conflito) · **Plano:** [Gate 0 + MVP](../plans/2026-10-17-digitalizadora-plano-final.md)
 
 ---
 
