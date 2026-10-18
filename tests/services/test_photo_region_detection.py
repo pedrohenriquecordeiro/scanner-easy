@@ -13,6 +13,7 @@ from tests.fakes.photo_scenes import (
     build_flat_lid,
     build_lid,
     build_photo_scene,
+    build_shaded_lid,
     paste_flat_sheet,
     photo_corners,
 )
@@ -407,6 +408,27 @@ def test_an_open_lid_with_a_shadow_gives_no_answer():
     book_preview = Image.open(io.BytesIO(build_book_on_glass_jpeg(BookOnGlass()))).convert("RGB")
 
     assert detect_photo_regions(book_preview) is None
+
+
+@pytest.mark.parametrize("shading_levels", [45, 70, 100])
+def test_two_photos_on_a_lid_shaded_from_top_to_bottom_are_two_regions(shading_levels):
+    lid = build_shaded_lid(SCENE_SIZE, shading_levels)
+
+    assert len(detect_in([UPPER_PHOTO, LOWER_PHOTO], lid).regions) == 2
+
+
+def test_the_photos_on_a_shaded_lid_are_found_with_their_corners():
+    lid = build_shaded_lid(SCENE_SIZE, 70)
+
+    regions = detect_in([UPPER_PHOTO, LOWER_PHOTO], lid).regions
+
+    assert worst_corner_error(regions[0], UPPER_PHOTO) < CORNER_TOLERANCE_PIXELS
+
+
+def test_one_photo_on_a_shaded_lid_is_left_to_the_detection_by_side():
+    lid = build_shaded_lid(SCENE_SIZE, 70)
+
+    assert detect_in([UPRIGHT_PHOTO], lid) is None
 
 
 def test_a_preview_too_small_for_a_border_gives_no_answer():

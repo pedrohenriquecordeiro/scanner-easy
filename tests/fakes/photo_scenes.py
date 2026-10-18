@@ -68,6 +68,13 @@ def build_flat_lid(size: tuple[int, int], color: tuple[int, int, int] = LID_COLO
     return Image.new("RGB", size, color)
 
 
+def build_shaded_lid(size: tuple[int, int], shading_levels: int) -> Image.Image:
+    """The lid getting darker from the top to the bottom by `shading_levels`, as a lid that is not closed does."""
+    lid = build_flat_lid(size)
+    shade = Image.linear_gradient("L").resize(size).point(lambda level: shading_levels * level // 255)
+    return ImageChops.subtract(lid, Image.merge("RGB", (shade, shade, shade)))
+
+
 def build_lid(size: tuple[int, int], color: tuple[int, int, int] = LID_COLOR) -> Image.Image:
     """The lid with the light vertical shading a closed white lid gives."""
     lid = build_flat_lid(size, color)

@@ -118,24 +118,41 @@ def _border_is_background(border_histograms: list[list[int]], background_levels:
     return min(background_shares) >= MINIMUM_BACKGROUND_BORDER_SHARE
 
 
-def _band_difference_mask(band: Image.Image, background_level: int, difference_levels: int) -> Image.Image:
-    table = [
-        MASK_ON if abs(level - background_level) > difference_levels else MASK_OFF
-        for level in range(GRAY_LEVEL_COUNT)
-    ]
-    return band.point(table)
+def _difference_from_level(band: Image.Image, background_level: int) -> Image.Image:
+    return ImageChops.difference(band, Image.new("L", band.size, background_level))
 
 
-def _foreground_mask(bands: list[Image.Image], background_levels: list[int], difference_levels: int) -> Image.Image:
+def _foreground_mask(differences: list[Image.Image], difference_levels: int) -> Image.Image:
     """A pixel is foreground when any colour channel differs enough, so a dark but coloured cover is not lost."""
-    band_masks = [
-        _band_difference_mask(band, background_level, difference_levels)
-        for band, background_level in zip(bands, background_levels, strict=True)
-    ]
-    mask = band_masks[0]
-    for band_mask in band_masks[1:]:
-        mask = ImageChops.lighter(mask, band_mask)
+    table = [MASK_ON if level > difference_levels else MASK_OFF for level in range(GRAY_LEVEL_COUNT)]
+    mask = differences[0].point(table)
+    for difference in differences[1:]:
+        mask = ImageChops.lighter(mask, difference.point(table))
     return mask.filter(ImageFilter.MedianFilter(REGION_NOISE_FILTER_SIZE))
+
+
+def _ramp_term(ramp: Image.Image, span: int) -> Image.Image:
+    """The ramp (0 to 255 across the image) as a term of 128 plus `span` levels spread over the image, centred."""
+    return ramp.point(
+        [
+            min(GRAY_LEVEL_COUNT - 1, max(0, round(GRAY_LEVEL_COUNT / 2 + span * (level / 255 - 0.5))))
+            for level in range(GRAY_LEVEL_COUNT)
+        ]
+    )
+
+
+def _sloped_background(band: Image.Image) -> Image.Image:
+    """The lid as a plane: the medians of the four sides of the border give its level and its slope on both axes."""
+    top, bottom, left, right = (_median_level(strip.histogram()) for strip in _border_strips(band, _border_width(band)))
+    vertical_ramp = Image.linear_gradient("L").resize(band.size, Image.Resampling.BILINEAR)
+    horizontal_ramp = Image.linear_gradient("L").rotate(90).resize(band.size, Image.Resampling.BILINEAR)
+    average_level = round((top + bottom + left + right) / 4)
+    return ImageChops.add(
+        _ramp_term(horizontal_ramp, right - left),
+        _ramp_term(vertical_ramp, bottom - top),
+        scale=1.0,
+        offset=average_level - GRAY_LEVEL_COUNT,
+    )
 
 
 Run = tuple[int, int, int]
@@ -353,21 +370,10 @@ def _is_plausible(candidate: _Candidate, loose_mask: Image.Image, accepted: list
     return _ring_foreground_share(loose_mask, candidate.corners, accepted) <= MAXIMUM_RING_FOREGROUND_SHARE
 
 
-def detect_photo_regions(preview: Image.Image) -> PhotoRegions | None:
-    """preview: mode "L" or "RGB" with the longest edge up to PREVIEW_MAXIMUM_EDGE_PIXELS, in pixels of the preview.
-
-    None: the border is not a uniform background (an open lid), so this detector has no say. Otherwise the
-    regions, largest first, at most MAXIMUM_PHOTOS; the others that were plausible are counted as ignored."""
-    width, height = preview.size
-    if min(width, height) <= 2 * MINIMUM_BORDER_WIDTH_PIXELS:
-        return None
-    bands = list(preview.split())
-    border_histograms = [_border_histogram(band) for band in bands]
-    background_levels = [_median_level(histogram) for histogram in border_histograms]
-    if not _border_is_background(border_histograms, background_levels):
-        return None
-    mask = _foreground_mask(bands, background_levels, FOREGROUND_DIFFERENCE_LEVELS)
-    loose_mask = _foreground_mask(bands, background_levels, SURROUNDING_DIFFERENCE_LEVELS)
+def _regions_in(differences: list[Image.Image]) -> PhotoRegions:
+    """The plausible regions of foreground, largest first, at most MAXIMUM_PHOTOS; the others are counted."""
+    mask = _foreground_mask(differences, FOREGROUND_DIFFERENCE_LEVELS)
+    loose_mask = _foreground_mask(differences, SURROUNDING_DIFFERENCE_LEVELS)
     accepted: list[Corners] = []
     ignored_count = 0
     for candidate in _candidates_of(mask):
@@ -378,3 +384,38 @@ def detect_photo_regions(preview: Image.Image) -> PhotoRegions | None:
         else:
             ignored_count += 1
     return PhotoRegions(tuple(PhotoRegion(corners) for corners in accepted), ignored_count)
+
+
+def _regions_on_a_shaded_lid(bands: list[Image.Image]) -> PhotoRegions | None:
+    """A lid that is darker on one side than on the other (not closed, a vignette) is not one level but a plane.
+
+    This only answers when it finds two photos, which one level or the detection by side cannot tell apart; one
+    object keeps with them, and the detection by side also copes with a book on an open lid."""
+    differences = [ImageChops.difference(band, _sloped_background(band)) for band in bands]
+    border_histograms = [_border_histogram(difference) for difference in differences]
+    if not _border_is_background(border_histograms, [0] * len(differences)):
+        return None
+    detection = _regions_in(differences)
+    return detection if len(detection.regions) == MAXIMUM_PHOTOS else None
+
+
+def detect_photo_regions(preview: Image.Image) -> PhotoRegions | None:
+    """preview: mode "L" or "RGB" with the longest edge up to PREVIEW_MAXIMUM_EDGE_PIXELS, in pixels of the preview.
+
+    None: the border is not a uniform background (an open lid), so this detector has no say, unless the border is a
+    shaded lid with two photos on it. Otherwise the regions, largest first, at most MAXIMUM_PHOTOS; the others that
+    were plausible are counted as ignored."""
+    width, height = preview.size
+    if min(width, height) <= 2 * MINIMUM_BORDER_WIDTH_PIXELS:
+        return None
+    bands = list(preview.split())
+    border_histograms = [_border_histogram(band) for band in bands]
+    background_levels = [_median_level(histogram) for histogram in border_histograms]
+    if not _border_is_background(border_histograms, background_levels):
+        return _regions_on_a_shaded_lid(bands)
+    differences = [_difference_from_level(band, level) for band, level in zip(bands, background_levels, strict=True)]
+    detection = _regions_in(differences)
+    if len(detection.regions) < MAXIMUM_PHOTOS:
+        # A lid a little shaded still passes as one level, but its shade can hide a second photo.
+        return _regions_on_a_shaded_lid(bands) or detection
+    return detection

@@ -106,7 +106,7 @@ O livro (tampa aberta, 4 digitalizações) **não** passa no teste de "borda é 
 
 ### 3.3 Combinação com o detector por lado
 
-Entre as cenas acima, as que o detector de regiões deixa sem resposta (tampa em branco, página com linha fina, polaroide completa, foto de 2%) também dão **nenhuma moldura** no detector por lado: a ordem "regiões, depois por lado" não inventa moldura onde nada existe. As cenas de duas fotos, resolvidas pelo detector de regiões, nunca chegam ao por lado.
+**Revisado (15):** o detector por lado só roda quando o detector de regiões **não tem voto**, isto é, quando a borda não é uma tampa uniforme (o livro com a tampa aberta). Numa tampa uniforme a resposta do detector de regiões é final, mesmo vazia: então tampa em branco, página com linha fina, polaroide completa e um grupo de fotos que as guardas recusam dão **nenhuma moldura** e a imagem fica inteira. (A primeira versão deste parágrafo dizia que o detector por lado também não achava nada nessas cenas; isso era falso para uma foto que toca 3 lados e para duas fotos sobrepostas, onde ele devolvia um retângulo que cortava a foto.) As cenas de duas fotos, resolvidas pelo detector de regiões, nunca chegam ao por lado.
 
 ### 3.4 Tamanho do JPEG regravado em função da qualidade
 
@@ -660,7 +660,7 @@ Quatro giros da página devolvem a moldura; girar à esquerda desfaz girar à di
 1. **Fundo.** Histograma de cada canal na borda da prévia (faixa de 1,5% da maior aresta, no mínimo 2 px) e a mediana de cada canal. A borda é fundo se ao menos 60% dela fica a ±20 níveis da mediana em **todos** os canais (a regra de hoje). Senão: `None`, e a detecção por lado assume (o livro com a tampa aberta cai aqui).
 2. **Primeiro plano.** Um pixel é primeiro plano se algum canal difere do fundo por mais de 20 níveis (uma capa escura colorida não se perde); filtro de mediana de 5 (`REGION_NOISE_FILTER_SIZE`). Uma segunda máscara, mais frouxa (10 níveis, mesmo filtro), serve ao anel da etapa 7.
 3. **Componentes conexos** em Python puro, por **corridas de linha** (`re.finditer(b"\xff+", linha)`) e união-busca: uma corrida liga-se às da linha anterior com que se sobrepõe. Cada componente guarda a área e, por corrida, os quatro cantos de pixel `(início, y)`, `(fim, y)`, `(início, y + 1)`, `(fim, y + 1)`.
-4. **Área mínima:** descarta componentes com menos de 3% da prévia (`MINIMUM_PHOTO_AREA_SHARE`; poeira, etiquetas, a foto de passaporte).
+4. **Área mínima:** descarta componentes com menos de **1%** da prévia (`MINIMUM_PHOTO_AREA_SHARE`; poeira, etiquetas). Eram 3%, o que deixava de fora a foto 3x4 cm (cerca de 1,9% de um vidro A4) e a 3,5x4,5 cm (2,5%); com 1% o filtro de mediana de 5, o preenchimento e o anel seguem recusando poeira, fios de cabelo e um disco de 0,8% (revisão, 15).
 5. **Casco convexo** (cadeia monótona) e **retângulo de área mínima**: o ótimo tem um lado sobre uma aresta do casco, então se testa cada aresta (projeta o casco no eixo da aresta e no perpendicular, pega a caixa e a área); fica a menor.
 6. **Guardas**, da maior área para a menor, até 2 aceitos: preenchimento (pixels do componente ÷ área do retângulo) `≥ 0,75`; o retângulo toca no máximo 2 lados da prévia (faixa de 1,5%): uma região em 3 ou 4 lados é o fundo em volta de uma folha grande; o **anel** em volta (a faixa de 1,5%, rasterizada com `ImageDraw.polygon`, menos o interior e menos o anel já aceito de outra foto) tem no máximo 25% de primeiro plano da máscara frouxa (uma metade escura da página, quase igual à tampa, faria a moldura cortar o conteúdo). Os componentes que passam além dos 2 maiores contam em `ignored_count`.
 7. **Papéis:** o lado de cima é a aresta mais próxima da horizontal **em pixels da prévia** (empate: a de ângulo maior, no sentido horário). Depois, a ordem de leitura (6.1).
@@ -674,16 +674,16 @@ Quatro giros da página devolvem a moldura; girar à esquerda desfaz girar à di
 
 ```
 regiões = detect_photo_regions(prévia)
-se regiões não é None e há regiões:   molduras = as regiões convertidas        # até 2, borda uniforme
-senão:                                bordas = detect_paper_edges(prévia)      # o livro, tampa aberta: uma moldura retangular
-                                      molduras = [bordas convertidas] ou ()
+se regiões não é None:   molduras = as regiões convertidas ou ()     # até 2; tampa uniforme: a resposta é final
+senão:                   bordas = detect_paper_edges(prévia)         # o livro, tampa aberta: uma moldura retangular
+                         molduras = [bordas convertidas] ou ()
 ```
 
 A regra de segurança de hoje é toda mantida: borda que não é fundo uniforme = não há região; capa quase igual à tampa = não há região (o anel recusa quando a parte escura não vira primeiro plano); folha que enche o vidro = nada; branco sobre branco = nada (e as molduras do usuário valem mais que o palpite). As 20 cenas do detector estrito dão os mesmos retângulos (±3 px); a mudança de comportamento é só o piso de área, de 10% para 3% por região.
 
 **Limites conhecidos (vão para a tela como dica, 8.5):** duas fotos a menos de uns 2,7 mm uma da outra viram uma região só (a moldura envolve as duas; use **Adicionar moldura**); mais de 2 fotos: as 2 maiores (a tela avisa); foto com borda branca sobre tampa branca: acha só a parte colorida.
 
-**Constantes (nomeadas, em `photo_region_detection.py` e `page_crop_detection_service.py`):** `MINIMUM_PHOTO_AREA_SHARE = 0.03`, `MAXIMUM_PHOTOS = 2`, `REGION_NOISE_FILTER_SIZE = 5`, `MINIMUM_REGION_FILL_SHARE = 0.75`, `MAXIMUM_TOUCHED_SIDES = 2`, `MAXIMUM_RING_FOREGROUND_SHARE = 0.25`, `AXIS_SNAP_DEGREES = 1.5`, `CROP_MARGIN_RATIO = 0.01`, `MAXIMUM_MARGIN_HALVINGS = 10`; as de fundo e de primeiro plano (`BORDER_WIDTH_RATIO`, `BACKGROUND_TOLERANCE_LEVELS = 20`, `MINIMUM_BACKGROUND_BORDER_SHARE = 0.6`, `FOREGROUND_DIFFERENCE_LEVELS = 20`, `SURROUNDING_DIFFERENCE_LEVELS = 10`) saem de `paper_region_detection.py` para o módulo novo sem mudar de valor.
+**Constantes (nomeadas, em `photo_region_detection.py` e `page_crop_detection_service.py`):** `MINIMUM_PHOTO_AREA_SHARE = 0.01`, `MAXIMUM_PHOTOS = 2`, `REGION_NOISE_FILTER_SIZE = 5`, `MINIMUM_REGION_FILL_SHARE = 0.75`, `MAXIMUM_TOUCHED_SIDES = 2`, `MAXIMUM_RING_FOREGROUND_SHARE = 0.25`, `AXIS_SNAP_DEGREES = 1.5`, `CROP_MARGIN_RATIO = 0.01`, `MAXIMUM_MARGIN_HALVINGS = 10`; as de fundo e de primeiro plano (`BORDER_WIDTH_RATIO`, `BACKGROUND_TOLERANCE_LEVELS = 20`, `MINIMUM_BACKGROUND_BORDER_SHARE = 0.6`, `FOREGROUND_DIFFERENCE_LEVELS = 20`, `SURROUNDING_DIFFERENCE_LEVELS = 10`) saem de `paper_region_detection.py` para o módulo novo sem mudar de valor.
 
 **Testes** (todos abaixo de 100 ms, escritos antes do código): cenas sintéticas feitas por `tests/fakes/photo_scenes.py` direto em prévia de 400 px (retângulos girados com `ImageDraw.polygon`, conteúdo de gradiente e círculos, tampa com degradê leve e ruído), com a verdade conhecida: 1 foto reta, 1 foto a 31°, 2 fotos a −30° e −2° (a cena real, em formas sintéticas), 2 fotos lado a lado, empilhadas e a 30 px de vão (acha 2) e a 8 px (acha 1), 3 fotos (2 achadas, 1 ignorada), tampa em branco, página com linha fina, polaroide, foto de 2%, foto encostada no vidro, tampa escura com folha reta e a 7°, as 20 cenas portadas do detector estrito; o livro (quatro digitalizações reais, quando `DIGITALIZADORA_REAL_SCANS_FOLDER` aponta para elas, e a imagem sintética `tests/fakes/book_on_glass.py`) segue enquadrado por lado e o de regiões fica de fora; as três `photos-*.jpg` reais, **também só com a variável**, dão 2 regiões com cantos a ±0,02 e ângulos −30° e −2° (±2°). Nenhuma imagem com pessoas entra no repositório.
 
@@ -853,7 +853,7 @@ Catálogo de erros (`error_message_catalog.py`):
 | `saved_scan_unreadable` (muda) | "Não consegui ler o original da última digitalização para ajustá-la. Veja o registro em ~/Library/Logs/Digitalizadora." |
 | `image_adjustment_failed` (muda) | "Não consegui processar a imagem com a memória livre do Mac. Escolha uma resolução menor e tente de novo." |
 
-Editor: "Moldura 1 de 2 selecionada." · "Moldura 2 adicionada." · "Só dá para ter 2 molduras." · "Moldura 2 removida." · "Moldura 1 girada: o lado de cima da foto mudou." · durante uma regravação do modo Rápido: "Regravando…" · detecção: "Achei 2 molduras e salvei.", "Achei 1 moldura e salvei.", "Achei mais de 2 fotos; usei as 2 maiores." (somada ao anterior) e, sem achado, "Não achei uma borda confiável nesta página. As molduras não mudaram." · aplicação: "Molduras aplicadas à página 2." · "Corte removido da página 2." · descrição de uma moldura reta: "Moldura 1: esquerda 13%, topo 12%, direita 91%, base 91%." e de uma torta: "Moldura 1: inclinada 30° para a esquerda. Cantos: superior esquerdo (4%, 28%), superior direito (65%, 2%), inferior direito (89%, 32%), inferior esquerdo (28%, 58%)." (esquerda = sentido anti-horário na tela) · "Sem corte: a página inteira será usada." · dica do diálogo: "Arraste os cantos, os lados ou a moldura toda. A alça de cima gira a moldura. Com o teclado, escolha uma alça (Tab) e use as setas; Shift anda mais." · dicas das limitações: "Duas fotos muito juntas podem virar uma só moldura: use Adicionar moldura." fica só no `aria-describedby` do diálogo, em texto pequeno (não na caixa Ajustes).
+Editor: "Moldura 1 de 2 selecionada." · "Moldura 2 adicionada." · "Só dá para ter 2 molduras." · "Moldura 2 removida." · "Moldura 1 girada: o lado de cima da foto mudou." · durante uma regravação do modo Rápido: "Regravando…" · detecção: "Achei 2 molduras e salvei.", "Achei 1 moldura e salvei.", "Achei mais de 2 fotos; usei as 2 maiores." (somada ao anterior) e, sem achado, "Não achei uma borda confiável nesta página. As molduras não mudaram." · aplicação: "Molduras aplicadas à página 2." · "Corte removido da página 2." · descrição de uma moldura reta: "Moldura 1: esquerda 13%, topo 12%, direita 91%, base 91%." e de uma torta: "Moldura 1: inclinada 30° para a esquerda. Cantos: superior esquerdo (4%, 28%), superior direito (65%, 2%), inferior direito (89%, 32%), inferior esquerdo (28%, 58%)." (esquerda = sentido anti-horário na tela) · "Sem corte: a página inteira será usada." · dica do diálogo: "Arraste os cantos, os lados ou a moldura toda. A alça de cima gira a moldura. Com o teclado, escolha uma alça (Tab) e use as setas; Shift anda mais." · dicas das limitações: "Duas fotos muito juntas podem virar uma só moldura: use Adicionar moldura. Uma foto com uma faixa quase branca pode virar duas: confira as molduras, remova uma e ajuste a outra." fica só no `aria-describedby` do diálogo, em texto pequeno (não na caixa Ajustes).
 
 ## 9. Simulador
 
@@ -1140,7 +1140,44 @@ Não foi repetido aqui o que o servidor já mediu (13.4): 600 e 1200 dpi, memór
 
 ### 14.5 Pontos que seguem abertos
 
-- **Limpeza do servidor (T64 e T65):** tirar o `crop` do corpo do documento, o apelido `PUT …/crop` e `POST …/crop/detect`, e `file_name`/`size_in_bytes` de `last_result` (e os testes de integração que ainda os usam, `tests/integration/test_frame_and_rotation_flow.py` entre eles).
+- ~~**Limpeza do servidor (T64 e T65)**~~ feita na revisão (15.2).
 - **Aceitação na impressora real (T68)**, com as duas fotos e depois o livro.
-- **Ergonomia no toque:** a alça de girar a moldura fica a uns 6% da altura da moldura, fora do lado de cima; em moldura pequena ela e a alça do lado de cima ficam perto (cada uma tem 44 px de área de toque). Na aceitação em toque de verdade vale conferir.
+- **Ergonomia no toque:** resolvida na revisão (15.4): a alça de girar fica a pelo menos 52 px do lado de cima e, sem espaço fora da página, passa para dentro da moldura.
 - **Duas molduras que se sobrepõem** têm o botão de selecionar da outra por baixo do da selecionada: clicar na parte comum move a selecionada, e a outra se seleciona pela parte só dela ou pelo teclado.
+
+
+## 15. Revisão das molduras livres (achados verificados e aplicados)
+
+Baseline antes da revisão: 4039 testes; depois, **4081 passam** (17 pulados; com as variáveis de fora ligadas, 4093 passam e 5 pulam) e `ruff` está limpo. Nada foi enviado ao GitHub, a impressora real não foi usada e a porta 8765 não foi tocada. O que mudou de contrato:
+
+### 15.1 Detecção
+
+- **Detector por lado só sem voto das regiões** (3.3, 6.3): `PageCropDetectionService.detect_crops` roda `detect_photo_regions` uma vez; `None` (borda não uniforme, o livro) vai ao detector por lado; qualquer outra resposta, mesmo sem regiões, é final.
+- **Área mínima de 1%** (`MINIMUM_PHOTO_AREA_SHARE`), com os testes de poeira, fio e etiqueta mantidos.
+- **Tampa com sombra de cima para baixo** (`photo_region_detection.py`): com a borda não uniforme, ou com menos de 2 regiões em tampa uniforme, o fundo também é tentado como um **plano** (nível e inclinação saem das medianas dos quatro lados da borda, montado só com Pillow: `Image.linear_gradient` e `ImageChops.add`). Esse caminho **só responde quando acha 2 regiões** (o que um nível único e o detector por lado não separam); um objeto só (o livro, uma foto) continua indo ao detector por lado. Cenas de 2 cartões com sombra de 34, 45, 70 e 100 níveis passam a dar 2 molduras (antes 0 ou um retângulo que cobria 77% de uma foto); as 4 digitalizações reais do livro e as 3 de 2 fotos dão o mesmo de antes. Custo: cerca de 15 ms a mais, só quando a primeira passada não achou 2.
+- **Faixa quase branca atravessando uma foto (dividida em duas molduras): não foi tratada no código.** A heurística proposta (juntar duas regiões cujo retângulo conjunto é quase cheio) juntaria também duas fotos lado a lado e coladas, que é justamente o caso de uso de 2 fotos; ela é inerente ao branco sobre branco e o usuário corrige em **Ampliar**. Mitigação: a dica do diálogo ganhou "Uma foto com uma faixa quase branca pode virar duas: confira as molduras, remova uma e ajuste a outra."
+
+### 15.2 Servidor
+
+- **`ScanOutputRepository.save_in_folder(output_folder, encoded_scan)`** (porta e repositório; `save` chama com a pasta dos ajustes): `LastScanEditService` cria os arquivos novos na **pasta da digitalização**, não na dos ajustes de agora. Antes, trocar a pasta de saída e depois adicionar uma moldura gravava o arquivo na pasta nova, repetia o nome no manifesto e mandava o mestre para `set-aside-*`.
+- Reforços: dois arquivos de mesmo nome no mesmo render viram `OutputFolderUnavailableError`; uma edição que acha o espaço sumido marca a digitalização como **não editável** no tracker (o painel deixa de oferecer Ampliar e Girar).
+- **Partida com o disco externo desligado:** `restore_after_start` não descarta mais o espaço quando a pasta de saída não existe (aviso no log, painel sem última digitalização); só descarta quando a pasta existe e nenhum arquivo dela existe. O mestre fica.
+- **Erros das rotas do último arquivo:** `LAST_SCAN_ERROR_STATUSES` ganhou `invalid_page_rotation` (422); os erros do espaço (`insufficient_draft_storage`, `draft_storage_unavailable`) viram os códigos `insufficient_last_scan_storage` (507) e `last_scan_storage_unavailable` (503), com texto do modo Rápido (`respond_to_last_scan_error`, usado também pela rota de pré-visualização).
+- **API provisória removida:** `PUT …/crop`, `POST …/crop/detect`, `ProvisionalCropRequestBody`, a chave `crop` das páginas, `crop_detected` e `file_name`/`size_in_bytes` de `last_result`.
+- **`output_page_count`** no corpo do documento (`document.output_page_count`) e no resumo de `/api/state` (`document.output_page_count`): páginas do PDF (uma página com 2 molduras conta 2).
+- **Cabeçalho `Cache-Control: no-cache`** em `/` e em `/static/*` (`RevalidatedStaticFiles`; o ETag faz a revalidação virar um 304): o Chrome deixava de pegar JS e CSS novos depois de uma atualização.
+
+### 15.3 Interface
+
+- **Diálogo da moldura:** coluna flex com altura máxima da tela (`100dvh`); só a área da imagem rola e as linhas de botões ficam sempre à vista (as duas primeiras linhas viraram uma); no celular (≤ 30 rem) o diálogo todo rola e só a linha de **Cancelar** e **Aplicar** fica grudada embaixo. Medido no Chrome sem janela em 1280×720, 1440×800, 1440×900, 1920×950 e 390×844: **Aplicar** e **Cancelar** ficam a vista em todos.
+- **Contagem de páginas do PDF:** o resumo diz "2 páginas (4 no PDF)", o aviso do documento pendente também, e a pergunta de Salvar usa as páginas do PDF.
+- **Aplicar em andamento:** Adicionar, Remover, Sem corte, Girar moldura, Detectar, Girar página e **Cancelar** ficam desabilitados, as alças e as setas não mexem na moldura e o Esc não fecha o diálogo; assim "Alterações da moldura descartadas." nunca é dito de algo que o servidor aplicou.
+- **Foco visível** em **Mover a moldura** e na seleção: listras (preto e branco a 35%) em vez do véu branco a 22%.
+- **Qualidade do JPEG:** o salvamento espera 300 ms depois da última mudança (uma tecla segurada não dispara mais um PUT por passo) e uma resposta sobre um valor antigo não devolve o controle a ele (de 20 setas a 80 ms de latência, de 90 acabava em 82; agora acaba em 70).
+- **Alça de girar a moldura:** no mínimo 52 px do meio do lado de cima (antes cobria a alça desse lado em 390 px) e, sem espaço fora da página, vai para dentro da moldura.
+- **Aviso de arquivo apagado:** "O arquivo X foi apagado porque agora há só N arquivo(s)." (não nomeia mais uma moldura, porque os arquivos acompanham as posições).
+
+### 15.4 Testes e histórico
+
+- Os ajudantes de teste sem parâmetro booleano (`build_job(output_format, adjustment)`, `job_with`) e com no máximo 3 parâmetros (`rectangle((esquerda, topo, direita, base))`, `render_request`, ajudantes `turn_last_scan`, `put_last_crops` e `detect_last_crops`); o teste de 409 durante a digitalização, de 0,8 s, virou cinco testes sem espera (a digitalização fica presa por um portão). Os testes de integração do aplicativo inteiro seguem em 0,1 a 0,2 s cada (subir o aplicativo e escanear no simulador): aberto.
+- Os dois commits locais de mesmo assunto "erros e textos novos do ajuste da última digitalização" foram juntos num só, para o histórico ficar bissectável (nada tinha sido enviado).

@@ -468,6 +468,11 @@ def test_frame_dialog_warns_about_photos_that_are_too_close() -> None:
     assert "Duas fotos muito juntas podem virar uma só moldura: use Adicionar moldura." in page
 
 
+def test_frame_dialog_warns_about_a_photo_with_a_near_white_band() -> None:
+    page = " ".join(read_static_file("index.html").split())
+    assert "Uma foto com uma faixa quase branca pode virar duas: confira as molduras" in page
+
+
 def test_frame_dialog_buttons_come_in_the_documented_order() -> None:
     page = read_static_file("index.html")
     labels = re.findall(
