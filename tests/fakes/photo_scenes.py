@@ -83,6 +83,11 @@ def paste_photo(canvas: Image.Image, placed_photo: PlacedPhoto) -> None:
     canvas.paste(rotated_photo, (left, top), rotated_mask)
 
 
+def paste_flat_sheet(canvas: Image.Image, placed_sheet: PlacedPhoto, color: tuple[int, int, int]) -> None:
+    """A sheet of one colour with the same placement as a photo: a white page on a dark lid, a polaroid border."""
+    ImageDraw.Draw(canvas).polygon(list(photo_corners(placed_sheet)), fill=color)
+
+
 def build_photo_scene(
     canvas_size: tuple[int, int], photos: Sequence[PlacedPhoto], lid: Image.Image | None = None
 ) -> Image.Image:

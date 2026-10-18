@@ -17,12 +17,13 @@ from digitalizadora.repositories.file_system_document_draft_repository import (
 )
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_page_crop_detector import CropDetectionResult, DocumentPageCropDetector
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.page_crop_detection_service import DetectedCrops, PageCropDetectionService
 from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, page_identifier_at, seed_draft_folder
 from tests.fakes.document_service_parts import InstantFileWriter
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.page_crops import rectangle
+from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sequential_page_identifiers import SequentialPageIdentifiers
 from tests.fakes.synthetic_scans import build_scan_jpeg
@@ -40,14 +41,20 @@ SAMPLE_CROP = rectangle(0.1, 0.1, 0.9, 0.9)
 
 
 class StubCropDetectionService(PageCropDetectionService):
-    def __init__(self, crop: PageCrop | None = None, failure: Exception | None = None) -> None:
-        self._crop = crop
+    def __init__(
+        self,
+        crops: tuple[PageCrop, ...] = (),
+        ignored_region_count: int = 0,
+        failure: Exception | None = None,
+    ) -> None:
+        self._crops = crops
+        self._ignored_region_count = ignored_region_count
         self._failure = failure
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+    def detect_crops(self, jpeg_content: bytes) -> DetectedCrops:
         if self._failure is not None:
             raise self._failure
-        return self._crop
+        return DetectedCrops(self._crops, self._ignored_region_count)
 
 
 def build_store(drafts_folder: Path) -> DocumentDraftStore:
@@ -114,7 +121,7 @@ def test_nothing_found_leaves_the_frame_and_the_revision_alone(drafts_folder):
 
 def test_a_frame_found_on_the_master_is_stored_in_the_displayed_orientation(drafts_folder):
     store, detector = build_detector(
-        drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=rectangle(0.0, 0.0, 0.5, 1.0))
+        drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(rectangle(0.0, 0.0, 0.5, 1.0),))
     )
     store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
@@ -124,7 +131,7 @@ def test_a_frame_found_on_the_master_is_stored_in_the_displayed_orientation(draf
 
 
 def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
-    store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=SAMPLE_CROP))
+    store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(SAMPLE_CROP,)))
     store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
@@ -133,7 +140,7 @@ def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
 
 
 def test_a_found_frame_replaces_the_frame_of_before(drafts_folder):
-    store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=SAMPLE_CROP))
+    store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(SAMPLE_CROP,)))
     store.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle(0.3, 0.3, 0.6, 0.6)])
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
@@ -142,7 +149,7 @@ def test_a_found_frame_replaces_the_frame_of_before(drafts_folder):
 
 
 def test_the_same_frame_found_again_keeps_the_revision(drafts_folder):
-    store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=SAMPLE_CROP))
+    store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(SAMPLE_CROP,)))
     store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
     revision_before = store.snapshot().revision
 
@@ -210,3 +217,47 @@ def test_a_page_without_a_frame_stays_unframed_when_nothing_is_found(drafts_fold
     _, detector = build_detector(drafts_folder, WHITE_PAGE)
 
     assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER).draft.pages[0].framing == UNFRAMED
+
+
+LEFT_CROP = rectangle(0.05, 0.1, 0.45, 0.9)
+RIGHT_CROP = rectangle(0.55, 0.1, 0.95, 0.9)
+
+
+def test_two_frames_found_are_both_stored_in_reading_order(drafts_folder):
+    _, detector = build_detector(
+        drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(RIGHT_CROP, LEFT_CROP))
+    )
+
+    result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
+
+    assert result.draft.pages[0].framing.crops == (LEFT_CROP, RIGHT_CROP)
+
+
+def test_the_regions_ignored_by_the_detection_are_counted_in_the_result(drafts_folder):
+    _, detector = build_detector(
+        drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(LEFT_CROP, RIGHT_CROP), ignored_region_count=1)
+    )
+
+    assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER).ignored_region_count == 1
+
+
+def test_two_frames_found_on_a_turned_page_are_turned_with_it(drafts_folder):
+    store, detector = build_detector(
+        drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(LEFT_CROP, RIGHT_CROP))
+    )
+    store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
+
+    crops = detector.detect_for_page(FIRST_PAGE_IDENTIFIER).draft.pages[0].framing.crops
+
+    assert sorted(crop.bounding_edges.right for crop in crops) == pytest.approx([0.9, 0.9])
+
+
+def test_two_real_photos_on_a_white_lid_become_two_frames(drafts_folder):
+    scene = build_photo_scene_jpeg(
+        (582, 800), [PlacedPhoto((150.0, 260.0), (240, 300), 10.0), PlacedPhoto((430.0, 540.0), (240, 300), -6.0, 2)]
+    )
+    _, detector = build_detector(drafts_folder, scene)
+
+    result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
+
+    assert len(result.draft.pages[0].framing.crops) == 2

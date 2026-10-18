@@ -1,6 +1,6 @@
 """Finds each edge of the sheet on the glass in a small preview, side by side, with Pillow only.
 
-paper_region_detection takes the border of the preview for a uniform background and fails when the lid is open:
+photo_region_detection takes the border of the preview for a uniform background and fails when the lid is open:
 the border then holds a blown-out side, a shadow and a gradient. Here every side is searched on its own, from the
 glass inwards, on a profile of medians that ignores text. A side where the cover blends into the glass is read from
 the glass beside the sheet. The result is only a suggestion for a frame the user can still adjust.

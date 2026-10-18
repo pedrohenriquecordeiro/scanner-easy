@@ -55,8 +55,7 @@ class DocumentPageCapture:
         if not job.request.adjustment.auto_crop:
             return UNFRAMED
         try:
-            crop = self._crop_detection_service.detect_crop_to_suggest(jpeg_content)
-            return UNFRAMED if crop is None else PageFraming().with_crops([crop])
+            return PageFraming().with_crops(self._crop_detection_service.detect_crops(jpeg_content).crops)
         except DigitalizadoraError:
             # A failed suggestion never costs the page: it joins the draft whole and the user can frame it.
             LOGGER.warning("The automatic crop of the page failed; the page was kept whole", exc_info=True)

@@ -10,7 +10,6 @@ from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, InsufficientDraftStorageError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_framing import UNFRAMED
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_job import ScanJob
@@ -24,7 +23,7 @@ from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.page_crop_detection_service import DetectedCrops, PageCropDetectionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.storage_guard_service import (
@@ -36,6 +35,7 @@ from digitalizadora.services.storage_guard_service import (
 from digitalizadora.services.thumbnail_service import ThumbnailService
 from tests.fakes.document_drafts import page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
+from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.sequential_page_identifiers import SequentialPageIdentifiers
@@ -180,6 +180,20 @@ def test_a_page_with_the_automatic_crop_gets_the_frame_of_the_sheet(page_capture
     assert (edges.left, edges.right) == pytest.approx((0.18, 0.82), abs=0.05)
 
 
+TWO_PHOTOS = ScannedImage(
+    build_photo_scene_jpeg(
+        (582, 800), [PlacedPhoto((150.0, 260.0), (240, 300), 10.0), PlacedPhoto((430.0, 540.0), (240, 300), -6.0, 2)]
+    ),
+    "image/jpeg",
+)
+
+
+def test_a_page_with_two_photos_and_the_automatic_crop_gets_two_frames(page_capture):
+    page = page_capture.store(TWO_PHOTOS, CROPPING_JOB)
+
+    assert len(page.framing.crops) == 2
+
+
 def test_a_page_with_the_automatic_crop_has_no_rotation(page_capture):
     page = page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
 
@@ -220,7 +234,7 @@ class FailingCropDetectionService(PageCropDetectionService):
     def __init__(self, failure: Exception) -> None:
         self._failure = failure
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+    def detect_crops(self, jpeg_content: bytes) -> DetectedCrops:
         raise self._failure
 
 
@@ -255,9 +269,9 @@ class CountingCropDetectionService(PageCropDetectionService):
     def __init__(self) -> None:
         self.detection_count = 0
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+    def detect_crops(self, jpeg_content: bytes) -> DetectedCrops:
         self.detection_count += 1
-        return None
+        return DetectedCrops((), 0)
 
 
 def test_the_detection_is_not_run_without_the_automatic_crop(scan_encoder, draft_store):

@@ -19,10 +19,10 @@ class ImageAdjustmentService:
         if not adjustment.is_active:
             return jpeg_content
         try:
-            crop = self._crop_detection_service.detect_crop_to_apply(jpeg_content)
-            if crop is None:
+            detected_crops = self._crop_detection_service.detect_crops(jpeg_content).crops
+            if not detected_crops:
                 return jpeg_content
-            return self._crop(jpeg_content, crop, adjustment.jpeg_quality)
+            return self._crop(jpeg_content, detected_crops[0], adjustment.jpeg_quality)
         except MemoryError as error:
             raise ImageAdjustmentFailedError("Not enough memory to adjust the scanned image") from error
         except (OSError, Image.DecompressionBombError, ValueError) as error:

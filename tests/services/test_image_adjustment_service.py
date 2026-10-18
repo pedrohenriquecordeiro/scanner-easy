@@ -70,13 +70,15 @@ def test_the_crop_keeps_the_sheet_content(service, sheet_on_dark_lid):
     assert min(center_pixel) > 200
 
 
-def test_the_crop_of_a_page_without_a_sheet_returns_the_same_bytes(service, marked_page):
-    assert service.adjust(marked_page, CROP) is marked_page
+def test_the_crop_of_a_page_without_a_sheet_returns_the_same_bytes(service):
+    white_page = build_scan_jpeg(PAGE_SIZE)
+
+    assert service.adjust(white_page, CROP) is white_page
 
 
-def test_a_crop_that_finds_no_sheet_says_so_in_the_log(service, marked_page, caplog):
+def test_a_crop_that_finds_no_sheet_says_so_in_the_log(service, caplog):
     with caplog.at_level(logging.INFO):
-        service.adjust(marked_page, CROP)
+        service.adjust(build_scan_jpeg(PAGE_SIZE), CROP)
 
     assert [record.levelno for record in caplog.records] == [logging.INFO]
 

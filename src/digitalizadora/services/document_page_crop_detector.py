@@ -28,15 +28,15 @@ class DocumentPageCropDetector:
     def detect_for_page(self, page_identifier: str) -> CropDetectionResult:
         stored_page = self._draft_store.read_page_content(page_identifier)
         try:
-            master_crop = self._crop_detection_service.detect_crop_to_suggest(stored_page.jpeg_content)
+            detected = self._crop_detection_service.detect_crops(stored_page.jpeg_content)
         except ScanFailedError as error:
             raise DamagedDocumentPageError(page_identifier, stored_page.position) from error
-        if master_crop is None:
-            return CropDetectionResult(self._current_draft(), crops_detected=False, ignored_region_count=0)
-        # The detection ran on the stored JPEG; the frame is kept in the orientation the page is displayed in.
-        displayed_crops = stored_page.page.framing.crops_from_master([master_crop])
+        if not detected.crops:
+            return CropDetectionResult(self._current_draft(), False, detected.ignored_region_count)
+        # The detection ran on the stored JPEG; the frames are kept in the orientation the page is displayed in.
+        displayed_crops = stored_page.page.framing.crops_from_master(detected.crops)
         draft = self._draft_store.set_page_crops(page_identifier, displayed_crops)
-        return CropDetectionResult(draft, crops_detected=True, ignored_region_count=0)
+        return CropDetectionResult(draft, True, detected.ignored_region_count)
 
     def _current_draft(self) -> DocumentDraft:
         return self._draft_store.snapshot().draft
