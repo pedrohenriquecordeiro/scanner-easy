@@ -167,7 +167,7 @@ Os achados da revisão que tratavam só do script e do roteiro desta task (F-14,
 - [ ] **Passo 1: Criar o repositório e conferir o Python**
 
 Run: `git init -b main`
-Expected: `Initialized empty Git repository in /Users/usuario/Code/projects/digitalizadora/.git/`
+Expected: `Initialized empty Git repository in <projeto>/.git/`
 
 Run: `python3 -c "import sys; assert sys.version_info >= (3, 12), sys.version; print(sys.version.split()[0])"`
 Expected: um número `3.12.x` ou maior (nesta máquina, `3.12.3`). Se aparecer `AssertionError`, usar `python3.12` no lugar de `python3` nos passos seguintes e em `make setup PYTHON=python3.12`.

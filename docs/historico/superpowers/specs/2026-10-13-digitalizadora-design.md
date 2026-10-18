@@ -924,7 +924,7 @@ Cada fase vira um plano próprio, escrito depois de validar a anterior com a imp
 
 **B. App HP (já instalado; o Digitalizadora não precisa dele).** Tem presets Foto, Documento, Vários itens, Livro e Lote, "Adicionar digitalização" para várias páginas e PDF pesquisável. Pede conta HP e internet.
 
-**C. NAPS2 8.x (grátis; `brew install --cask naps2`).** No Mac não existe a barra de perfis; use os atalhos F2–F12 por perfil. Crie os perfis "Documento PDF" (Vidro, A4, 300 dpi, cinza) e "Foto JPG" (Vidro, 600 dpi, cor, qualidade JPEG 90, Auto-Crop). Em "Salvar automaticamente", use **caminho absoluto** (`/Users/usuario/Scans/doc-$(nnn).pdf`; o `~` não funciona). Para várias páginas num PDF: Digitalizar > Lote > "Várias digitalizações, perguntar entre elas" e "Salvar num único arquivo".
+**C. NAPS2 8.x (grátis; `brew install --cask naps2`).** No Mac não existe a barra de perfis; use os atalhos F2–F12 por perfil. Crie os perfis "Documento PDF" (Vidro, A4, 300 dpi, cinza) e "Foto JPG" (Vidro, 600 dpi, cor, qualidade JPEG 90, Auto-Crop). Em "Salvar automaticamente", use **caminho absoluto** (`/Users/<usuario>/Scans/doc-$(nnn).pdf`; o `~` não funciona). Para várias páginas num PDF: Digitalizar > Lote > "Várias digitalizações, perguntar entre elas" e "Salvar num único arquivo".
 
 Até o modo Documento estar implementado, para juntar PDFs de uma página, abra-os no Preview e arraste as miniaturas.
 

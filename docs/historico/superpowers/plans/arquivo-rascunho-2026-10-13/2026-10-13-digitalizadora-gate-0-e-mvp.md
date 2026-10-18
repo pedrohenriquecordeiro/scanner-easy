@@ -325,14 +325,14 @@ Objetivo: descobrir, com a impressora **ligada**, se a HP DeskJet Ink Advantage 
 
 - [ ] Impressora ligada e a luz do Wi-Fi **fixa** (piscando = ainda conectando).
 - [ ] Mac na mesma rede Wi-Fi da impressora (a impressora só usa 2,4 GHz).
-- [ ] **VPN desligada** (o FortiClient está instalado).
+- [ ] **VPN desligada** (há uma VPN instalada).
 - [ ] Abrir o **Terminal.app** (não o terminal do VS Code nem o do Claude Code: o macOS só libera a Rede Local para processos iniciados pelo Terminal.app).
 - [ ] **Não** atualizar o firmware da impressora nem o macOS até terminar o Gate 0.
 - [ ] Uma folha de papel comum no vidro, com a tampa fechada, para os passos 0.4 a 0.7.
 - [ ] No Terminal.app, ir para a pasta do projeto e criar as variáveis usadas abaixo (troque pelos valores do passo 0.2):
 
 ```bash
-cd /Users/usuario/Code/digitalizadora
+cd <projeto>
 export PRINTER_HOST=192.168.0.40
 export PRINTER_PORT=8080
 ```
@@ -569,7 +569,7 @@ Expected: apenas `.gitkeep`.
 Seguir a seção "Preparação" de `docs/spike-0/README.md`: impressora ligada com a luz do Wi-Fi fixa, Mac na mesma rede, VPN desligada, **Terminal.app** (não o terminal do VS Code), sem atualizar firmware nem macOS, uma folha no vidro. Depois:
 
 ```bash
-cd /Users/usuario/Code/digitalizadora
+cd <projeto>
 cp docs/spike-0/results-template.md docs/spike-0/results.md
 ```
 
@@ -674,7 +674,7 @@ Expected: `docs/spike-0/results.md` completo, com a build do macOS, a tabela e a
 - [ ] **Passo 1: Criar o repositório e conferir o Python**
 
 Run: `git init -b main`
-Expected: `Initialized empty Git repository in /Users/usuario/Code/digitalizadora/.git/`
+Expected: `Initialized empty Git repository in <projeto>/.git/`
 
 Run: `python3 -c "import sys; assert sys.version_info >= (3, 12), sys.version; print(sys.version.split()[0])"`
 Expected: um número `3.12.x` ou maior (nesta máquina, `3.12.3`). Se aparecer `AssertionError`, usar `python3.12` no lugar de `python3` nos passos seguintes e em `make setup PYTHON=python3.12`.

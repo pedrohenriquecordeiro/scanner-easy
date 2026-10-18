@@ -38,7 +38,7 @@ Status: **medido** (feito neste Mac), **confirmado** (fonte primária), **infer�
 | 12 | Privacidade de **Rede Local** (macOS 15): só o que é iniciado pelo **Terminal.app** é isento. Terminal do VS Code, shell do Claude Code, apps empacotados e LaunchAgents não são. | confirmado (Apple TN3179) | O app deve ser iniciado pelo Terminal.app. Um app empacotado precisa de permissão. |
 | 13 | Disco interno de 245 GB com **só 2–3 GB livres**; nenhum disco externo conectado. | medido | Pasta de saída em disco externo e guarda de espaço livre. |
 | 14 | Sem Xcode.app (só Command Line Tools). Python 3.12.3 já tem FastAPI, uvicorn, httpx e Pillow 10.4. Tesseract instalado, sem o idioma `por`. | medido | Caminho nativo em Swift descartado; ambiente virtual próprio do projeto. |
-| 15 | FortiClient e OrbStack instalados. | medido | Uma VPN pode bloquear a rede local à parte da permissão de Rede Local. Testar com a VPN desligada. |
+| 15 | Uma VPN e um software de contêineres instalados. | medido | Uma VPN pode bloquear a rede local à parte da permissão de Rede Local. Testar com a VPN desligada. |
 | 16 | O macOS 27 saiu em 2026-09-14; seu Mac está no 15.7.3 (o 15.8.1 existe). | confirmado | Não atualizar o macOS antes de validar; registrar a build em cada teste. |
 
 ---
@@ -210,7 +210,7 @@ Os 48 achados menores (estilo, mensagens, contagens esperadas, pequenas lacunas 
 
 **Nada.** A pesquisa e suas retomadas, a redação do plano e a revisão já haviam terminado quando você pediu para parar; o `TaskStop` confirmou que a última (a revisão) não estava mais ativa. Uma retomada da pesquisa que eu mesmo havia interrompido antes (ela repetia agentes já prontos) também está encerrada, e `ListAgents` não mostrou nenhum agente desta sessão em andamento.
 
-### 8.2 No projeto (`/Users/usuario/Code/digitalizadora`)
+### 8.2 No projeto (`<projeto>`)
 
 | Arquivo | O que é | Estado |
 |---|---|---|
@@ -227,8 +227,8 @@ Não existe código do produto, ambiente virtual nem repositório Git: o projeto
 
 ### 8.3 Fora do projeto
 
-- **Memória do assistente** (`~/.claude/projects/-Users-usuario-Code-digitalizadora/memory/`): duas anotações e o índice, sobre o estado do projeto e sobre como retomar execuções de workflow sem repetir trabalho.
-- **Registros dos agentes** (`~/.claude/projects/-Users-usuario-Code-digitalizadora/subagents/workflows/`): o texto bruto de cada pesquisador, cético, redator e revisor.
+- **Memória do assistente** (`~/.claude/projects/-<usuario>-<projeto>/memory/`): duas anotações e o índice, sobre o estado do projeto e sobre como retomar execuções de workflow sem repetir trabalho.
+- **Registros dos agentes** (`~/.claude/projects/-<usuario>-<projeto>/subagents/workflows/`): o texto bruto de cada pesquisador, cético, redator e revisor.
 - **Pasta temporária da sessão** (cerca de 136 MB): partes do plano, ferramentas e as pastas de teste dos revisores. É descartável.
 - **Documento online "Digitalizadora: relatório do levantamento"**, que comecei a criar antes do seu pedido de Markdown: ficou só com a estrutura (seções vazias). Este arquivo `.md` é o relatório de verdade; o documento online pode ser apagado, ou eu o preencho se você quiser.
 
@@ -239,7 +239,7 @@ Não existe código do produto, ambiente virtual nem repositório Git: o projeto
 ### 9.1 Decisões
 
 1. **Nomes:** aceita a exceção D6 (módulos Python em `snake_case`, o resto em kebab-case)? Recomendo sim.
-2. **Onde guardar:** você tem um HD ou SSD externo? O disco interno tem só 2–3 GB livres. Há dados do OrbStack (cerca de 39 GB) e do Colima (cerca de 11 GB) que você poderia reaproveitar; não mexi em nada.
+2. **Onde guardar:** você tem um HD ou SSD externo? O disco interno tem só 2–3 GB livres. Há dados de contêineres (cerca de 39 GB e 11 GB) que você poderia reaproveitar; não mexi em nada.
 3. **Interface:** uma página local no navegador, aberta por duplo clique, serve para a v1? Recomendo sim; app empacotado só na Fase 5.
 4. **Volume:** 20–50 s por página é aceitável? Para milhares de folhas de documentos, vale pensar num scanner com alimentador; o app já nasce preparado para ele.
 5. **Próxima fase:** PDF de várias páginas primeiro (recomendo) ou fotos primeiro?
