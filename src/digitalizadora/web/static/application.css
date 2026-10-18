@@ -758,8 +758,8 @@ button:disabled {
   width: auto;
   max-width: 100%;
   height: auto;
-  /* What is left of the screen after the title, the hints, the status line and the buttons. */
-  max-height: min(60dvh, max(12rem, calc(100dvh - 28rem)));
+  /* What is left of the screen after the title, the hints, the status line, the buttons and the padding of the row. */
+  max-height: min(60dvh, max(12rem, calc(100dvh - 32.5rem)));
   outline: 1px solid var(--color-border);
   outline-offset: -1px;
 }
