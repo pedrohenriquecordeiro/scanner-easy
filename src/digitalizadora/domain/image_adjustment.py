@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
 # Every image written again (cropped, turned or put in a PDF) takes this quality; there is no setting for it.
-REENCODING_JPEG_QUALITY = 90
-# A rewritten JPEG is this many times the size of the scanner's (which is about quality 50) at quality 90.
-RENDERED_SIZE_FACTOR = 2
+REENCODING_JPEG_QUALITY = 100
+# A rewritten JPEG at quality 100 measured about 3 times the size of the scanner's (about quality 50).
+RENDERED_SIZE_FACTOR = 4
 
 
 @dataclass(frozen=True)

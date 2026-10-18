@@ -6,7 +6,7 @@ import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, RENDERED_SIZE_FACTOR, ImageAdjustment
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import (
     MINIMUM_FREE_SPACE_BYTES,
@@ -229,8 +229,8 @@ CROPPED = ImageAdjustment(auto_crop=True)
 COLOR_AT_1200 = ScanSettings(1200, ColorMode.COLOR)
 
 
-def test_an_active_crop_doubles_the_estimated_page_size_at_the_default_quality():
-    assert estimated_page_bytes(COLOR_AT_300, CROPPED) == 2 * estimated_page_bytes(COLOR_AT_300)
+def test_an_active_crop_multiplies_the_estimated_page_size_by_the_rendered_size_factor():
+    assert estimated_page_bytes(COLOR_AT_300, CROPPED) == RENDERED_SIZE_FACTOR * estimated_page_bytes(COLOR_AT_300)
 
 
 def test_no_adjustment_keeps_the_estimated_page_size():
@@ -256,4 +256,4 @@ def test_the_space_check_without_adjustment_still_accepts_what_it_accepted_befor
 def test_fewer_pages_remain_when_an_adjustment_is_active():
     guard = build_guard(MINIMUM_FREE_SPACE_BYTES + 100 * estimated_page_bytes(COLOR_AT_300))
 
-    assert guard.estimate_pages_remaining(OUTPUT_FOLDER, COLOR_AT_300, CROPPED) == 50
+    assert guard.estimate_pages_remaining(OUTPUT_FOLDER, COLOR_AT_300, CROPPED) == 100 // RENDERED_SIZE_FACTOR

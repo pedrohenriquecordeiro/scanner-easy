@@ -20,6 +20,7 @@ from digitalizadora.domain.document_draft import (
     is_page_identifier,
 )
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
+from digitalizadora.domain.image_adjustment import RENDERED_SIZE_FACTOR
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
@@ -345,12 +346,12 @@ def test_the_estimated_document_size_counts_a_page_without_framing_once() -> Non
     assert build_document_draft(2).estimate_document_size_in_bytes() == 2 * build_document_page(FIRST).size_in_bytes
 
 
-def test_the_estimated_document_size_doubles_a_page_that_needs_rendering_at_the_fixed_quality() -> None:
+def test_the_estimated_document_size_scales_a_page_that_needs_rendering_by_the_rendered_size_factor() -> None:
     plain_draft = build_document_draft(2)
     framed_draft = plain_draft.with_page_framing(FIRST, FRAMING)
     page_size = plain_draft.pages[0].size_in_bytes
 
-    assert framed_draft.estimate_document_size_in_bytes() == 3 * page_size
+    assert framed_draft.estimate_document_size_in_bytes() == (1 + RENDERED_SIZE_FACTOR) * page_size
 
 
 def test_the_estimated_size_of_the_draft_on_disk_ignores_the_framing(draft: DocumentDraft) -> None:

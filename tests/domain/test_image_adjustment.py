@@ -21,9 +21,9 @@ def test_the_adjustment_is_immutable() -> None:
         NO_ADJUSTMENT.auto_crop = True  # type: ignore[misc]
 
 
-def test_every_image_written_again_takes_the_fixed_quality_of_ninety() -> None:
-    assert REENCODING_JPEG_QUALITY == 90
+def test_every_image_written_again_takes_the_fixed_quality_of_one_hundred() -> None:
+    assert REENCODING_JPEG_QUALITY == 100
 
 
-def test_a_rewritten_image_is_estimated_at_twice_the_size_of_the_scanner_one() -> None:
-    assert RENDERED_SIZE_FACTOR == 2
+def test_a_rewritten_image_is_estimated_at_four_times_the_size_of_the_scanner_one() -> None:
+    assert RENDERED_SIZE_FACTOR == 4
