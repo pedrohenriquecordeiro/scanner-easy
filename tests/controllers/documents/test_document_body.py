@@ -12,7 +12,7 @@ from digitalizadora.domain.documents.document_draft import (
 from digitalizadora.domain.imaging.page_framing import PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.services.documents.document_draft_store import UNAVAILABLE_DRAFT_STORAGE_STATE, DraftStorageState
 from tests.fakes.document_drafts import build_document_draft, page_identifier_at
 from tests.fakes.page_crops import quadrilateral, rectangle

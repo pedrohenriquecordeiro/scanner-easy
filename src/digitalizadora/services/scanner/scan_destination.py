@@ -1,8 +1,8 @@
 from typing import Protocol
 
-from digitalizadora.domain.scan_job import ScanJob
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.domain.scanning.scan_job import ScanJob
+from digitalizadora.domain.scanning.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 
 
 class ScanDestination[StoredOutcome](Protocol):

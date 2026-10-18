@@ -5,8 +5,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
-from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
-from digitalizadora.domain.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
 
 logger = logging.getLogger(__name__)
 

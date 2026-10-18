@@ -5,11 +5,11 @@ from types import MappingProxyType
 from urllib.parse import urlsplit
 from xml.parsers import expat
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import ScanFailedError, ScanRejectedError
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
-from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
+from digitalizadora.domain.scanner.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 
 # Unit of platen_maximum_width and platen_maximum_height: 1/300 of an inch.
 ESCL_UNITS_PER_INCH = 300

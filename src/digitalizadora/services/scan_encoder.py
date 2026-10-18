@@ -4,8 +4,8 @@ from datetime import datetime
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import ScanFailedError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_job import ScanJob
-from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.domain.scanning.scan_job import ScanJob
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from digitalizadora.services.imaging.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.pdf_assembly_service import (

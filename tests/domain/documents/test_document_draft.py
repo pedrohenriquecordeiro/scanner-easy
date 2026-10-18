@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.documents.document_draft import (
     DocumentDraft,
     DocumentFinalizationResult,
@@ -24,7 +23,8 @@ from digitalizadora.domain.imaging.image_adjustment import RENDERED_SIZE_FACTOR
 from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_result import ScanResult
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, build_document_page
 from tests.fakes.page_crops import rectangle
 

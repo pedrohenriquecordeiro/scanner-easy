@@ -7,7 +7,6 @@ import pikepdf
 import pytest
 from PIL import Image
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.documents.document_draft import DocumentFinalizationResult, DocumentPage, DraftSnapshot
 from digitalizadora.domain.documents.document_draft_reconciliation import (
     MANIFEST_FILE_NAME,
@@ -27,8 +26,9 @@ from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageA
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from digitalizadora.services.documents.document_draft_service import DocumentDraftService
 from digitalizadora.services.documents.document_draft_store import DraftStorageState
 from digitalizadora.services.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, estimated_page_bytes

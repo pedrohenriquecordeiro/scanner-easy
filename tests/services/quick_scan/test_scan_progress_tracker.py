@@ -9,7 +9,7 @@ from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.stored_scans import (

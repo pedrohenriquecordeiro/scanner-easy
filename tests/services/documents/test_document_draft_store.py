@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.documents.document_draft import (
     DocumentDraft,
     DocumentFinalizationResult,
@@ -28,8 +27,9 @@ from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_result import ScanResult
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,
 )

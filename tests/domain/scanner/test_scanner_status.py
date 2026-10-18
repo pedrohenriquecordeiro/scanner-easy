@@ -1,6 +1,6 @@
 import pytest
 
-from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanner.scanner_status import ScannerState, ScannerStatus
 
 
 def test_status_is_ready_when_idle() -> None:

@@ -10,7 +10,7 @@ from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import ApplicationSettingsRepository
 from digitalizadora.domain.quick_scan.last_scan import SavedScanFile
 from digitalizadora.domain.scan_file_naming_policy import SINGLE_FILE_COUNT, ScanFileNamingPolicy
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.output_folder_preparer import prepare_output_folder, translate_storage_error
 

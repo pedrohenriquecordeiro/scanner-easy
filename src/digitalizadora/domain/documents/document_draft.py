@@ -6,11 +6,11 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
 from digitalizadora.domain.imaging.image_adjustment import RENDERED_SIZE_FACTOR
 from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_result import ScanResult
 
 PAGE_IDENTIFIER_PATTERN = re.compile(r"[0-9a-f]{16}")
 PAGE_IDENTIFIER_SIZE_IN_BYTES = 8

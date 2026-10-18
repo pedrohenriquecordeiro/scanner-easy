@@ -2,11 +2,11 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
 from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, RENDERED_SIZE_FACTOR, ImageAdjustment
 from digitalizadora.domain.scan_quality import pixels_per_page
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 
 BYTES_PER_KIBIBYTE = 1024
 MINIMUM_FREE_SPACE_BYTES = BYTES_PER_KIBIBYTE**3

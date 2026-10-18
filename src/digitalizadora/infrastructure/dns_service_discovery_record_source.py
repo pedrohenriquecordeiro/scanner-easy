@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
-from digitalizadora.domain.scanner_route import ScannerRoute, route_for_host_name
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute, route_for_host_name
 from digitalizadora.infrastructure.bonjour_scanner_discovery import ServiceRecord
 
 logger = logging.getLogger(__name__)

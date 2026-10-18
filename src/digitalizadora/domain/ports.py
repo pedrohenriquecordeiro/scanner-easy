@@ -9,12 +9,12 @@ from digitalizadora.domain.documents.document_draft_reconciliation import DraftF
 from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.quick_scan.last_scan import QuickScanMasterFiles, QuickScanSlot, SavedScanFile
-from digitalizadora.domain.scan_result import ScanResult
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
-from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
-from digitalizadora.domain.scanner_status import ScannerStatus
+from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
+from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
+from digitalizadora.domain.scanner.scanner_status import ScannerStatus
+from digitalizadora.domain.scanning.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 
 
 class Clock(Protocol):

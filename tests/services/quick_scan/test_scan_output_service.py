@@ -8,7 +8,6 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.application_settings import ApplicationSettings
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     ImageAdjustmentFailedError,
@@ -19,11 +18,12 @@ from digitalizadora.domain.errors import (
 from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
-from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_job import ScanJob
+from digitalizadora.domain.scanning.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,

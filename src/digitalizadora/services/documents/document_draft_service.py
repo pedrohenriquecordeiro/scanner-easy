@@ -20,15 +20,15 @@ from digitalizadora.domain.imaging.page_crop import PageCrop
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import Clock
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftStorageState
 from digitalizadora.services.documents.document_finalizer import DocumentFinalizer
 from digitalizadora.services.documents.document_page_crop_detector import CropDetectionResult, DocumentPageCropDetector
 from digitalizadora.services.documents.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.documents.document_pdf_assembler import DocumentAssemblyInput
-from digitalizadora.services.scan_service import ScanService
+from digitalizadora.services.scanner.scan_service import ScanService
 
 
 @dataclass(frozen=True)

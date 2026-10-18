@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 
-from digitalizadora.domain.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
 from digitalizadora.infrastructure.bonjour_scanner_discovery import (
     BonjourScannerDiscovery,
     ServiceRecord,

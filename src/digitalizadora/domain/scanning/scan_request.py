@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 
 
 @dataclass(frozen=True)

@@ -5,13 +5,13 @@ import pikepdf
 import pytest
 from PIL import Image
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import ScanFailedError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_job import ScanJob
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_job import ScanJob
+from digitalizadora.domain.scanning.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from digitalizadora.services.imaging.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService

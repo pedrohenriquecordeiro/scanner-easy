@@ -3,11 +3,11 @@ from collections.abc import Callable
 
 import pytest
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import ScanFailedError, ScanRejectedError
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
-from digitalizadora.domain.scanner_status import ScannerState
+from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
+from digitalizadora.domain.scanner.scanner_status import ScannerState
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.infrastructure.escl.escl_protocol import (
     ESCL_UNITS_PER_INCH,
     build_scan_settings_xml,

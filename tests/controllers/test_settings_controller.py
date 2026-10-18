@@ -8,12 +8,12 @@ from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import OutputFolderUnavailableError
 from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository

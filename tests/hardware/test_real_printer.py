@@ -7,8 +7,8 @@ from PIL import Image
 
 from digitalizadora.composition_root import build_scanner_http_client
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
-from digitalizadora.domain.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
 from digitalizadora.infrastructure.bonjour_scanner_discovery import BonjourScannerDiscovery
 from digitalizadora.infrastructure.dns_service_discovery_record_source import DnsServiceDiscoveryRecordSource
 from digitalizadora.infrastructure.escl.escl_scanner_gateway import EsclGatewayTiming, EsclScannerGateway

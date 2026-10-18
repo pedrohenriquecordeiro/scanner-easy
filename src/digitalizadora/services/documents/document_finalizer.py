@@ -4,7 +4,7 @@ from digitalizadora.domain.documents.document_draft import DocumentDraft
 from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.errors import DocumentAssemblyFailedError, DocumentTooLargeError, ScanFailedError
 from digitalizadora.domain.ports import ScanOutputRepository
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.services.documents.document_pdf_assembler import DocumentAssemblyInput, DocumentPdfAssembler
 from digitalizadora.services.pdf_assembly_service import DEFAULT_PDF_TITLE_TEMPLATE, PdfDocumentMetadata
 from digitalizadora.services.storage_guard_service import StorageGuardService

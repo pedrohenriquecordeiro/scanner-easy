@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from digitalizadora.domain.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
 
 
 @dataclass(frozen=True)

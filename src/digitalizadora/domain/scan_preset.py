@@ -2,8 +2,8 @@ from collections.abc import Mapping
 from enum import Enum
 from types import MappingProxyType
 
-from digitalizadora.domain.color_mode import ColorMode
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 
 DOCUMENT_DOTS_PER_INCH = 300
 DOCUMENT_ECONOMY_DOTS_PER_INCH = 200

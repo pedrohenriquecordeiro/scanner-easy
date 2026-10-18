@@ -7,9 +7,9 @@ from urllib.parse import urlsplit
 
 from digitalizadora.domain.errors import DigitalizadoraError, LocalNetworkBlockedError, ScannerUnreachableError
 from digitalizadora.domain.ports import ScannerDiscovery, ScannerEndpointRepository, ScannerGateway
-from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
-from digitalizadora.domain.scanner_route import ScannerRoute, route_for_host_name
-from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute, route_for_host_name
+from digitalizadora.domain.scanner.scanner_status import ScannerState, ScannerStatus
 
 logger = logging.getLogger(__name__)
 DISCOVERY_TIMEOUT_SECONDS = 5.0

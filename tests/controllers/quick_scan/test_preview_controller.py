@@ -13,7 +13,7 @@ from digitalizadora.domain.imaging.page_framing import PageFraming
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.last_scan import QuickScanMasterFiles
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,

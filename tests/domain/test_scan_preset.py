@@ -1,7 +1,7 @@
 import pytest
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scanning.color_mode import ColorMode
 
 
 @pytest.mark.parametrize(

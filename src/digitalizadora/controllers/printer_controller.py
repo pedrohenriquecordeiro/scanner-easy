@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.domain.errors import InvalidSettingsError
-from digitalizadora.services.printer_connection_service import (
+from digitalizadora.services.scanner.printer_connection_service import (
     PrinterConnectionService,
     PrinterConnectionState,
 )

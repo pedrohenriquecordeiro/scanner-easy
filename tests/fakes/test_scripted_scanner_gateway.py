@@ -1,10 +1,10 @@
 import pytest
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import ScannerUnreachableError
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanner.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from tests.fakes.scripted_scanner_gateway import (
     FixedGatewayProvider,
     ScriptedScannerGateway,

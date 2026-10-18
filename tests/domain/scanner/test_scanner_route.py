@@ -1,6 +1,6 @@
 import pytest
 
-from digitalizadora.domain.scanner_route import ScannerRoute, route_for_host_name
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute, route_for_host_name
 
 
 @pytest.mark.parametrize(

@@ -6,9 +6,9 @@ from fastapi.responses import JSONResponse
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.domain.errors import DigitalizadoraError
-from digitalizadora.domain.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
-from digitalizadora.services.scan_service import ScanService
+from digitalizadora.services.scanner.scan_service import ScanService
 
 logger = logging.getLogger(__name__)
 

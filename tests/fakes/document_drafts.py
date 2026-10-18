@@ -2,13 +2,13 @@ from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.documents.document_draft import DocumentDraft, DocumentPage
 from digitalizadora.domain.documents.document_draft_reconciliation import (
     MANIFEST_FILE_NAME,
     page_file_name,
     thumbnail_file_name,
 )
+from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.repositories.documents.document_manifest_codec import encode_manifest
 from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
 

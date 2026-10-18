@@ -2,8 +2,8 @@ import json
 import logging
 from pathlib import Path
 
-from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
-from digitalizadora.domain.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 
 LOGGER = logging.getLogger(__name__)

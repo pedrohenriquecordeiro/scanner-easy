@@ -9,9 +9,9 @@ from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.ports import QuickScanSlotRepository, ScanOutputRepository
 from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
-from digitalizadora.domain.scan_job import ScanJob
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.domain.scanning.scan_job import ScanJob
+from digitalizadora.domain.scanning.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import OutputsRequest, QuickScanOutputRenderer
 from digitalizadora.services.scan_encoder import EncodedMaster, OutputIdentity, ScanEncoder

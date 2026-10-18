@@ -9,7 +9,6 @@ from http import HTTPStatus
 import httpx
 import pytest
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import (
     LocalNetworkBlockedError,
     ScanFailedError,
@@ -18,8 +17,9 @@ from digitalizadora.domain.errors import (
     ScanRejectedError,
     ScanTimedOutError,
 )
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanner_status import ScannerState
+from digitalizadora.domain.scanner.scanner_status import ScannerState
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.infrastructure.escl.escl_protocol import (
     build_scan_settings_xml,
     parse_scanner_capabilities,

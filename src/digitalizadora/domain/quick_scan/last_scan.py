@@ -3,9 +3,9 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.scanning.color_mode import ColorMode
 
 
 @dataclass(frozen=True)

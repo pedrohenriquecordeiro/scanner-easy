@@ -13,8 +13,8 @@ from digitalizadora.domain.errors import (
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_request import ScanRequest
+from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.services.documents.document_draft_service import DocumentDraftService
 from tests.fakes.blocking_free_space_reader import BlockingFreeSpaceReader
 from tests.fakes.document_drafts import page_identifier_at

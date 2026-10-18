@@ -14,7 +14,7 @@ from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderU
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.file_system_scan_output_repository import (
     MAXIMUM_NAME_ATTEMPTS,

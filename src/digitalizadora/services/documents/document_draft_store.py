@@ -33,7 +33,7 @@ from digitalizadora.domain.errors import (
 from digitalizadora.domain.imaging.page_crop import PageCrop
 from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.ports import DocumentDraftRepository
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import StorageGuardService
 
 LOGGER = logging.getLogger(__name__)

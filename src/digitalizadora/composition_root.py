@@ -24,7 +24,7 @@ from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import ApplicationSettingsRepository, Clock, ScannerGateway
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
+from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
 from digitalizadora.infrastructure.bonjour_scanner_discovery import BonjourScannerDiscovery, ServiceRecordSource
 from digitalizadora.infrastructure.dns_service_discovery_record_source import DnsServiceDiscoveryRecordSource
 from digitalizadora.infrastructure.escl.escl_scanner_gateway import EsclGatewayTiming, EsclScannerGateway
@@ -56,14 +56,14 @@ from digitalizadora.services.imaging.page_image_view_service import PageImageVie
 from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
-from digitalizadora.services.printer_connection_service import PrinterConnectionService
 from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditParts, LastScanEditService
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import QuickScanOutputRenderer
 from digitalizadora.services.quick_scan.scan_output_service import ScanOutputParts, ScanOutputService
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_encoder import ScanEncoder
-from digitalizadora.services.scan_service import ScanService
+from digitalizadora.services.scanner.printer_connection_service import PrinterConnectionService
+from digitalizadora.services.scanner.scan_service import ScanService
 from digitalizadora.services.storage_guard_service import StorageGuardService, read_free_space_in_bytes
 
 logger = logging.getLogger(__name__)

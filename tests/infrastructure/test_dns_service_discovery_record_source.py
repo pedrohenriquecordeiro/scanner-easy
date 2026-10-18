@@ -1,7 +1,7 @@
 import inspect
 from collections.abc import Sequence
 
-from digitalizadora.domain.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
 from digitalizadora.infrastructure.bonjour_scanner_discovery import ServiceRecordSource
 from digitalizadora.infrastructure.dns_service_discovery_record_source import (
     DnsServiceDiscoveryRecordSource,

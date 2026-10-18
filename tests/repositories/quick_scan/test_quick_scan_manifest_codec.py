@@ -6,12 +6,12 @@ from typing import Any
 
 import pytest
 
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import UnreadableQuickScanError
 from digitalizadora.domain.imaging.page_framing import PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanSlot, SavedScanFile
+from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.repositories.quick_scan.quick_scan_manifest_codec import (
     MANIFEST_FORMAT_VERSION,
     decode_quick_scan_manifest,

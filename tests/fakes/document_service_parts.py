@@ -11,7 +11,7 @@ from digitalizadora.domain.documents.document_draft_reconciliation import MANIFE
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.documents.document_manifest_codec import decode_manifest
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
@@ -34,7 +34,7 @@ from digitalizadora.services.jpeg_resolution_service import JpegResolutionServic
 from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_encoder import ScanEncoder
-from digitalizadora.services.scan_service import ScanService
+from digitalizadora.services.scanner.scan_service import ScanService
 from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT
 from tests.fakes.fixed_clock import FixedClock

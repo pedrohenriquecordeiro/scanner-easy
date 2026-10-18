@@ -4,10 +4,10 @@ from dataclasses import dataclass
 import pytest
 
 from digitalizadora.domain.errors import LocalNetworkBlockedError, ScanFailedError, ScannerUnreachableError
-from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
-from digitalizadora.domain.scanner_route import ScannerRoute
-from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
-from digitalizadora.services.printer_connection_service import (
+from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.services.scanner.printer_connection_service import (
     DISCOVERY_TIMEOUT_SECONDS,
     PrinterConnectionService,
 )

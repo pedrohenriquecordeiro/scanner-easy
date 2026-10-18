@@ -5,13 +5,13 @@ from pathlib import Path
 
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
-from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InvalidSettingsError
 from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import ApplicationSettingsRepository
 from digitalizadora.domain.scan_quality import is_supported_dots_per_inch
-from digitalizadora.domain.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.color_mode import ColorMode
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
 
 NULL_CHARACTER = "\0"
 

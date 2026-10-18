@@ -1,6 +1,6 @@
 import pytest
 
-from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
+from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
 
 
 def build_capabilities(

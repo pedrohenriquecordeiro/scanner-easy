@@ -27,9 +27,9 @@ from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scanner_route import ScannerRoute
-from digitalizadora.domain.scanner_status import ScannerState
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_status import ScannerState
+from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,
@@ -37,9 +37,9 @@ from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_reposito
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.application_state_service import ApplicationStateService
 from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
-from digitalizadora.services.printer_connection_service import PrinterConnectionState
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
+from digitalizadora.services.scanner.printer_connection_service import PrinterConnectionState
 from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.controllers.controller_test_support import (
     SCANNED_AT,

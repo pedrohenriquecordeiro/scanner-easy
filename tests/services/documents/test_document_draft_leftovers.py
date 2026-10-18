@@ -9,7 +9,7 @@ from digitalizadora.domain.documents.document_draft import DocumentDraft
 from digitalizadora.domain.errors import DraftStorageUnavailableError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,

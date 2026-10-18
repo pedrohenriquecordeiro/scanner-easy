@@ -2,10 +2,10 @@ from collections import deque
 from collections.abc import Sequence
 
 from digitalizadora.domain.ports import ScannerGateway
-from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
-from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
+from digitalizadora.domain.scanner.scanner_status import ScannerState, ScannerStatus
+from digitalizadora.domain.scanning.scan_settings import ScanSettings
+from digitalizadora.domain.scanning.scanned_image import ScannedImage
 
 
 def build_sample_capabilities() -> ScannerCapabilities:

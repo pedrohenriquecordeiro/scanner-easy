@@ -5,9 +5,9 @@ from fastapi.testclient import TestClient
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.printer_controller import PrinterController
-from digitalizadora.domain.scanner_route import ScannerRoute
-from digitalizadora.domain.scanner_status import ScannerState
-from digitalizadora.services.printer_connection_service import PrinterConnectionState
+from digitalizadora.domain.scanner.scanner_route import ScannerRoute
+from digitalizadora.domain.scanner.scanner_status import ScannerState
+from digitalizadora.services.scanner.printer_connection_service import PrinterConnectionState
 from tests.controllers.controller_test_support import (
     StubPrinterConnectionService,
     build_test_client,
