@@ -72,6 +72,7 @@ def read_size_of_jpeg(jpeg_content: bytes) -> tuple[int, int]:
 class QuickScanParts:
     output_folder: Path
     slot_folder: Path
+    settings_repository: InMemoryApplicationSettingsRepository
     output_repository: FileSystemScanOutputRepository
     slot_repository: FileSystemQuickScanSlotRepository
     progress_tracker: ScanProgressTracker
@@ -154,6 +155,7 @@ def build_quick_scan_parts_in(
     return QuickScanParts(
         output_folder=output_folder,
         slot_folder=slot_folder,
+        settings_repository=settings_repository,
         output_repository=real_output_repository,
         slot_repository=real_slot_repository,
         progress_tracker=progress_tracker,

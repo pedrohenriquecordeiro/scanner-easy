@@ -142,10 +142,10 @@ def test_a_second_frame_is_sent_with_the_first(scenario_results: dict) -> None:
     assert [crop["top_left"] for crop in body["crops"]] == [{"x": 0.1, "y": 0.1}, {"x": 0.55, "y": 0.3}]
 
 
-def test_a_removed_frame_says_which_file_was_deleted_and_why(scenario_results: dict) -> None:
+def test_a_removed_frame_says_which_file_was_deleted_without_naming_a_frame(scenario_results: dict) -> None:
     panel = scenario_results["apply_a_removed_frame_that_deletes_a_file"]["panel"]
     assert panel["status"] == (
-        f"Moldura aplicada: 1 arquivo. O arquivo {SECOND_FILE} foi apagado porque a moldura 2 foi removida."
+        f"Moldura aplicada: 1 arquivo. O arquivo {SECOND_FILE} foi apagado porque agora há só 1 arquivo."
     )
 
 

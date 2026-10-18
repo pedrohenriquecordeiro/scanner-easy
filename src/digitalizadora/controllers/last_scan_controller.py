@@ -22,11 +22,29 @@ LAST_SCAN_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
         "saved_scan_unreadable": HTTPStatus.CONFLICT,
         "last_scan_not_editable": HTTPStatus.CONFLICT,
         "invalid_crop": HTTPStatus.UNPROCESSABLE_ENTITY,
+        "invalid_page_rotation": HTTPStatus.UNPROCESSABLE_ENTITY,
+        "insufficient_last_scan_storage": HTTPStatus.INSUFFICIENT_STORAGE,
+        "last_scan_storage_unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
         "insufficient_storage": HTTPStatus.INSUFFICIENT_STORAGE,
         "output_folder_unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
         "image_adjustment_failed": HTTPStatus.INTERNAL_SERVER_ERROR,
     }
 )
+# The slot of the last scan is kept in the folder of the drafts, whose errors speak of document pages.
+LAST_SCAN_ERROR_CODES_OF_THE_SLOT: Mapping[str, str] = MappingProxyType(
+    {
+        "insufficient_draft_storage": "insufficient_last_scan_storage",
+        "draft_storage_unavailable": "last_scan_storage_unavailable",
+    }
+)
+
+
+def respond_to_last_scan_error(error: DigitalizadoraError, error_message_catalog: ErrorMessageCatalog) -> JSONResponse:
+    error_code = LAST_SCAN_ERROR_CODES_OF_THE_SLOT.get(error.code, error.code)
+    return JSONResponse(
+        status_code=LAST_SCAN_ERROR_STATUSES.get(error_code, HTTPStatus.INTERNAL_SERVER_ERROR),
+        content=build_error_body(error_message_catalog, error_code),
+    )
 
 
 def describe_edit_result(result: LastScanEditResult) -> dict[str, Any]:
@@ -88,7 +106,4 @@ class LastScanController:
         return JSONResponse(content=describe_edit_result(result))
 
     def _respond_to_error(self, error: DigitalizadoraError) -> JSONResponse:
-        return JSONResponse(
-            status_code=LAST_SCAN_ERROR_STATUSES.get(error.code, HTTPStatus.INTERNAL_SERVER_ERROR),
-            content=build_error_body(self._error_message_catalog, error.code),
-        )
+        return respond_to_last_scan_error(error, self._error_message_catalog)

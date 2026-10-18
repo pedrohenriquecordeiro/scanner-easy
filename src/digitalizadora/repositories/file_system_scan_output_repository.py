@@ -35,10 +35,13 @@ class FileSystemScanOutputRepository:
         prepare_output_folder(self.output_folder())
 
     def save(self, encoded_scan: EncodedScan) -> Path:
-        folder = self.output_folder()
-        candidate_names = self._sequence_file_names(folder, encoded_scan.created_at, encoded_scan.output_format)
+        return self.save_in_folder(self.output_folder(), encoded_scan)
+
+    def save_in_folder(self, output_folder: Path, encoded_scan: EncodedScan) -> Path:
+        """Under the next free sequence name of that folder; an edit of an old scan saves in the folder of the scan."""
+        candidate_names = self._sequence_file_names(output_folder, encoded_scan.created_at, encoded_scan.output_format)
         destination, _ = self._write_under_a_free_name(
-            folder,
+            output_folder,
             candidate_names,
             lambda candidate: self._file_writer.write_new_file(candidate, encoded_scan.content),
         )

@@ -2,11 +2,10 @@ from http import HTTPStatus
 from types import MappingProxyType
 
 from fastapi import APIRouter, Response
-from fastapi.responses import JSONResponse
 
 from digitalizadora.controllers.document_controller import parse_page_rotation
-from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
-from digitalizadora.controllers.last_scan_controller import LAST_SCAN_ERROR_STATUSES
+from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
+from digitalizadora.controllers.last_scan_controller import respond_to_last_scan_error
 from digitalizadora.domain.errors import DigitalizadoraError
 from digitalizadora.services.last_scan_view_service import LastScanViewService
 
@@ -41,9 +40,6 @@ class PreviewController:
                 scan_identifier, parse_page_rotation(rotation_degrees)
             )
         except DigitalizadoraError as error:
-            return JSONResponse(
-                status_code=LAST_SCAN_ERROR_STATUSES.get(error.code, HTTPStatus.INTERNAL_SERVER_ERROR),
-                content=build_error_body(self._error_message_catalog, error.code),
-            )
+            return respond_to_last_scan_error(error, self._error_message_catalog)
         return Response(content=preview_jpeg, media_type=JPEG_MEDIA_TYPE, headers=dict(IMMUTABLE_HEADERS))
 

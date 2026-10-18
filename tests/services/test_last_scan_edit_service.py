@@ -240,6 +240,37 @@ async def test_adding_a_second_frame_creates_the_next_numbered_file(parts, servi
     assert parts.saved_names() == [FIRST_FILE, SECOND_FILE]
 
 
+async def test_a_frame_added_after_the_output_folder_changed_goes_next_to_the_first_file(parts, service, tmp_path):
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, auto_crop=True))
+    settings = parts.settings_repository.load()
+    parts.settings_repository.save(replace(settings, output_folder=tmp_path / "other-folder"))
+
+    await service.set_crops([LEFT_BOX, RIGHT_BOX], JPEG_QUALITY)
+
+    assert parts.saved_names() == [FIRST_FILE, SECOND_FILE]
+
+
+async def test_a_scan_edited_after_the_output_folder_changed_can_still_be_turned(parts, service, tmp_path):
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, auto_crop=True))
+    settings = parts.settings_repository.load()
+    parts.settings_repository.save(replace(settings, output_folder=tmp_path / "other-folder"))
+    await service.set_crops([LEFT_BOX, RIGHT_BOX], JPEG_QUALITY)
+
+    await service.rotate_clockwise(JPEG_QUALITY)
+
+    assert current_last_scan(parts).framing.rotation is PageRotation.CLOCKWISE_90
+
+
+async def test_a_slot_that_is_gone_makes_the_scan_not_editable(parts, service):
+    one_whole_scan(parts)
+    parts.slot_repository.discard()
+
+    with pytest.raises(SavedScanUnreadableError):
+        await service.rotate_clockwise(JPEG_QUALITY)
+
+    assert current_last_scan(parts).is_editable is False
+
+
 async def test_adding_a_second_frame_lists_both_files_in_the_slot(parts, service):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, auto_crop=True))
 
@@ -501,7 +532,7 @@ async def test_a_failed_edit_restores_the_manifest_to_the_framing_of_before(tmp_
 async def test_a_failed_edit_leaves_the_tracker_unchanged(tmp_path):
     parts = build_quick_scan_parts(tmp_path)
     one_whole_scan(parts)
-    parts.slot_repository.master_file_path(current_last_scan(parts).scan_identifier).unlink()
+    parts.slot_repository.master_file_path(current_last_scan(parts).scan_identifier).write_bytes(b"not a jpeg")
     last_scan_before = current_last_scan(parts)
 
     with pytest.raises(SavedScanUnreadableError):

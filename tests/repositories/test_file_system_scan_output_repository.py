@@ -70,6 +70,14 @@ def test_saved_file_holds_the_encoded_content(tmp_path):
     assert saved_path.read_bytes() == b"scan content"
 
 
+def test_a_file_saved_in_a_folder_goes_there_and_not_to_the_output_folder_of_the_settings(tmp_path):
+    other_folder = tmp_path / "other"
+
+    saved_path = build_real_repository(tmp_path / "scans").save_in_folder(other_folder, build_encoded_scan())
+
+    assert saved_path == other_folder / "2026-10-13_00001.pdf"
+
+
 def test_next_file_of_the_day_ends_with_sequence_two(tmp_path):
     repository = build_real_repository(tmp_path)
     repository.save(build_encoded_scan())

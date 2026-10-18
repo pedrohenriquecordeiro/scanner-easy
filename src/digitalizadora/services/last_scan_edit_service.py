@@ -10,6 +10,7 @@ from digitalizadora.domain.errors import (
     LastScanFileMissingError,
     LastScanNotEditableError,
     NoLastScanError,
+    OutputFolderUnavailableError,
     SavedScanUnreadableError,
     ScanAlreadyRunningError,
     ScanFailedError,
@@ -28,6 +29,10 @@ from digitalizadora.services.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIX
 
 LOGGER = logging.getLogger(__name__)
 UNKNOWN_MODIFICATION_TIME = 0
+
+
+class _SlotGoneError(SavedScanUnreadableError):
+    """The slot of the last scan is not there any more, so the scan cannot be adjusted again."""
 
 
 @dataclass(frozen=True)
@@ -113,6 +118,11 @@ class LastScanEditService:
             self._progress_tracker.mark_last_scan_edit_started()
             try:
                 outcome = await asyncio.to_thread(self._apply_edit, plan, jpeg_quality)
+            except _SlotGoneError:
+                self._progress_tracker.replace_last_scan(
+                    last_scan.scan_identifier, StoredScan(replace(last_scan, is_editable=False), thumbnail_jpeg)
+                )
+                raise
             finally:
                 self._progress_tracker.mark_last_scan_edit_ended()
             # Back on the event loop: only here the tracker, which the loop owns, takes the adjusted scan.
@@ -198,7 +208,7 @@ class LastScanEditService:
     def _load_slot(self) -> QuickScanSlot:
         slot = self._slot_repository.load()
         if slot is None:
-            raise SavedScanUnreadableError("The slot of the last scan is gone")
+            raise _SlotGoneError("The slot of the last scan is gone")
         expected = self._progress_tracker.snapshot().last_scan
         if expected is None or expected.scan_identifier != slot.last_scan.scan_identifier:
             raise NoLastScanError("The slot holds another scan than the last one")
@@ -232,11 +242,13 @@ class LastScanEditService:
                 output_path = last_scan.saved_file_path(last_scan.saved_files[index])
                 self._scan_output_repository.replace_saved_scan(output_path, encoded_scan.content)
             else:
-                output_path = self._scan_output_repository.save(encoded_scan)
+                output_path = self._scan_output_repository.save_in_folder(last_scan.output_folder, encoded_scan)
             described_file = self._scan_output_repository.describe_saved_scan(output_path)
             saved_files.append(
                 described_file or SavedScanFile(output_path.name, len(encoded_scan.content), UNKNOWN_MODIFICATION_TIME)
             )
+        if len({saved_file.file_name for saved_file in saved_files}) != len(saved_files):
+            raise OutputFolderUnavailableError("Two files of the last scan would have the same name")
         deleted_file_names, kept_file_names = self._remove_files_without_a_frame(last_scan, len(outputs))
         return _RenderedFiles(tuple(saved_files), deleted_file_names, kept_file_names)
 
@@ -262,6 +274,12 @@ class LastScanEditService:
         slot = self._slot_repository.load()
         if slot is None:
             self._slot_repository.delete_leftovers(None)
+            return
+        if not slot.last_scan.output_folder.is_dir():
+            LOGGER.warning(
+                "The output folder %s of the last scan is not reachable; its slot is kept as it is",
+                slot.last_scan.output_folder,
+            )
             return
         if not self._any_file_exists(slot.last_scan):
             self._slot_repository.discard()

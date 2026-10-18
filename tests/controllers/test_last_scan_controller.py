@@ -10,7 +10,9 @@ from digitalizadora.controllers.last_scan_controller import LAST_SCAN_ERROR_STAT
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
+    DraftStorageUnavailableError,
     ImageAdjustmentFailedError,
+    InsufficientDraftStorageError,
     InsufficientStorageError,
     LastScanBusyError,
     LastScanFileMissingError,
@@ -151,6 +153,32 @@ def test_every_edit_answers_the_documented_errors(
     )
 
 
+@pytest.mark.parametrize(("method", "path", "body"), EDIT_REQUESTS)
+@pytest.mark.parametrize(
+    ("error", "quick_mode_code", "status"),
+    [
+        (InsufficientDraftStorageError("full"), "insufficient_last_scan_storage", HTTPStatus.INSUFFICIENT_STORAGE),
+        (DraftStorageUnavailableError("broken"), "last_scan_storage_unavailable", HTTPStatus.SERVICE_UNAVAILABLE),
+    ],
+    ids=lambda value: getattr(value, "code", str(value)),
+)
+def test_the_errors_of_the_slot_speak_of_the_last_scan_and_not_of_document_pages(
+    client: TestClient,
+    edit_service: StubLastScanEditService,
+    method: str,
+    path: str,
+    body: object,
+    error: DigitalizadoraError,
+    quick_mode_code: str,
+    status: HTTPStatus,
+) -> None:
+    edit_service.failure = error
+
+    response = send(client, method, path, body)
+
+    assert (response.status_code, response.json()["code"]) == (status, quick_mode_code)
+
+
 def test_an_unexpected_domain_error_answers_500(client: TestClient, edit_service: StubLastScanEditService) -> None:
     edit_service.failure = DigitalizadoraError("something else")
 
@@ -166,6 +194,9 @@ def test_the_error_statuses_cover_the_documented_codes() -> None:
         "saved_scan_unreadable": 409,
         "last_scan_not_editable": 409,
         "invalid_crop": 422,
+        "invalid_page_rotation": 422,
+        "insufficient_last_scan_storage": 507,
+        "last_scan_storage_unavailable": 503,
         "insufficient_storage": 507,
         "output_folder_unavailable": 503,
         "image_adjustment_failed": 500,

@@ -65,11 +65,11 @@ function describe_saved_scan_status(last_result) {
   return `Pronto! ${file_names.length} arquivos salvos: ${join_names(file_names)}`;
 }
 
-function describe_deleted_files(previous_file_names, deleted_file_names) {
-  return deleted_file_names.map((file_name) => {
-    const frame_number = previous_file_names.indexOf(file_name) + 1;
-    return `O arquivo ${file_name} foi apagado porque a moldura ${frame_number} foi removida.`;
-  });
+function describe_deleted_files(deleted_file_names, remaining_file_count) {
+  // The files follow the positions of the frames, so no frame is named: the first file may now hold the other photo.
+  return deleted_file_names.map(
+    (file_name) => `O arquivo ${file_name} foi apagado porque agora há só ${describe_file_count(remaining_file_count)}.`,
+  );
 }
 
 function describe_kept_files(kept_file_names) {
@@ -108,7 +108,7 @@ function describe_last_scan_edit(edit) {
   return [
     describe_last_scan_action(action, edited_scan),
     ...describe_created_files(previous_file_names, edited_scan.file_names),
-    ...describe_deleted_files(previous_file_names, answer.deleted_file_names),
+    ...describe_deleted_files(answer.deleted_file_names, edited_scan.file_names.length),
     ...describe_kept_files(answer.kept_file_names),
   ].join(" ");
 }

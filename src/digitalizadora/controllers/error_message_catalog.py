@@ -96,6 +96,14 @@ ERROR_MESSAGES: Mapping[str, str] = MappingProxyType(
         "last_scan_not_editable": (
             "O original desta digitalização não foi guardado, então ela não pode ser ajustada."
         ),
+        "insufficient_last_scan_storage": (
+            "Pouco espaço livre no disco do Mac para ajustar a última digitalização. "
+            "Libere espaço e tente de novo."
+        ),
+        "last_scan_storage_unavailable": (
+            "Não consigo guardar o original da última digitalização no disco do Mac. "
+            "Veja o registro em ~/Library/Logs/Digitalizadora."
+        ),
     }
 )
 

@@ -16,6 +16,7 @@ from digitalizadora.services.photo_region_detection import (
     PREVIEW_MAXIMUM_EDGE_PIXELS,
     Corners,
     PhotoRegion,
+    PhotoRegions,
     detect_photo_regions,
     grow_rectangle,
 )
@@ -137,25 +138,26 @@ class PageCropDetectionService:
     """Looks for the photos or the sheet lying on the glass in a scanner JPEG and answers them as crops in fractions.
 
     Both modes only suggest crops the user can adjust. First the detector of regions, which finds up to two rotated
-    photos when the border of the scan is a uniform lid; when it finds none, the detection by side, which copes with an
-    open lid and answers one rectangle.
+    photos when the border of the scan is a uniform lid, and then its answer is final (no region keeps the whole image);
+    only when the border is not uniform (an open lid) the detection by side answers, with one rectangle.
     """
 
     def detect_crops(self, jpeg_content: bytes) -> DetectedCrops:
         with _failures_of_the_detection():
             preview, full_size = _read_preview(jpeg_content)
-            detected_crops = self._crops_of_regions(preview, full_size)
-            if not detected_crops.crops:
+            detection = detect_photo_regions(preview)
+            if detection is None:
                 detected_crops = DetectedCrops(self._crops_by_side(preview, full_size), 0)
+            else:
+                detected_crops = self._crops_of_regions(detection, preview.size, full_size)
             if not detected_crops.crops:
                 LOGGER.info("The automatic crop found no reliable photo or sheet; the whole image is kept")
             return detected_crops
 
-    def _crops_of_regions(self, preview: Image.Image, full_size: tuple[int, int]) -> DetectedCrops:
-        detection = detect_photo_regions(preview)
-        if detection is None:
-            return DetectedCrops((), 0)
-        crops = [_crop_of_region(region, preview.size, full_size) for region in detection.regions]
+    def _crops_of_regions(
+        self, detection: PhotoRegions, preview_size: tuple[int, int], full_size: tuple[int, int]
+    ) -> DetectedCrops:
+        crops = [_crop_of_region(region, preview_size, full_size) for region in detection.regions]
         found_crops = [crop for crop in crops if crop is not None]
         return DetectedCrops(put_in_reading_order(found_crops), detection.ignored_count)
 

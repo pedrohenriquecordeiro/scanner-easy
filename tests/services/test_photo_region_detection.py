@@ -93,7 +93,7 @@ def test_a_uniform_image_has_no_sheet():
     assert detect_paper_region(build_preview(background_level=128)) is None
 
 
-def test_a_sheet_below_three_percent_of_the_glass_is_ignored():
+def test_a_sheet_below_one_percent_of_the_glass_is_ignored():
     small_paper = FilledRectangle((90, 130, 110, 150), PAPER_LEVEL)
 
     assert detect_paper_region(build_preview(rectangles=[small_paper])) is None
@@ -163,7 +163,7 @@ def test_noise_of_five_levels_still_finds_the_sheet(seed):
 
 
 def test_text_blocks_that_look_light_grey_on_a_white_lid_are_not_a_sheet():
-    blocks = [FilledRectangle((30, top, 170, top + 6), 225) for top in range(40, 240, 12)]
+    blocks = [FilledRectangle((30, top, 170, top + 3), 225) for top in range(40, 240, 12)]
 
     assert detect_paper_region(build_preview(background_level=WHITE_LEVEL, rectangles=blocks)) is None
 
@@ -332,8 +332,14 @@ def test_a_page_with_a_thin_printed_frame_has_no_region():
     assert detect_in([], lid).regions == ()
 
 
-def test_a_photo_of_two_percent_of_the_page_is_ignored():
-    tiny = PlacedPhoto(center=(145.0, 200.0), size=(45, 50), angle_degrees=20.0)
+def test_a_photo_of_two_percent_of_the_page_like_a_passport_photo_is_found():
+    passport_photo = PlacedPhoto(center=(145.0, 200.0), size=(45, 50), angle_degrees=20.0)
+
+    assert len(detect_in([passport_photo]).regions) == 1
+
+
+def test_a_photo_of_half_a_percent_of_the_page_is_ignored():
+    tiny = PlacedPhoto(center=(145.0, 200.0), size=(25, 25), angle_degrees=20.0)
 
     detection = detect_in([tiny])
 

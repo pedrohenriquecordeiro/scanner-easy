@@ -21,7 +21,7 @@ FOREGROUND_DIFFERENCE_LEVELS = 20
 # Looser than the foreground, to see what a region left out: a dark part of the page next to the lid.
 SURROUNDING_DIFFERENCE_LEVELS = 10
 REGION_NOISE_FILTER_SIZE = 5
-MINIMUM_PHOTO_AREA_SHARE = 0.03
+MINIMUM_PHOTO_AREA_SHARE = 0.01
 MAXIMUM_PHOTOS = 2
 # A photo is a solid block, while the rectangle around loose foreground (text, scratches) is not.
 MINIMUM_REGION_FILL_SHARE = 0.75

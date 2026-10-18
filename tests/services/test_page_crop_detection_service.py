@@ -123,15 +123,28 @@ def test_two_photos_never_reach_the_detection_by_side(service, monkeypatch):
     assert len(detected.crops) == 2
 
 
-def test_a_side_without_an_edge_stays_at_the_glass(service, monkeypatch):
+def test_a_side_without_an_edge_stays_at_the_glass(service, book_on_glass, monkeypatch):
     def edges_without_a_left_one(preview: Image.Image) -> PaperEdges:
         return PaperEdges(None, 0.2, 0.8, None)
 
     monkeypatch.setattr(page_crop_detection_service, "detect_paper_edges", edges_without_a_left_one)
 
-    crop = only_crop(service, build_scan_jpeg(LID_SIZE))
+    crop = only_crop(service, book_on_glass)
 
     assert (box_of(crop).left, box_of(crop).bottom) == (0.0, 1.0)
+
+
+def test_an_l_shaped_group_that_the_regions_reject_on_a_uniform_lid_keeps_the_whole_image(service, monkeypatch):
+    def fail_if_called(preview: Image.Image) -> object:
+        raise AssertionError("the detection by side must not run on a uniform lid")
+
+    monkeypatch.setattr(page_crop_detection_service, "detect_paper_edges", fail_if_called)
+    horizontal_bar = PlacedPhoto(center=(500.0, 325.0), size=(600, 250), angle_degrees=0.0)
+    vertical_bar = PlacedPhoto(center=(325.0, 500.0), size=(250, 600), angle_degrees=0.0, seed=2)
+
+    detected = service.detect_crops(build_photo_scene_jpeg(GLASS_SIZE, [horizontal_bar, vertical_bar]))
+
+    assert detected.crops == ()
 
 
 def build_dark_cover_around_a_bright_picture() -> bytes:

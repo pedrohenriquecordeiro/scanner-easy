@@ -112,6 +112,26 @@ def test_a_slot_whose_files_were_all_deleted_is_forgotten(parts):
     assert (restarted.progress_tracker.snapshot().last_scan, list(restarted.slot_folder.iterdir())) == (None, [])
 
 
+def test_an_output_folder_that_is_not_reachable_does_not_cost_the_master(parts):
+    stored_scan = parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
+    parts.output_folder.rename(parts.output_folder.parent / "unplugged-disk")
+    restarted = restart(parts)
+
+    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+
+    assert (parts.slot_folder / f"master-{stored_scan.last_scan.scan_identifier}.jpg").is_file()
+
+
+def test_an_output_folder_that_is_not_reachable_restores_no_panel(parts):
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
+    parts.output_folder.rename(parts.output_folder.parent / "unplugged-disk")
+    restarted = restart(parts)
+
+    restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
+
+    assert restarted.progress_tracker.snapshot().last_scan is None
+
+
 def test_a_slot_with_at_least_one_file_is_restored(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=True))
     (parts.output_folder / SECOND_FILE).unlink()

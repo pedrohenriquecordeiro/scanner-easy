@@ -145,7 +145,7 @@ Antes de começar: `DIGITALIZADORA_SIMULATOR_SCENE=photos_two make simulator` nu
 | D6 | Com o teclado: abrir **Ampliar** com Enter, Tab até o canto inferior direito, setas e Shift+setas, Esc | O foco começa em **Mover a moldura**; a ordem do Tab é cantos, lados, mover, girar, selecionar a outra moldura, botões; cada seta anda 0,5% (Shift 5%) e a tela diz a posição; Esc fecha sem aplicar e devolve o foco a **Ampliar** |  |
 | D7 | Tocar (tela de toque ou emulação) e arrastar um canto | O canto acompanha o dedo |  |
 | D8 | **Aplicar** | O diálogo fecha; o painel diz "Moldura aplicada: 2 arquivos."; só o arquivo da moldura mudada foi regravado |  |
-| D9 | **Ampliar**, selecionar a moldura 2 (clicando dentro dela), **Remover moldura**, **Aplicar** | O painel diz "O arquivo AAAA-MM-DD_NNNNN.pdf foi apagado porque a moldura 2 foi removida."; só sobra um arquivo |  |
+| D9 | **Ampliar**, selecionar a moldura 2 (clicando dentro dela), **Remover moldura**, **Aplicar** | O painel diz "O arquivo AAAA-MM-DD_NNNNN.pdf foi apagado porque agora há só 1 arquivo."; só sobra um arquivo |  |
 | D10 | **Ampliar**, **Adicionar moldura**, **Aplicar** | Um arquivo novo aparece (o próximo número livre) e o painel diz "Novo arquivo: …"; com 2 molduras, **Adicionar moldura** fica desabilitado |  |
 | D11 | **Girar ↻** no painel, quatro vezes | Cada giro regrava os arquivos e a miniatura gira; depois de quatro, tudo volta à posição original |  |
 | D12 | Mexer o controle de **Qualidade do JPEG** para 60 (com as setas) e girar o painel quatro vezes | O número acompanha o controle; os arquivos regravados ficam bem menores (cerca de metade) |  |

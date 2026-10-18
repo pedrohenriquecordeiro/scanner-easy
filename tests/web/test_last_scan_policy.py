@@ -82,7 +82,7 @@ EDIT_CASES = [
     pytest.param(
         edit("set_crops", TWO_FILES, answer(ONE_FILE, ONE_CROP, deleted="['2026-10-18_00008.pdf']")),
         "Moldura aplicada: 1 arquivo. "
-        "O arquivo 2026-10-18_00008.pdf foi apagado porque a moldura 2 foi removida.",
+        "O arquivo 2026-10-18_00008.pdf foi apagado porque agora há só 1 arquivo.",
         id="a-removed-frame-deletes-its-file",
     ),
     pytest.param(

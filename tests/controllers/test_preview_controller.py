@@ -137,6 +137,15 @@ def test_the_enlarged_view_is_turned_by_the_rotation_in_the_address(client, prog
         assert image.size == (100, 160)
 
 
+@pytest.mark.parametrize("rotation_degrees", [45, -90, 360])
+def test_an_invalid_rotation_in_the_address_is_422(client, progress_tracker, slot_repository, rotation_degrees) -> None:
+    identifier = keep_a_master(slot_repository, progress_tracker)
+
+    response = client.get(f"/api/scans/last/preview?scan_identifier={identifier}&rotation_degrees={rotation_degrees}")
+
+    assert (response.status_code, response.json()["code"]) == (HTTPStatus.UNPROCESSABLE_ENTITY, "invalid_page_rotation")
+
+
 def test_the_enlarged_view_of_another_scan_is_404(client, progress_tracker, slot_repository) -> None:
     keep_a_master(slot_repository, progress_tracker)
 
