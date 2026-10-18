@@ -1,6 +1,6 @@
 from typing import Any
 
-from digitalizadora.controllers.document_body import describe_crop
+from digitalizadora.controllers.documents.document_body import describe_crop
 from digitalizadora.domain.last_scan import LastScan
 
 

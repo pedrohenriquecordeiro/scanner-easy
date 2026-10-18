@@ -1,4 +1,4 @@
-from digitalizadora.domain.document_draft import DocumentDraft, is_page_identifier
+from digitalizadora.domain.documents.document_draft import DocumentDraft, is_page_identifier
 from tests.fakes.document_drafts import (
     DEFAULT_PAGE_SIZE_IN_BYTES,
     DRAFT_CREATED_AT,

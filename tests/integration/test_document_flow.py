@@ -11,12 +11,12 @@ from fastapi.testclient import TestClient
 from digitalizadora.application_factory import create_application
 from digitalizadora.composition_root import DRAFTS_FOLDER_NAME, ContainerOverrides, build_container
 from digitalizadora.configuration import ApplicationConfiguration
-from digitalizadora.domain.document_draft_reconciliation import MANIFEST_FILE_NAME, page_file_name
+from digitalizadora.domain.documents.document_draft_reconciliation import MANIFEST_FILE_NAME, page_file_name
 from digitalizadora.domain.errors import DraftFolderInUseError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.infrastructure.escl.escl_scanner_gateway import EsclGatewayTiming
-from digitalizadora.repositories.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
+from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
 from digitalizadora.simulator.fake_escl_scanner_app import FakeScannerBehavior, create_fake_escl_scanner_app
 from tests.fakes.configuration_builder import TEST_PORT, build_application_configuration
 from tests.fakes.document_drafts import (

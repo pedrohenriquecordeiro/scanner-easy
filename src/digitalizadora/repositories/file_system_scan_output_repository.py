@@ -2,8 +2,8 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from itertools import islice
 from pathlib import Path
 
-from digitalizadora.domain.document_name_policy import FIRST_ATTEMPT_NUMBER, build_document_file_name
-from digitalizadora.domain.document_pdf_to_save import DocumentPdfToSave
+from digitalizadora.domain.documents.document_name_policy import FIRST_ATTEMPT_NUMBER, build_document_file_name
+from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import OutputFolderUnavailableError
 from digitalizadora.domain.last_scan import SavedScanFile

@@ -11,8 +11,8 @@ from PIL import Image
 
 from digitalizadora.composition_root import DRAFTS_FOLDER_NAME
 from digitalizadora.configuration import ApplicationConfiguration
-from digitalizadora.domain.document_draft_reconciliation import page_file_name
-from digitalizadora.repositories.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
+from digitalizadora.domain.documents.document_draft_reconciliation import page_file_name
+from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
 from digitalizadora.simulator.fake_escl_scanner_app import FakeScannerBehavior
 from digitalizadora.simulator.photo_scene_page import PHOTO_PLACEMENTS_BY_SCENE, PhotoScene, photo_corners
 from tests.fakes.configuration_builder import build_application_configuration

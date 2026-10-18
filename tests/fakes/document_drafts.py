@@ -3,14 +3,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
-from digitalizadora.domain.document_draft import DocumentDraft, DocumentPage
-from digitalizadora.domain.document_draft_reconciliation import (
+from digitalizadora.domain.documents.document_draft import DocumentDraft, DocumentPage
+from digitalizadora.domain.documents.document_draft_reconciliation import (
     MANIFEST_FILE_NAME,
     page_file_name,
     thumbnail_file_name,
 )
-from digitalizadora.repositories.document_manifest_codec import encode_manifest
-from digitalizadora.repositories.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
+from digitalizadora.repositories.documents.document_manifest_codec import encode_manifest
+from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
 
 DRAFT_CREATED_AT = datetime(2026, 10, 17, 10, 0, 0, tzinfo=timezone(timedelta(hours=-3)))
 DEFAULT_PAGE_SIZE_IN_BYTES = 3

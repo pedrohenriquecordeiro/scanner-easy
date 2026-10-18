@@ -3,7 +3,7 @@ from types import MappingProxyType
 
 from fastapi import APIRouter, Response
 
-from digitalizadora.controllers.document_controller import parse_page_rotation
+from digitalizadora.controllers.documents.document_controller import parse_page_rotation
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.last_scan_controller import respond_to_last_scan_error
 from digitalizadora.domain.errors import DigitalizadoraError

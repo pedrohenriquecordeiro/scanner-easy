@@ -15,7 +15,7 @@ from digitalizadora.application_factory import (
     create_application,
     find_validation_error_code,
 )
-from digitalizadora.controllers.document_controller import DocumentController
+from digitalizadora.controllers.documents.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.last_scan_controller import LastScanController
 from digitalizadora.controllers.preview_controller import PreviewController

@@ -3,7 +3,7 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from digitalizadora.domain.document_draft import DocumentPage
+from digitalizadora.domain.documents.document_draft import DocumentPage
 from digitalizadora.domain.errors import DigitalizadoraError
 from digitalizadora.domain.last_scan import LastScan
 from digitalizadora.domain.ports import ScannerGatewayProvider

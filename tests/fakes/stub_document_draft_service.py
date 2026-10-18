@@ -1,15 +1,20 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from digitalizadora.domain.document_draft import DocumentDraft, DocumentFinalizationResult, DocumentPage, DraftSnapshot
+from digitalizadora.domain.documents.document_draft import (
+    DocumentDraft,
+    DocumentFinalizationResult,
+    DocumentPage,
+    DraftSnapshot,
+)
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
-from digitalizadora.services.document_draft_store import DraftStorageState
-from digitalizadora.services.document_page_crop_detector import CropDetectionResult
+from digitalizadora.services.documents.document_draft_store import DraftStorageState
+from digitalizadora.services.documents.document_page_crop_detector import CropDetectionResult
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, build_document_page, page_identifier_at
 
 STUB_DRAFT_SESSION = "5c0f9a2e7b1d4c38"

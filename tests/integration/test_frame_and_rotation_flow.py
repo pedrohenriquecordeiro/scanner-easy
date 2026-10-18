@@ -16,9 +16,9 @@ from PIL import Image
 from digitalizadora.application_factory import create_application
 from digitalizadora.composition_root import DRAFTS_FOLDER_NAME, ContainerOverrides, build_container
 from digitalizadora.configuration import ApplicationConfiguration
-from digitalizadora.domain.document_draft_reconciliation import page_file_name
+from digitalizadora.domain.documents.document_draft_reconciliation import page_file_name
 from digitalizadora.infrastructure.escl.escl_scanner_gateway import EsclGatewayTiming
-from digitalizadora.repositories.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
+from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
 from digitalizadora.simulator.fake_escl_scanner_app import (
     FakeScannerBehavior,
     LidBackground,

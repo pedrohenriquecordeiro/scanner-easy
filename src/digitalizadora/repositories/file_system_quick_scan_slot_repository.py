@@ -8,7 +8,7 @@ from digitalizadora.domain.errors import UnreadableQuickScanError
 from digitalizadora.domain.last_scan import QuickScanMasterFiles, QuickScanSlot
 from digitalizadora.domain.ports import Clock
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter, is_temporary_file_name
-from digitalizadora.repositories.file_system_document_draft_repository import translate_draft_storage_error
+from digitalizadora.repositories.documents.file_system_document_draft_repository import translate_draft_storage_error
 from digitalizadora.repositories.quick_scan_manifest_codec import (
     decode_quick_scan_manifest,
     encode_quick_scan_manifest,

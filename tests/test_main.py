@@ -11,7 +11,9 @@ from digitalizadora.composition_root import DRAFTS_FOLDER_NAME
 from digitalizadora.configuration import ApplicationConfiguration
 from digitalizadora.controllers.error_message_catalog import ERROR_MESSAGES
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
-from digitalizadora.repositories.file_system_document_draft_repository import FileSystemDocumentDraftRepository
+from digitalizadora.repositories.documents.file_system_document_draft_repository import (
+    FileSystemDocumentDraftRepository,
+)
 from tests.fakes.document_drafts import DRAFT_CREATED_AT
 from tests.fakes.fixed_clock import FixedClock
 

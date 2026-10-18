@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from digitalizadora.domain.document_draft import DocumentPage
+from digitalizadora.domain.documents.document_draft import DocumentPage
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     DraftStorageUnavailableError,

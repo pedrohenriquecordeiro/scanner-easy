@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from digitalizadora.controllers.document_body import build_document_summary_body
+from digitalizadora.controllers.documents.document_body import build_document_summary_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.controllers.last_scan_body import describe_last_scan
 from digitalizadora.controllers.settings_body import build_settings_body
@@ -12,7 +12,7 @@ from digitalizadora.services.application_state_service import (
     ApplicationStateService,
     StorageState,
 )
-from digitalizadora.services.document_draft_service import DocumentDraftService
+from digitalizadora.services.documents.document_draft_service import DocumentDraftService
 
 
 class StateController:

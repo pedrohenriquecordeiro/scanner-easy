@@ -1,7 +1,7 @@
 import threading
 from dataclasses import replace
 
-from digitalizadora.domain.document_draft import DocumentPage
+from digitalizadora.domain.documents.document_draft import DocumentPage
 from digitalizadora.domain.last_scan import SavedScanFile
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_progress import ScanPhase

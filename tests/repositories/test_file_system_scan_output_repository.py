@@ -8,7 +8,7 @@ from typing import BinaryIO
 import pytest
 
 from digitalizadora.domain.application_settings import ApplicationSettings
-from digitalizadora.domain.document_pdf_to_save import DocumentPdfToSave
+from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError, ScanFailedError
 from digitalizadora.domain.output_format import OutputFormat

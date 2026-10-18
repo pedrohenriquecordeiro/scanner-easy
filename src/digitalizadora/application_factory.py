@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from digitalizadora.controllers.document_controller import DocumentController
+from digitalizadora.controllers.documents.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import (
     UNEXPECTED_ERROR_CODE,
     ErrorMessageCatalog,

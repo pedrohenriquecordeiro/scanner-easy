@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from digitalizadora.controllers.crop_request_body import PageCropsRequestBody
+from digitalizadora.controllers.documents.crop_request_body import PageCropsRequestBody
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.controllers.last_scan_body import describe_last_scan
 from digitalizadora.domain.errors import DigitalizadoraError, InvalidCropError

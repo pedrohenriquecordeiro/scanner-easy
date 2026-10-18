@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Protocol
 
 from digitalizadora.domain.application_settings import ApplicationSettings
-from digitalizadora.domain.document_draft import DocumentDraft, DocumentPageFiles
-from digitalizadora.domain.document_draft_reconciliation import DraftFileInventory
-from digitalizadora.domain.document_pdf_to_save import DocumentPdfToSave
+from digitalizadora.domain.documents.document_draft import DocumentDraft, DocumentPageFiles
+from digitalizadora.domain.documents.document_draft_reconciliation import DraftFileInventory
+from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.last_scan import QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.scan_result import ScanResult
