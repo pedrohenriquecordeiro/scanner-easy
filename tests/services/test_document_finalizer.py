@@ -30,6 +30,7 @@ from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, seed_draft_folder
+from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sample_images import build_sample_jpeg
@@ -37,6 +38,7 @@ from tests.fakes.scripted_file_writer import ScriptedFileWriter
 
 JPEG_QUALITY = 90
 FINALIZED_AT = DRAFT_CREATED_AT + timedelta(minutes=5)
+NAMING_POLICY = ScanFileNamingPolicy(FixedClock(DRAFT_CREATED_AT))
 DOCUMENT_NAME = "Contrato do apartamento"
 DOCUMENT_FILE_NAME = "Contrato do apartamento.pdf"
 POINTS_PER_INCH = 72
@@ -88,7 +90,7 @@ def build_finalizer(
     )
     return DocumentFinalizer(
         DocumentPdfAssembler(PageFramingRenderer(), PdfAssemblyService()),
-        FileSystemScanOutputRepository(settings_repository, ScanFileNamingPolicy(), file_writer),
+        FileSystemScanOutputRepository(settings_repository, NAMING_POLICY, file_writer),
         StorageGuardService(free_space_reader),
     )
 
@@ -176,12 +178,12 @@ def test_write_document_saves_the_pdf_under_the_document_name(finalizer, seeded_
     assert result.output_path == output_folder / DOCUMENT_FILE_NAME
 
 
-def test_write_document_without_a_name_follows_the_sequence_of_the_finalization_day(
+def test_write_document_without_a_name_uses_the_timestamp_name(
     finalizer, seeded_input, output_folder
 ):
     result = finalizer.write_document(seeded_input)
 
-    assert result.output_path == output_folder / "2026-10-17_00001.pdf"
+    assert result.output_path == output_folder / "2026-10-17_10-00-00-000000000.pdf"
 
 
 def test_pdf_title_is_the_document_name(finalizer, seeded_input):
@@ -246,7 +248,7 @@ def test_memory_error_while_assembling_raises_document_too_large(seeded_input, o
     )
     finalizer = DocumentFinalizer(
         DocumentPdfAssembler(PageFramingRenderer(), ExhaustedMemoryPdfAssemblyService()),
-        FileSystemScanOutputRepository(settings_repository, ScanFileNamingPolicy(), AtomicFileWriter()),
+        FileSystemScanOutputRepository(settings_repository, NAMING_POLICY, AtomicFileWriter()),
         StorageGuardService(free_space_reader),
     )
 

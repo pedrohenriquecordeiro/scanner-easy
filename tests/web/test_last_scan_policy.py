@@ -6,9 +6,11 @@ pytestmark = pytest.mark.skipif(
     NODE_EXECUTABLE is None, reason="Node.js is not installed, so last-scan-policy.js cannot be exercised"
 )
 
-ONE_FILE = "['2026-10-18_00007.pdf']"
-TWO_FILES = "['2026-10-18_00007.pdf', '2026-10-18_00008.pdf']"
-THREE_FILES = "['2026-10-18_00007.pdf', '2026-10-18_00008.pdf', '2026-10-18_00009.pdf']"
+ONE_FILE = "['2026-10-18_16-14-03-000000006.pdf']"
+TWO_FILES = "['2026-10-18_16-14-03-000000006.pdf', '2026-10-18_16-14-03-000000007.pdf']"
+THREE_FILES = (
+    "['2026-10-18_16-14-03-000000006.pdf', '2026-10-18_16-14-03-000000007.pdf', '2026-10-18_16-14-03-000000008.pdf']"
+)
 ONE_CROP = "[{}]"
 
 
@@ -40,12 +42,12 @@ ADDRESS_CASES = [
 STATUS_CASES = [
     pytest.param(
         f"describe_saved_scan_status({{file_names: {ONE_FILE}}})",
-        "Pronto! Salvo como 2026-10-18_00007.pdf",
+        "Pronto! Salvo como 2026-10-18_16-14-03-000000006.pdf",
         id="one-file",
     ),
     pytest.param(
         f"describe_saved_scan_status({{file_names: {TWO_FILES}}})",
-        "Pronto! 2 arquivos salvos: 2026-10-18_00007.pdf e 2026-10-18_00008.pdf",
+        "Pronto! 2 arquivos salvos: 2026-10-18_16-14-03-000000006.pdf e 2026-10-18_16-14-03-000000007.pdf",
         id="two-files",
     ),
     pytest.param(
@@ -66,7 +68,7 @@ EDIT_CASES = [
     ),
     pytest.param(
         edit("set_crops", ONE_FILE, answer(TWO_FILES, "[{}, {}]")),
-        "Moldura aplicada: 2 arquivos. Novo arquivo: 2026-10-18_00008.pdf.",
+        "Moldura aplicada: 2 arquivos. Novo arquivo: 2026-10-18_16-14-03-000000007.pdf.",
         id="a-second-frame-creates-a-file",
     ),
     pytest.param(
@@ -80,24 +82,26 @@ EDIT_CASES = [
         id="crop-removed",
     ),
     pytest.param(
-        edit("set_crops", TWO_FILES, answer(ONE_FILE, ONE_CROP, deleted="['2026-10-18_00008.pdf']")),
+        edit("set_crops", TWO_FILES, answer(ONE_FILE, ONE_CROP, deleted="['2026-10-18_16-14-03-000000007.pdf']")),
         "Moldura aplicada: 1 arquivo. "
-        "O arquivo 2026-10-18_00008.pdf foi apagado porque agora há só 1 arquivo.",
+        "O arquivo 2026-10-18_16-14-03-000000007.pdf foi apagado porque agora há só 1 arquivo.",
         id="a-removed-frame-deletes-its-file",
     ),
     pytest.param(
-        edit("set_crops", TWO_FILES, answer(TWO_FILES, ONE_CROP, kept="['2026-10-18_00008.pdf']")),
-        "Moldura aplicada: 2 arquivos. Mantive 2026-10-18_00008.pdf porque ele foi alterado depois de gravado.",
+        edit("set_crops", TWO_FILES, answer(TWO_FILES, ONE_CROP, kept="['2026-10-18_16-14-03-000000007.pdf']")),
+        "Moldura aplicada: 2 arquivos. Mantive 2026-10-18_16-14-03-000000007.pdf "
+        "porque ele foi alterado depois de gravado.",
         id="an-edited-file-is-kept",
     ),
     pytest.param(
         edit("set_crops", ONE_FILE, answer(THREE_FILES, "[{}, {}]")),
-        "Moldura aplicada: 3 arquivos. Novos arquivos: 2026-10-18_00008.pdf e 2026-10-18_00009.pdf.",
+        "Moldura aplicada: 3 arquivos. Novos arquivos: "
+        "2026-10-18_16-14-03-000000007.pdf e 2026-10-18_16-14-03-000000008.pdf.",
         id="two-new-files",
     ),
     pytest.param(
         edit("detect_crops", ONE_FILE, answer(TWO_FILES, "[{}, {}]", extra=", crops_detected: true")),
-        "Molduras detectadas: 2 arquivos. Novo arquivo: 2026-10-18_00008.pdf.",
+        "Molduras detectadas: 2 arquivos. Novo arquivo: 2026-10-18_16-14-03-000000007.pdf.",
         id="detection-found-two-photos",
     ),
     pytest.param(

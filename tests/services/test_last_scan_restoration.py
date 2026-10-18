@@ -19,8 +19,8 @@ from tests.fakes.quick_scan_parts import (
 )
 
 JPEG_QUALITY = 90
-FIRST_FILE = "2026-10-13_00001.jpg"
-SECOND_FILE = "2026-10-13_00002.jpg"
+FIRST_FILE = "2026-10-13_15-30-12-000000000.jpg"
+SECOND_FILE = "2026-10-13_15-30-12-000000001.jpg"
 
 
 @pytest.fixture

@@ -17,7 +17,7 @@ EXPECTED_PORT_NAMES = {
     "QuickScanSlotRepository",
 }
 EXPECTED_METHOD_NAMES_BY_PORT = {
-    "Clock": {"now"},
+    "Clock": {"now", "now_in_nanoseconds"},
     "ScannerGateway": {"read_capabilities", "read_status", "scan_page"},
     "ScannerGatewayProvider": {"acquire_gateway"},
     "ScannerDiscovery": {"discover"},

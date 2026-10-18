@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable, Iterator
-from datetime import datetime
+from itertools import islice
 from pathlib import Path
 
 from digitalizadora.domain.document_name_policy import FIRST_ATTEMPT_NUMBER, build_document_file_name
@@ -38,8 +38,8 @@ class FileSystemScanOutputRepository:
         return self.save_in_folder(self.output_folder(), encoded_scan)
 
     def save_in_folder(self, output_folder: Path, encoded_scan: EncodedScan) -> Path:
-        """Under the next free sequence name of that folder; an edit of an old scan saves in the folder of the scan."""
-        candidate_names = self._sequence_file_names(output_folder, encoded_scan.created_at, encoded_scan.output_format)
+        """Under a timestamp name in that folder; an edit of an old scan saves in the folder of the scan."""
+        candidate_names = self._generated_file_names(output_folder, encoded_scan.output_format)
         destination, _ = self._write_under_a_free_name(
             output_folder,
             candidate_names,
@@ -91,21 +91,14 @@ class FileSystemScanOutputRepository:
 
     def _document_file_names(self, folder: Path, document_pdf: DocumentPdfToSave) -> Iterator[str]:
         if not document_pdf.document_name:
-            return self._sequence_file_names(folder, document_pdf.created_at, OutputFormat.PDF)
+            return self._generated_file_names(folder, OutputFormat.PDF)
         self._prepare_folder(folder)
         attempt_numbers = range(FIRST_ATTEMPT_NUMBER, FIRST_ATTEMPT_NUMBER + MAXIMUM_NAME_ATTEMPTS)
         return (build_document_file_name(document_pdf.document_name, number) for number in attempt_numbers)
 
-    def _sequence_file_names(self, folder: Path, created_at: datetime, output_format: OutputFormat) -> Iterator[str]:
+    def _generated_file_names(self, folder: Path, output_format: OutputFormat) -> Iterator[str]:
         self._prepare_folder(folder)
-        try:
-            first_sequence_number = self._highest_sequence_number(folder, created_at) + 1
-        except OSError as error:
-            raise translate_storage_error(error, f"Cannot use the output folder {folder}") from error
-        sequence_numbers = range(first_sequence_number, first_sequence_number + MAXIMUM_NAME_ATTEMPTS)
-        return (
-            self._naming_policy.build_file_name(created_at, number, output_format) for number in sequence_numbers
-        )
+        return islice(self._naming_policy.file_names(output_format), MAXIMUM_NAME_ATTEMPTS)
 
     def _prepare_folder(self, folder: Path) -> None:
         try:
@@ -128,9 +121,3 @@ class FileSystemScanOutputRepository:
         raise OutputFolderUnavailableError(
             f"No free file name in {folder} after {MAXIMUM_NAME_ATTEMPTS} attempts"
         )
-
-    def _highest_sequence_number(self, folder: Path, scanned_at: datetime) -> int:
-        sequence_numbers = (
-            self._naming_policy.extract_sequence_number(entry.name, scanned_at) for entry in folder.iterdir()
-        )
-        return max((number for number in sequence_numbers if number is not None), default=0)

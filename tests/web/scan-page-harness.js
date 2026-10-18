@@ -36,7 +36,7 @@ const UNAVAILABLE_STORAGE = { free_space_in_bytes: 0, estimated_pages_remaining:
 const CONFLICT_BODY = { code: "scan_already_running", message: "Já existe uma digitalização em andamento." };
 const FINISHED_SCAN_RESULT = {
   scan_identifier: "9f3c1d2e4b5a6978",
-  file_names: ["2026-10-17_00001.pdf"],
+  file_names: ["2026-10-17_10-00-00-000000000.pdf"],
   total_size_in_bytes: 1234567,
   scanned_at: "2026-10-17T10:00:00",
   rotation_degrees: 0,

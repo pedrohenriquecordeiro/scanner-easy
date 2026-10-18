@@ -1,73 +1,50 @@
 from datetime import datetime, timedelta, timezone
-
-import pytest
+from itertools import islice
 
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
+from tests.fakes.fixed_clock import FixedClock
 
-SCANNED_AT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=timezone(timedelta(hours=-3)))
-OTHER_DAY = datetime(2026, 10, 14, 0, 0, 1, tzinfo=timezone(timedelta(hours=-3)))
-
-
-@pytest.mark.parametrize(
-    ("sequence_number", "output_format", "expected_name"),
-    [
-        (7, OutputFormat.PDF, "2026-10-13_00007.pdf"),
-        (7, OutputFormat.JPEG, "2026-10-13_00007.jpg"),
-        (1, OutputFormat.PDF, "2026-10-13_00001.pdf"),
-        (99999, OutputFormat.PDF, "2026-10-13_99999.pdf"),
-        (100000, OutputFormat.PDF, "2026-10-13_100000.pdf"),
-    ],
-)
-def test_build_file_name(
-    sequence_number: int, output_format: OutputFormat, expected_name: str
-) -> None:
-    policy = ScanFileNamingPolicy()
-
-    assert policy.build_file_name(SCANNED_AT, sequence_number, output_format) == expected_name
+TIME_ZONE = timezone(timedelta(hours=-3))
+SCANNED_AT = datetime(2026, 10, 13, 15, 30, 12, 123456, tzinfo=TIME_ZONE)
+LAST_NANOSECOND_OF_THE_SECOND = datetime(2026, 10, 13, 15, 30, 59, 999999, tzinfo=TIME_ZONE)
 
 
-@pytest.mark.parametrize(
-    ("file_name", "expected_sequence_number"),
-    [
-        ("2026-10-13_00007.pdf", 7),
-        ("2026-10-13_00007.jpg", 7),
-        ("2026-10-13_00001.pdf", 1),
-        ("2026-10-13_99999.jpg", 99999),
-        ("2026-10-13_000007.jpg", 7),
-        ("2026-10-13_100000.pdf", 100000),
-    ],
-)
-def test_extract_sequence_number_of_a_name_from_the_same_day(
-    file_name: str, expected_sequence_number: int
-) -> None:
-    assert ScanFileNamingPolicy().extract_sequence_number(file_name, SCANNED_AT) == (
-        expected_sequence_number
-    )
+def first_names(moment: datetime, output_format: OutputFormat, count: int) -> list[str]:
+    return list(islice(ScanFileNamingPolicy(FixedClock(moment)).file_names(output_format), count))
 
 
-def test_extract_sequence_number_ignores_a_name_from_another_date() -> None:
-    assert ScanFileNamingPolicy().extract_sequence_number("2026-10-13_00007.pdf", OTHER_DAY) is None
+def test_name_has_local_date_time_and_nine_digit_nanoseconds_with_the_pdf_extension() -> None:
+    assert first_names(SCANNED_AT, OutputFormat.PDF, 1) == ["2026-10-13_15-30-12-123456000.pdf"]
 
 
-@pytest.mark.parametrize(
-    "file_name",
-    [
-        "notes.txt",
-        "",
-        "2026-10-13_00007.png",
-        "2026-10-13_00007.pdf.part",
-        "2026-10-13_00007",
-        "2026-10-13_0007.pdf",
-        "2026-10-13_00000.pdf",
-        "2026-10-13_abcde.pdf",
-        "x2026-10-13_00007.pdf",
-        "2026-10-13_00007.PDF",
-        "2026-10-13_00007.JPG",
-        "2026-10-13_00007.jpeg",
-        "2026-10-13_00007.pdf\n",
-        "2026-10-13_00007 .pdf",
-    ],
-)
-def test_extract_sequence_number_rejects_names_outside_the_pattern(file_name: str) -> None:
-    assert ScanFileNamingPolicy().extract_sequence_number(file_name, SCANNED_AT) is None
+def test_name_takes_the_extension_of_the_output_format() -> None:
+    assert first_names(SCANNED_AT, OutputFormat.JPEG, 1) == ["2026-10-13_15-30-12-123456000.jpg"]
+
+
+def test_zero_nanoseconds_are_padded_to_nine_digits() -> None:
+    assert first_names(SCANNED_AT.replace(microsecond=0), OutputFormat.PDF, 1) == ["2026-10-13_15-30-12-000000000.pdf"]
+
+
+def test_following_candidates_advance_one_nanosecond_each() -> None:
+    assert first_names(SCANNED_AT, OutputFormat.PDF, 2)[1] == "2026-10-13_15-30-12-123456001.pdf"
+
+
+def test_candidates_cross_into_the_next_second_in_order() -> None:
+    names = first_names(LAST_NANOSECOND_OF_THE_SECOND, OutputFormat.PDF, 2)
+
+    assert names == ["2026-10-13_15-30-59-999999000.pdf", "2026-10-13_15-30-59-999999001.pdf"]
+
+
+def test_candidates_are_unique_and_sorted() -> None:
+    names = first_names(SCANNED_AT, OutputFormat.PDF, 50)
+
+    assert names == sorted(set(names))
+
+
+def test_each_iteration_reads_the_clock_when_the_first_name_is_requested() -> None:
+    clock = FixedClock(SCANNED_AT)
+    names = ScanFileNamingPolicy(clock).file_names(OutputFormat.PDF)
+    clock.advance(1)
+
+    assert next(names) == "2026-10-13_15-30-13-123456000.pdf"

@@ -20,6 +20,7 @@ from digitalizadora.repositories.file_system_scan_output_repository import (
     MAXIMUM_NAME_ATTEMPTS,
     FileSystemScanOutputRepository,
 )
+from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.scripted_file_writer import ScriptedFileWriter
 
@@ -45,8 +46,9 @@ def build_settings(output_folder: Path) -> ApplicationSettings:
 
 
 def build_repository(output_folder: Path, file_writer) -> FileSystemScanOutputRepository:
+    naming_policy = ScanFileNamingPolicy(FixedClock(SCANNED_AT))
     return FileSystemScanOutputRepository(
-        InMemoryApplicationSettingsRepository(build_settings(output_folder)), ScanFileNamingPolicy(), file_writer
+        InMemoryApplicationSettingsRepository(build_settings(output_folder)), naming_policy, file_writer
     )
 
 
@@ -58,10 +60,14 @@ def test_output_folder_comes_from_the_settings(tmp_path):
     assert build_real_repository(tmp_path / "scans").output_folder() == tmp_path / "scans"
 
 
-def test_first_file_of_the_day_ends_with_sequence_one(tmp_path):
+FIRST_NAME = "2026-10-13_15-30-12-000000000"
+SECOND_NAME = "2026-10-13_15-30-12-000000001"
+
+
+def test_file_is_named_with_the_local_date_time_and_nanoseconds_of_the_clock(tmp_path):
     saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
 
-    assert saved_path == tmp_path / "2026-10-13_00001.pdf"
+    assert saved_path == tmp_path / f"{FIRST_NAME}.pdf"
 
 
 def test_saved_file_holds_the_encoded_content(tmp_path):
@@ -75,76 +81,57 @@ def test_a_file_saved_in_a_folder_goes_there_and_not_to_the_output_folder_of_the
 
     saved_path = build_real_repository(tmp_path / "scans").save_in_folder(other_folder, build_encoded_scan())
 
-    assert saved_path == other_folder / "2026-10-13_00001.pdf"
+    assert saved_path == other_folder / f"{FIRST_NAME}.pdf"
 
 
-def test_next_file_of_the_day_ends_with_sequence_two(tmp_path):
+def test_a_second_save_at_the_same_reading_gets_the_next_nanosecond(tmp_path):
     repository = build_real_repository(tmp_path)
     repository.save(build_encoded_scan())
 
     second_path = repository.save(build_encoded_scan())
 
-    assert second_path.name == "2026-10-13_00002.pdf"
+    assert second_path.name == f"{SECOND_NAME}.pdf"
 
 
-def test_sequence_continues_after_the_highest_existing_number_when_there_are_gaps(tmp_path):
-    (tmp_path / "2026-10-13_00003.pdf").write_bytes(b"x")
-    (tmp_path / "2026-10-13_00007.jpg").write_bytes(b"x")
-
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
-
-    assert saved_path.name == "2026-10-13_00008.pdf"
-
-
-def test_files_of_other_dates_do_not_interfere(tmp_path):
-    (tmp_path / "2026-10-12_00009.pdf").write_bytes(b"x")
+def test_old_files_with_the_daily_counter_are_left_alone_and_never_collide(tmp_path):
+    (tmp_path / "2026-10-13_00001.pdf").write_bytes(b"old")
+    (tmp_path / "2026-10-13_00007.jpg").write_bytes(b"old")
 
     saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
 
-    assert saved_path.name == "2026-10-13_00001.pdf"
+    assert (saved_path.name, (tmp_path / "2026-10-13_00001.pdf").read_bytes()) == (f"{FIRST_NAME}.pdf", b"old")
 
 
-def test_each_date_has_its_own_counter(tmp_path):
+def test_the_date_of_the_name_follows_the_clock_and_not_the_folder_content(tmp_path):
+    (tmp_path / "2026-10-12_15-30-12-000000000.pdf").write_bytes(b"x")
+
+    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+
+    assert saved_path.name == f"{FIRST_NAME}.pdf"
+
+
+def test_pdf_and_jpeg_saved_at_the_same_reading_get_distinct_names(tmp_path):
     repository = build_real_repository(tmp_path)
-    repository.save(build_encoded_scan(created_at=SCANNED_AT))
+    repository.save(build_encoded_scan(OutputFormat.PDF))
 
-    next_day_path = repository.save(build_encoded_scan(created_at=NEXT_DAY))
+    saved_path = repository.save(build_encoded_scan(OutputFormat.JPEG))
 
-    assert next_day_path.name == "2026-10-14_00001.pdf"
-
-
-def test_files_with_other_extensions_do_not_interfere(tmp_path):
-    (tmp_path / "2026-10-13_00009.png").write_bytes(b"x")
-    (tmp_path / "2026-10-13_00009.txt").write_bytes(b"x")
-
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
-
-    assert saved_path.name == "2026-10-13_00001.pdf"
+    assert saved_path.name == f"{FIRST_NAME}.jpg"
 
 
-def test_pdf_and_jpeg_of_the_same_date_share_the_counter(tmp_path):
-    (tmp_path / "2026-10-13_00004.jpg").write_bytes(b"x")
-
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan(OutputFormat.PDF))
-
-    assert saved_path.name == "2026-10-13_00005.pdf"
-
-
-def test_jpeg_uses_the_jpg_extension_and_the_shared_counter(tmp_path):
-    (tmp_path / "2026-10-13_00004.pdf").write_bytes(b"x")
-
+def test_jpeg_uses_the_jpg_extension(tmp_path):
     saved_path = build_real_repository(tmp_path).save(build_encoded_scan(OutputFormat.JPEG))
 
-    assert saved_path.name == "2026-10-13_00005.jpg"
+    assert saved_path.name == f"{FIRST_NAME}.jpg"
 
 
 def test_unrelated_files_and_leftover_temporary_files_are_ignored(tmp_path):
-    for name in ("notes.txt", "2026-10-13_abc.pdf", ".2026-10-13_00009.pdf.4242-0a1b2c3d.part"):
+    for name in ("notes.txt", "2026-10-13_abc.pdf", ".2026-10-13_15-30-12-000000000.pdf.4242-0a1b2c3d.part"):
         (tmp_path / name).write_bytes(b"x")
 
     saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
 
-    assert saved_path.name == "2026-10-13_00001.pdf"
+    assert saved_path.name == f"{FIRST_NAME}.pdf"
 
 
 def test_missing_output_folder_is_created(tmp_path):
@@ -247,8 +234,8 @@ def test_name_taken_by_another_process_moves_to_the_following_number(tmp_path):
 
     saved_path = repository.save(build_encoded_scan())
 
-    assert saved_path.name == "2026-10-13_00002.pdf"
-    assert (tmp_path / "2026-10-13_00001.pdf").read_bytes() == b"written by another process"
+    assert saved_path.name == f"{SECOND_NAME}.pdf"
+    assert (tmp_path / f"{FIRST_NAME}.pdf").read_bytes() == b"written by another process"
 
 
 def test_last_allowed_attempt_still_saves_the_file(tmp_path):
@@ -256,7 +243,7 @@ def test_last_allowed_attempt_still_saves_the_file(tmp_path):
 
     saved_path = build_repository(tmp_path, file_writer).save(build_encoded_scan())
 
-    assert saved_path.name == "2026-10-13_01000.pdf"
+    assert saved_path.name == "2026-10-13_15-30-12-000000999.pdf"
     assert len(file_writer.attempted_destinations) == MAXIMUM_NAME_ATTEMPTS
 
 
@@ -279,7 +266,8 @@ def test_ensure_output_folder_ready_creates_the_missing_folder(tmp_path):
 
 def test_ensure_output_folder_ready_follows_the_current_settings(tmp_path):
     settings_repository = InMemoryApplicationSettingsRepository(build_settings(tmp_path / "first"))
-    repository = FileSystemScanOutputRepository(settings_repository, ScanFileNamingPolicy(), AtomicFileWriter())
+    naming_policy = ScanFileNamingPolicy(FixedClock(SCANNED_AT))
+    repository = FileSystemScanOutputRepository(settings_repository, naming_policy, AtomicFileWriter())
     settings_repository.save(build_settings(tmp_path / "second"))
 
     repository.ensure_output_folder_ready()
@@ -443,13 +431,12 @@ def test_name_taken_during_the_assembly_assembles_again_under_the_next_name(tmp_
     assert (result.output_path.name, assembly.call_count) == ("Contrato do apartamento (2).pdf", 2)
 
 
-def test_empty_name_follows_the_sequence_of_the_finalization_day(tmp_path):
-    (tmp_path / "2026-10-17_00007.pdf").write_bytes(b"x")
-    (tmp_path / "2026-10-16_00009.pdf").write_bytes(b"x")
+def test_empty_name_gets_the_timestamp_name_of_the_clock(tmp_path):
+    (tmp_path / "2026-10-13_00007.pdf").write_bytes(b"x")
 
     result = build_real_repository(tmp_path).save_document(build_document_pdf(""))
 
-    assert result.output_path.name == "2026-10-17_00008.pdf"
+    assert result.output_path.name == f"{FIRST_NAME}.pdf"
 
 
 def test_last_allowed_name_attempt_still_saves_the_document(tmp_path):
@@ -522,7 +509,7 @@ def test_replace_saved_scan_swaps_the_content_under_the_same_name(tmp_path):
 
     repository.replace_saved_scan(saved_path, b"turned content")
 
-    assert (saved_path.read_bytes(), saved_path.name) == (b"turned content", "2026-10-13_00001.pdf")
+    assert (saved_path.read_bytes(), saved_path.name) == (b"turned content", "2026-10-13_15-30-12-000000000.pdf")
 
 
 def test_replace_saved_scan_leaves_no_temporary_file(tmp_path):
@@ -531,7 +518,7 @@ def test_replace_saved_scan_leaves_no_temporary_file(tmp_path):
 
     repository.replace_saved_scan(saved_path, b"turned content")
 
-    assert [entry.name for entry in tmp_path.iterdir()] == ["2026-10-13_00001.pdf"]
+    assert [entry.name for entry in tmp_path.iterdir()] == ["2026-10-13_15-30-12-000000000.pdf"]
 
 
 def test_replace_saved_scan_on_a_full_disk_keeps_the_original_file(tmp_path):
@@ -554,16 +541,16 @@ def test_replace_saved_scan_with_another_failure_raises_output_folder_unavailabl
 
 
 def test_describe_saved_scan_reports_the_size_of_the_file(tmp_path):
-    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path = tmp_path / "2026-10-13_15-30-12-000000000.pdf"
     saved_path.write_bytes(b"scan content")
 
     described = build_real_repository(tmp_path).describe_saved_scan(saved_path)
 
-    assert (described.file_name, described.size_in_bytes) == ("2026-10-13_00001.pdf", len(b"scan content"))
+    assert (described.file_name, described.size_in_bytes) == ("2026-10-13_15-30-12-000000000.pdf", len(b"scan content"))
 
 
 def test_describe_saved_scan_reports_the_modification_time_in_nanoseconds(tmp_path):
-    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path = tmp_path / "2026-10-13_15-30-12-000000000.pdf"
     saved_path.write_bytes(b"scan content")
 
     described = build_real_repository(tmp_path).describe_saved_scan(saved_path)
@@ -572,7 +559,7 @@ def test_describe_saved_scan_reports_the_modification_time_in_nanoseconds(tmp_pa
 
 
 def test_describe_saved_scan_changes_when_the_file_is_edited_later(tmp_path):
-    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path = tmp_path / "2026-10-13_15-30-12-000000000.pdf"
     saved_path.write_bytes(b"scan content")
     repository = build_real_repository(tmp_path)
     before = repository.describe_saved_scan(saved_path)
@@ -583,11 +570,11 @@ def test_describe_saved_scan_changes_when_the_file_is_edited_later(tmp_path):
 
 
 def test_describe_saved_scan_of_a_file_that_is_gone_is_none(tmp_path):
-    assert build_real_repository(tmp_path).describe_saved_scan(tmp_path / "2026-10-13_00001.pdf") is None
+    assert build_real_repository(tmp_path).describe_saved_scan(tmp_path / "2026-10-13_15-30-12-000000000.pdf") is None
 
 
 def test_delete_saved_scan_removes_the_file(tmp_path):
-    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path = tmp_path / "2026-10-13_15-30-12-000000000.pdf"
     saved_path.write_bytes(b"scan content")
 
     build_real_repository(tmp_path).delete_saved_scan(saved_path)
@@ -596,13 +583,13 @@ def test_delete_saved_scan_removes_the_file(tmp_path):
 
 
 def test_delete_saved_scan_of_a_file_that_is_gone_is_not_an_error(tmp_path):
-    build_real_repository(tmp_path).delete_saved_scan(tmp_path / "2026-10-13_00001.pdf")
+    build_real_repository(tmp_path).delete_saved_scan(tmp_path / "2026-10-13_15-30-12-000000000.pdf")
 
 
 def test_delete_saved_scan_of_a_file_that_cannot_be_removed_raises_output_folder_unavailable(tmp_path):
     folder = tmp_path / "locked"
     folder.mkdir()
-    saved_path = folder / "2026-10-13_00001.pdf"
+    saved_path = folder / "2026-10-13_15-30-12-000000000.pdf"
     saved_path.write_bytes(b"scan content")
     folder.chmod(READ_ONLY_FOLDER_MODE)
     try:

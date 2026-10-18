@@ -193,7 +193,7 @@ def _build_repositories(configuration: ApplicationConfiguration, clock: Clock) -
         scanner_endpoint=JsonScannerEndpointRepository(
             configuration.data_directory / SCANNER_ENDPOINT_FILE_NAME, file_writer
         ),
-        scan_output=FileSystemScanOutputRepository(settings_repository, ScanFileNamingPolicy(), file_writer),
+        scan_output=FileSystemScanOutputRepository(settings_repository, ScanFileNamingPolicy(clock), file_writer),
         document_draft=FileSystemDocumentDraftRepository(
             configuration.data_directory / DRAFTS_FOLDER_NAME, file_writer, clock
         ),

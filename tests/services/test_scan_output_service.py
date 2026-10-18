@@ -115,7 +115,7 @@ class Environment:
         self.free_space_reader = RecordingFreeSpaceReader(free_space)
         settings_repository = InMemoryApplicationSettingsRepository(self._settings())
         self.output_repository = FileSystemScanOutputRepository(
-            settings_repository, ScanFileNamingPolicy(), InstantFileWriter()
+            settings_repository, ScanFileNamingPolicy(FixedClock(STARTED_AT)), InstantFileWriter()
         )
         self.slot_repository = FileSystemQuickScanSlotRepository(
             self.slot_folder, InstantFileWriter(), FixedClock(STARTED_AT)
@@ -290,12 +290,12 @@ def test_one_photo_with_the_crop_saves_one_cropped_file(environment):
     assert read_image_size(saved_path)[0] < TWO_PHOTOS_SIZE[0]
 
 
-def test_two_photos_with_the_crop_save_two_files_with_consecutive_names(environment):
+def test_two_photos_with_the_crop_save_two_files_with_distinct_sorted_names(environment):
     stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert [saved_file.file_name for saved_file in stored_scan.last_scan.saved_files] == [
-        "2026-10-13_00001.jpg",
-        "2026-10-13_00002.jpg",
+        "2026-10-13_15-30-12-000000000.jpg",
+        "2026-10-13_15-30-12-000000001.jpg",
     ]
 
 
@@ -342,7 +342,7 @@ def test_a_detection_that_fails_still_saves_the_whole_image(tmp_path):
 
     stored_scan = environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
-    saved_size = read_image_size(environment.output_folder / "2026-10-13_00001.jpg")
+    saved_size = read_image_size(environment.output_folder / "2026-10-13_15-30-12-000000000.jpg")
     assert (stored_scan.last_scan.framing.crops, saved_size) == ((), TWO_PHOTOS_SIZE)
 
 
@@ -362,7 +362,7 @@ def test_a_lower_quality_gives_smaller_files(environment, tmp_path):
     high.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, ImageAdjustment(auto_crop=True, jpeg_quality=95)))
     low.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, ImageAdjustment(auto_crop=True, jpeg_quality=60)))
 
-    sizes = [(env.output_folder / "2026-10-13_00001.jpg").stat().st_size for env in (high, low)]
+    sizes = [(env.output_folder / "2026-10-13_15-30-12-000000000.jpg").stat().st_size for env in (high, low)]
     assert sizes[1] < sizes[0]
 
 
@@ -378,7 +378,8 @@ def test_a_master_that_the_disk_does_not_take_still_gives_the_files(tmp_path):
         ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
     )
 
-    assert (stored_scan.last_scan.is_editable, environment.saved_names()) == (False, ["2026-10-13_00001.jpg"])
+    expected_names = ["2026-10-13_15-30-12-000000000.jpg"]
+    assert (stored_scan.last_scan.is_editable, environment.saved_names()) == (False, expected_names)
 
 
 def test_a_scan_without_a_master_leaves_no_manifest(tmp_path):
@@ -431,13 +432,13 @@ def test_the_next_scan_deletes_the_master_of_the_previous_one(environment):
     assert master_names == [f"master-{SCAN_IDENTIFIERS[1]}.jpg"]
 
 
-def test_the_next_scan_continues_the_sequence_of_the_day(environment):
+def test_the_next_scan_gets_a_later_name_than_the_first(environment):
     service = environment.build_service()
     service.store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     stored_scan = service.store(ONE_PHOTO, job_with(OutputFormat.JPEG))
 
-    assert stored_scan.last_scan.saved_files[0].file_name == "2026-10-13_00003.jpg"
+    assert stored_scan.last_scan.saved_files[0].file_name == "2026-10-13_15-30-12-000000002.jpg"
 
 
 def test_an_encoder_error_propagates_and_nothing_is_saved(environment):
@@ -476,7 +477,7 @@ def test_a_failure_on_the_second_file_leaves_the_first_in_the_folder(environment
             TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
         )
 
-    assert environment.saved_names() == ["2026-10-13_00001.jpg"]
+    assert environment.saved_names() == ["2026-10-13_15-30-12-000000000.jpg"]
 
 
 def test_the_frames_are_in_reading_order_in_the_last_scan(environment):

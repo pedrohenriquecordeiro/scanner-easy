@@ -155,7 +155,7 @@ def _build_finalizer(
         ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
     )
     scan_output_repository = FileSystemScanOutputRepository(
-        settings_repository, ScanFileNamingPolicy(), AtomicFileWriter()
+        settings_repository, ScanFileNamingPolicy(FixedClock(DRAFT_CREATED_AT)), AtomicFileWriter()
     )
     return DocumentFinalizer(
         DocumentPdfAssembler(PageFramingRenderer(), pdf_assembly_service),

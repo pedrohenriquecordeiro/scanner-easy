@@ -48,7 +48,7 @@ O seletor **Modo** no topo da página tem duas opções:
 No modo Rápido:
 
 1. Coloque a folha (ou a foto) no vidro, com a face para baixo, e feche a tampa.
-2. Aperte **Espaço** (ou clique em **Digitalizar**). Espere cerca de 15 s (na qualidade Foto, cerca de 75 s): o status mostra Preparando, Digitalizando, Salvando e por fim "Pronto! Salvo como AAAA-MM-DD_NNNNN.pdf".
+2. Aperte **Espaço** (ou clique em **Digitalizar**). Espere cerca de 15 s (na qualidade Foto, cerca de 75 s): o status mostra Preparando, Digitalizando, Salvando e por fim "Pronto! Salvo como AAAA-MM-DD_HH-MM-SS-NNNNNNNNN.pdf".
 3. Levante a tampa, troque a folha e aperte Espaço de novo. Não precisa tocar no mouse.
 
 Ajustes (salvos na hora):
@@ -60,7 +60,7 @@ Ajustes (salvos na hora):
 - **Qualidade do JPEG** (50 a 100, padrão 90): vale quando a imagem é cortada ou girada.
 - **Pasta de saída:** digite o caminho completo (por exemplo `/Volumes/MeuDisco/Scans`) e clique em **Salvar**. O padrão é `~/Pictures/Digitalizadora`. A página mostra o espaço livre e quantas páginas ainda cabem; se a pasta sumir (por exemplo, um disco externo desconectado), mostra "Pasta de saída indisponível" no lugar do espaço livre.
 
-Os arquivos se chamam `AAAA-MM-DD_NNNNN.pdf` ou `.jpg`, com um contador de 5 dígitos por dia, e nunca sobrescrevem outro arquivo.
+Os arquivos se chamam `AAAA-MM-DD_HH-MM-SS-NNNNNNNNN.pdf` ou `.jpg`: a data e a hora locais da digitalização e 9 dígitos de nanossegundos (por exemplo `2026-10-18_16-14-03-123456789.jpg`). Cada arquivo de uma digitalização com várias fotos tem o seu próprio nome, em ordem, e o app nunca sobrescreve outro arquivo.
 
 ## Molduras de corte, até 2 fotos e qualidade do JPEG
 
@@ -101,7 +101,7 @@ Teclado no modo Documento (com o foco fora do campo do nome):
 
 Depois de "Descartar última", de fechar uma confirmação, de salvar o nome com Enter, de soltar uma miniatura arrastada ou de qualquer clique na grade, o foco volta ao botão **Adicionar página**: o próximo Espaço sempre adiciona uma página e nunca repete a ação. No campo do nome, Backspace apaga texto e Enter salva o nome. Os anúncios para o leitor de tela (VoiceOver) dizem o que mudou, por exemplo "Página 3 movida para a posição 2" ou "Página 12 descartada. O documento tem 11 páginas."
 
-**Nome do arquivo.** Sem nome, o PDF recebe o nome automático `AAAA-MM-DD_NNNNN.pdf`, na mesma sequência do modo Rápido. Com nome, vira `<nome>.pdf`, e o título do PDF é o nome. O app limpa o nome para ele servir em qualquer disco, inclusive os discos externos em exFAT: `/ \ : * ? " < > |` viram `-`, caracteres invisíveis saem, espaços repetidos viram um só, e saem os pontos do começo e do fim e um `.pdf` digitado no final (`Recibo: março` grava `Recibo- março.pdf`; `Relatório.PDF` grava `Relatório.pdf`). Acentos ficam. Um nome com mais de 120 caracteres (ou mais de 200 bytes) é recusado, nunca cortado. Se o arquivo já existir, o novo vira `<nome> (2).pdf`, depois `(3)`, e assim por diante: nunca sobrescreve, nem quando a diferença é só de maiúsculas.
+**Nome do arquivo.** Sem nome, o PDF recebe o nome automático `AAAA-MM-DD_HH-MM-SS-NNNNNNNNN.pdf`, no mesmo formato do modo Rápido. Com nome, vira `<nome>.pdf`, e o título do PDF é o nome. O app limpa o nome para ele servir em qualquer disco, inclusive os discos externos em exFAT: `/ \ : * ? " < > |` viram `-`, caracteres invisíveis saem, espaços repetidos viram um só, e saem os pontos do começo e do fim e um `.pdf` digitado no final (`Recibo: março` grava `Recibo- março.pdf`; `Relatório.PDF` grava `Relatório.pdf`). Acentos ficam. Um nome com mais de 120 caracteres (ou mais de 200 bytes) é recusado, nunca cortado. Se o arquivo já existir, o novo vira `<nome> (2).pdf`, depois `(3)`, e assim por diante: nunca sobrescreve, nem quando a diferença é só de maiúsculas.
 
 **Qualidade por página.** Cada página guarda a qualidade da hora em que foi digitalizada, então dá para trocar a qualidade no meio do documento (por exemplo, uma foto a 600 dpi entre páginas de texto). Todas saem no PDF com o tamanho real da folha.
 

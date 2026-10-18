@@ -37,8 +37,9 @@ ECONOMY_PRESET_DOTS_PER_INCH = 200
 MAXIMUM_STATE_POLLS = 500
 STATE_POLL_INTERVAL_SECONDS = 0.01
 DOCUMENT_REQUEST_TIMEOUT_SECONDS = 5.0
-FIRST_PDF_NAME_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}_00001\.pdf$")
-SECOND_JPG_NAME_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}_00002\.jpg$")
+TIMESTAMP_NAME_PATTERN = r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{9}"
+PDF_NAME_PATTERN = re.compile(rf"^{TIMESTAMP_NAME_PATTERN}\.pdf$")
+JPG_NAME_PATTERN = re.compile(rf"^{TIMESTAMP_NAME_PATTERN}\.jpg$")
 OUTPUT_FOLDER_UNAVAILABLE_MESSAGE = (
     "Não consigo gravar na pasta de saída. Se for um disco externo, confira se está conectado."
 )
@@ -210,7 +211,7 @@ def test_scan_request_is_accepted(client: TestClient, output_folder: Path) -> No
 
 def test_state_reports_the_completed_pdf_scan(client: TestClient, output_folder: Path) -> None:
     state = scan_once(client, output_folder, "pdf")
-    assert FIRST_PDF_NAME_PATTERN.match(state["last_result"]["file_names"][0])
+    assert PDF_NAME_PATTERN.match(state["last_result"]["file_names"][0])
 
 
 def test_completed_scan_leaves_the_application_idle_with_one_scan(client: TestClient, output_folder: Path) -> None:
@@ -224,10 +225,10 @@ def test_saved_pdf_has_exactly_one_page(client: TestClient, output_folder: Path)
         assert len(document.pages) == 1
 
 
-def test_second_scan_as_jpg_continues_the_day_sequence(client: TestClient, output_folder: Path) -> None:
+def test_second_scan_as_jpg_gets_a_timestamp_name(client: TestClient, output_folder: Path) -> None:
     scan_once(client, output_folder, "pdf")
     state = scan_once(client, output_folder, "jpg")
-    assert SECOND_JPG_NAME_PATTERN.match(state["last_result"]["file_names"][0])
+    assert JPG_NAME_PATTERN.match(state["last_result"]["file_names"][0])
 
 
 def test_second_scan_waits_until_the_printer_is_idle_again(

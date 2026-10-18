@@ -90,14 +90,13 @@ def test_the_cropped_file_of_one_photo_is_upright(configuration):
         assert has_upright_markers(image)
 
 
-def test_two_photos_give_two_files_with_consecutive_names_and_two_frames(configuration):
+def test_two_photos_give_two_files_with_distinct_sorted_names_and_two_frames(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
 
     file_names = state["last_result"]["file_names"]
-    numbers = [int(name.removesuffix(".jpg").rpartition("_")[2]) for name in file_names]
-    assert (numbers[1] - numbers[0], len(state["last_result"]["crops"])) == (1, 2)
+    assert (file_names == sorted(set(file_names)), len(file_names), len(state["last_result"]["crops"])) == (True, 2, 2)
 
 
 def test_the_two_frames_are_where_the_photos_are(configuration):

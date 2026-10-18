@@ -27,3 +27,18 @@ def test_advance_accumulates() -> None:
     clock.advance(2)
 
     assert clock.now() == MOMENT + timedelta(seconds=3)
+
+
+def test_nanoseconds_reading_follows_the_moment_with_microsecond_resolution() -> None:
+    clock = FixedClock(MOMENT.replace(microsecond=250000))
+
+    assert clock.now_in_nanoseconds() % 1_000_000_000 == 250_000_000
+
+
+def test_nanoseconds_reading_advances_with_the_clock() -> None:
+    clock = FixedClock(MOMENT)
+    before = clock.now_in_nanoseconds()
+
+    clock.advance(2)
+
+    assert clock.now_in_nanoseconds() - before == 2_000_000_000

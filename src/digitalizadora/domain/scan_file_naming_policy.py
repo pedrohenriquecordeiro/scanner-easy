@@ -1,34 +1,28 @@
-import re
+from collections.abc import Iterator
 from datetime import datetime
 
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.ports import Clock
 
-DATE_FORMAT = "%Y-%m-%d"
-SEQUENCE_NUMBER_MINIMUM_DIGITS = 5
-FIRST_SEQUENCE_NUMBER = 1
-FILE_EXTENSIONS_PATTERN = "|".join(
-    re.escape(output_format.file_extension) for output_format in OutputFormat
-)
+TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
+NANOSECONDS_PER_SECOND = 1_000_000_000
+NANOSECOND_DIGITS = 9
 
 
 class ScanFileNamingPolicy:
-    def build_file_name(
-        self, scanned_at: datetime, sequence_number: int, output_format: OutputFormat
-    ) -> str:
-        date_text = scanned_at.strftime(DATE_FORMAT)
-        padded_sequence = f"{sequence_number:0{SEQUENCE_NUMBER_MINIMUM_DIGITS}d}"
-        return f"{date_text}_{padded_sequence}.{output_format.file_extension}"
+    def __init__(self, clock: Clock) -> None:
+        self._clock = clock
 
-    def extract_sequence_number(self, file_name: str, scanned_at: datetime) -> int | None:
-        date_text = re.escape(scanned_at.strftime(DATE_FORMAT))
-        pattern = (
-            rf"{date_text}_([0-9]{{{SEQUENCE_NUMBER_MINIMUM_DIGITS},}})"
-            rf"\.(?:{FILE_EXTENSIONS_PATTERN})"
-        )
-        match = re.fullmatch(pattern, file_name)
-        if match is None:
-            return None
-        sequence_number = int(match.group(1))
-        if sequence_number < FIRST_SEQUENCE_NUMBER:
-            return None
-        return sequence_number
+    def file_names(self, output_format: OutputFormat) -> Iterator[str]:
+        """The name of the moment of the first read, then one nanosecond later each: unique and sorted."""
+        first_nanoseconds = self._clock.now_in_nanoseconds()
+        time_zone = self._clock.now().tzinfo
+        candidate_nanoseconds = first_nanoseconds
+        while True:
+            yield self._build_file_name(candidate_nanoseconds, time_zone, output_format)
+            candidate_nanoseconds += 1
+
+    def _build_file_name(self, epoch_nanoseconds: int, time_zone, output_format: OutputFormat) -> str:
+        seconds, nanoseconds = divmod(epoch_nanoseconds, NANOSECONDS_PER_SECOND)
+        timestamp_text = datetime.fromtimestamp(seconds, tz=time_zone).strftime(TIMESTAMP_FORMAT)
+        return f"{timestamp_text}-{nanoseconds:0{NANOSECOND_DIGITS}d}.{output_format.file_extension}"

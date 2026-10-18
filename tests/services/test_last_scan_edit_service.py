@@ -42,9 +42,9 @@ from tests.fakes.scripted_file_writer import ScriptedFileWriter
 from tests.fakes.synthetic_scans import build_scan_jpeg
 
 JPEG_QUALITY = 90
-FIRST_FILE = "2026-10-13_00001.jpg"
-SECOND_FILE = "2026-10-13_00002.jpg"
-THIRD_FILE = "2026-10-13_00003.jpg"
+FIRST_FILE = "2026-10-13_15-30-12-000000000.jpg"
+SECOND_FILE = "2026-10-13_15-30-12-000000001.jpg"
+THIRD_FILE = "2026-10-13_15-30-12-000000002.jpg"
 LEFT_BOX = rectangle((0.05, 0.05, 0.45, 0.45))
 RIGHT_BOX = rectangle((0.55, 0.55, 0.95, 0.95))
 TILTED_BOX = quadrilateral((0.30, 0.10), (0.80, 0.22), (0.70, 0.60), (0.20, 0.48))
@@ -98,7 +98,7 @@ async def test_turning_a_jpg_swaps_the_dimensions_of_the_file(parts, service):
 
 async def test_turning_a_pdf_writes_it_again_with_the_physical_size_swapped(parts, service):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.PDF))
-    pdf_path = parts.output_folder / "2026-10-13_00001.pdf"
+    pdf_path = parts.output_folder / "2026-10-13_15-30-12-000000000.pdf"
 
     await service.rotate_clockwise(JPEG_QUALITY)
 
@@ -291,7 +291,7 @@ async def test_each_file_has_the_size_of_its_frame(parts, service):
     )
 
 
-async def test_the_new_numbered_file_continues_the_sequence_of_the_day(parts, service):
+async def test_the_new_file_gets_a_name_after_the_existing_ones(parts, service):
     one_whole_scan(parts)
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
 

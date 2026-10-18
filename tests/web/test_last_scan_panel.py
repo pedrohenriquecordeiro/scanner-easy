@@ -2,8 +2,8 @@ import pytest
 
 from tests.web.panel_scenario_runner import NODE_EXECUTABLE, run_last_scan_scenarios
 
-FIRST_FILE = "2026-10-18_00007.pdf"
-SECOND_FILE = "2026-10-18_00008.pdf"
+FIRST_FILE = "2026-10-18_16-14-03-000000006.pdf"
+SECOND_FILE = "2026-10-18_16-14-03-000000007.pdf"
 UPPER_OUTLINE = "5,2 90,2 90,55 5,55"
 LOWER_OUTLINE = "5,60 90,60 90,95 5,95"
 WHOLE_OUTLINE = "10,10 80,10 80,90 10,90"
@@ -153,7 +153,7 @@ def test_the_panel_is_hidden_in_the_document_mode(scenario_results: dict) -> Non
 def test_a_new_scan_replaces_the_files_the_frames_and_the_thumbnail(scenario_results: dict) -> None:
     panel = scenario_results["panel_follows_a_new_scan"]
     assert (panel["file_names"], visible_outlines(panel), panel["thumbnail_source"]) == (
-        f"{SECOND_FILE}\n2026-10-18_00009.pdf",
+        f"{SECOND_FILE}\n2026-10-18_16-14-03-000000008.pdf",
         [UPPER_OUTLINE, LOWER_OUTLINE],
         "/api/scans/last/thumbnail?version=4",
     )

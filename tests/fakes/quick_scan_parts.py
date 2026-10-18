@@ -122,7 +122,7 @@ def build_quick_scan_parts_in(
         ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
     )
     real_output_repository = FileSystemScanOutputRepository(
-        settings_repository, ScanFileNamingPolicy(), InstantFileWriter()
+        settings_repository, ScanFileNamingPolicy(clock), InstantFileWriter()
     )
     real_slot_repository = FileSystemQuickScanSlotRepository(slot_folder, InstantFileWriter(), clock)
     used_output_repository = output_repository or real_output_repository

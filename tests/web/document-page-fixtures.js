@@ -42,7 +42,7 @@ const FINALIZED_BODY = {
 const LAST_FINISHED_DOCUMENT = { ...FINALIZED_BODY, finalized_at: "2026-10-17T10:05:00-03:00" };
 const LAST_SCAN_RESULT = {
   scan_identifier: "9f3c1d2e4b5a6978",
-  file_names: ["2026-10-17_00001.pdf"],
+  file_names: ["2026-10-17_10-00-00-000000000.pdf"],
   output_folder: "/Users/teste/Digitalizadora",
   output_format: "pdf",
   total_size_in_bytes: 1234567,
