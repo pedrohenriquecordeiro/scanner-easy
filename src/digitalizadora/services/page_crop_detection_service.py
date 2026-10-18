@@ -1,6 +1,5 @@
 import io
 import logging
-import math
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from digitalizadora.domain.errors import ImageAdjustmentFailedError, InvalidCrop
 from digitalizadora.domain.page_crop import CropCorner, PageCrop
 from digitalizadora.domain.page_framing import put_in_reading_order
 from digitalizadora.domain.pixel_region import PixelRegion
+from digitalizadora.services.edge_refinement import refine_corners
 from digitalizadora.services.paper_edge_detection import PaperEdges, detect_paper_edges
 from digitalizadora.services.photo_region_detection import (
     PREVIEW_MAXIMUM_EDGE_PIXELS,
@@ -27,14 +27,42 @@ MAXIMUM_MARGIN_HALVINGS = 10
 # A photo this close to upright is taken as upright: the crop is then a plain rectangle.
 AXIS_SNAP_DEGREES = 1.5
 PREVIEW_COLOR_MODE = "RGB"
+REFINEMENT_COLOR_MODE = "L"
+# Pillow decodes a JPEG at 1/2, 1/4 or 1/8 of the size: at 1200 dots per inch the refinement reads a quarter.
+REFINEMENT_MAXIMUM_EDGE_PIXELS = 2400
+
+
+class _EdgeRefiner:
+    """Moves a frame in pixels of the page onto the true edges of the photo, reading the page only when asked."""
+
+    def __init__(self, jpeg_content: bytes, full_size: tuple[int, int]) -> None:
+        self._jpeg_content = jpeg_content
+        self._full_size = full_size
+        self._luminance: Image.Image | None = None
+
+    def __call__(self, corners: Corners) -> Corners:
+        if self._luminance is None:
+            self._luminance = self._read_luminance()
+        scale_x = self._luminance.width / self._full_size[0]
+        scale_y = self._luminance.height / self._full_size[1]
+        scaled: Corners = tuple((x * scale_x, y * scale_y) for x, y in corners)  # type: ignore[assignment]
+        refined = refine_corners(self._luminance, scaled)
+        return tuple((x / scale_x, y / scale_y) for x, y in refined)  # type: ignore[return-value]
+
+    def _read_luminance(self) -> Image.Image:
+        edge = (REFINEMENT_MAXIMUM_EDGE_PIXELS, REFINEMENT_MAXIMUM_EDGE_PIXELS)
+        with Image.open(io.BytesIO(self._jpeg_content)) as source:
+            source.draft(REFINEMENT_COLOR_MODE, edge)
+            return source.convert(REFINEMENT_COLOR_MODE)
 
 
 @dataclass(frozen=True)
 class _PageGeometry:
-    """The page size in pixels and the margin around what was found, as a share of the longest side."""
+    """The page size in pixels, the margin around what was found (a share of the longest side) and its refiner."""
 
     full_size: tuple[int, int]
     margin_ratio: float
+    refine_edges: Callable[[Corners], Corners]
 
     @property
     def margin_pixels(self) -> float:
@@ -93,15 +121,24 @@ def _crop_around(region: PixelRegion, page: _PageGeometry) -> PageCrop | None:
         return None
 
 
-def _bounding_region(region: PhotoRegion, preview_size: tuple[int, int]) -> PixelRegion:
-    horizontal_positions = [corner[0] for corner in region.corners]
-    vertical_positions = [corner[1] for corner in region.corners]
-    width, height = preview_size
+def _bounding_region(corners: Corners, size: tuple[int, int]) -> PixelRegion:
+    horizontal_positions = [corner[0] for corner in corners]
+    vertical_positions = [corner[1] for corner in corners]
+    width, height = size
     return PixelRegion(
-        left=max(0, math.floor(min(horizontal_positions))),
-        top=max(0, math.floor(min(vertical_positions))),
-        right=min(width, math.ceil(max(horizontal_positions))),
-        bottom=min(height, math.ceil(max(vertical_positions))),
+        left=max(0, round(min(horizontal_positions))),
+        top=max(0, round(min(vertical_positions))),
+        right=min(width, round(max(horizontal_positions))),
+        bottom=min(height, round(max(vertical_positions))),
+    )
+
+
+def _corners_of_region(region: PixelRegion) -> Corners:
+    return (
+        (region.left, region.top),
+        (region.right, region.top),
+        (region.right, region.bottom),
+        (region.left, region.bottom),
     )
 
 
@@ -125,10 +162,13 @@ def _clamped(value: float) -> float:
     return min(1.0, max(0.0, value))
 
 
-def _rotated_crop(region: PhotoRegion, preview_size: tuple[int, int], page: _PageGeometry) -> PageCrop | None:
+def _corners_on_the_page(region: PhotoRegion, preview_size: tuple[int, int], page: _PageGeometry) -> Corners:
+    scale_x, scale_y = page.full_size[0] / preview_size[0], page.full_size[1] / preview_size[1]
+    return tuple((x * scale_x, y * scale_y) for x, y in region.corners)  # type: ignore[return-value]
+
+
+def _rotated_crop(corners_on_the_page: Corners, page: _PageGeometry) -> PageCrop | None:
     full_size = page.full_size
-    scale_x, scale_y = full_size[0] / preview_size[0], full_size[1] / preview_size[1]
-    corners_on_the_page: Corners = tuple((x * scale_x, y * scale_y) for x, y in region.corners)  # type: ignore[assignment]
     grown_corners = _grown_within_the_page(corners_on_the_page, page)
     try:
         return PageCrop.rounded(
@@ -140,11 +180,11 @@ def _rotated_crop(region: PhotoRegion, preview_size: tuple[int, int], page: _Pag
 
 
 def _crop_of_region(region: PhotoRegion, preview_size: tuple[int, int], page: _PageGeometry) -> PageCrop | None:
+    refined_corners = page.refine_edges(_corners_on_the_page(region, preview_size, page))
     angle = abs(region.top_edge_angle_degrees)
     if angle <= AXIS_SNAP_DEGREES or angle >= 90 - AXIS_SNAP_DEGREES:
-        bounding_region = _bounding_region(region, preview_size)
-        return _crop_around(bounding_region.scaled(preview_size, page.full_size), page)
-    return _rotated_crop(region, preview_size, page)
+        return _crop_around(_bounding_region(refined_corners, page.full_size), page)
+    return _rotated_crop(refined_corners, page)
 
 
 class PageCropDetectionService:
@@ -161,7 +201,8 @@ class PageCropDetectionService:
     def detect_crops(self, jpeg_content: bytes) -> DetectedCrops:
         with _failures_of_the_detection():
             preview, full_size = _read_preview(jpeg_content)
-            page = _PageGeometry(full_size, CROP_MARGIN_RATIO if self._crop_margin_enabled() else 0.0)
+            margin_ratio = CROP_MARGIN_RATIO if self._crop_margin_enabled() else 0.0
+            page = _PageGeometry(full_size, margin_ratio, _EdgeRefiner(jpeg_content, full_size))
             detection = detect_photo_regions(preview)
             if detection is None:
                 detected_crops = DetectedCrops(self._crops_by_side(preview, page), 0)
@@ -182,5 +223,7 @@ class PageCropDetectionService:
         edges = detect_paper_edges(preview)
         if edges is None:
             return ()
-        crop = _crop_around(_region_of_edges(edges, page.full_size), page)
+        coarse_region = _region_of_edges(edges, page.full_size)
+        refined_corners = page.refine_edges(_corners_of_region(coarse_region))
+        crop = _crop_around(_bounding_region(refined_corners, page.full_size), page)
         return () if crop is None else (crop,)

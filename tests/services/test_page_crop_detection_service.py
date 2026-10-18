@@ -388,3 +388,24 @@ def test_the_crop_margin_is_read_at_every_detection(sheet_on_dark_lid):
     second_left = box_of(only_crop(service, sheet_on_dark_lid)).left
 
     assert second_left > first_left
+
+
+FLUSH_TOLERANCE_PIXELS = 1.5
+
+
+def test_without_the_margin_an_upright_photo_is_framed_flush_with_its_edges():
+    upright = PlacedPhoto(center=(640.0, 880.0), size=(600, 800), angle_degrees=0.0)
+    flush_service = PageCropDetectionService(lambda: False)
+
+    edges = only_crop(flush_service, build_photo_scene_jpeg(GLASS_SIZE, [upright])).bounding_edges
+
+    measured = (edges.left * GLASS_SIZE[0], edges.top * GLASS_SIZE[1], edges.right * GLASS_SIZE[0])
+    assert measured == pytest.approx((340, 480, 940), abs=FLUSH_TOLERANCE_PIXELS)
+
+
+def test_without_the_margin_a_tilted_photo_is_framed_flush_with_its_corners():
+    flush_service = PageCropDetectionService(lambda: False)
+
+    crop = only_crop(flush_service, build_photo_scene_jpeg(GLASS_SIZE, [CARD]))
+
+    assert worst_distance(crop, crop_of(CARD)) * GLASS_SIZE[1] < FLUSH_TOLERANCE_PIXELS * 2
