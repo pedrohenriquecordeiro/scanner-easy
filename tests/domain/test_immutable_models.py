@@ -9,6 +9,8 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.pixel_region import PixelRegion
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
@@ -46,6 +48,8 @@ MODELS = [
     ApplicationSettings(Path("/tmp"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings),
     ImageAdjustment(),
     PixelRegion(0, 0, 1, 1),
+    PageCrop(0.0, 0.0, 1.0, 1.0),
+    PageFraming(),
     ScanProgressSnapshot(ScanPhase.IDLE, 0, None, None),
 ]
 

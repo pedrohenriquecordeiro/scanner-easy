@@ -21,6 +21,9 @@ from digitalizadora.domain.document_draft import (
 )
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, build_document_page
 
@@ -321,3 +324,59 @@ def test_with_page_replaced_keeps_the_name_and_creation_moment(draft: DocumentDr
     replaced = named.with_page_replaced(SECOND, REPLACEMENT)
 
     assert (replaced.name, replaced.created_at) == ("Contrato", named.created_at)
+
+
+FRAMING = PageFraming(rotation=PageRotation.CLOCKWISE_90, crop=PageCrop(0.1, 0.2, 0.5, 0.9))
+
+
+def test_a_page_starts_unframed() -> None:
+    assert build_document_page(FIRST).framing == UNFRAMED
+
+
+def test_with_page_framing_sets_the_framing_of_that_page_only(draft: DocumentDraft) -> None:
+    framed_draft = draft.with_page_framing(SECOND, FRAMING)
+
+    assert [page.framing for page in framed_draft.pages] == [UNFRAMED, FRAMING, UNFRAMED]
+
+
+def test_with_page_framing_keeps_the_position(draft: DocumentDraft) -> None:
+    assert draft.with_page_framing(SECOND, FRAMING).page_identifiers == draft.page_identifiers
+
+
+def test_with_page_framing_keeps_the_other_details_of_the_page(draft: DocumentDraft) -> None:
+    framed_page = draft.with_page_framing(SECOND, FRAMING).pages[1]
+
+    assert dataclasses.replace(framed_page, framing=UNFRAMED) == draft.pages[1]
+
+
+def test_with_page_framing_of_an_unknown_page_raises(draft: DocumentDraft) -> None:
+    with pytest.raises(PageNotFoundError):
+        draft.with_page_framing(UNKNOWN, FRAMING)
+
+
+def test_with_page_framing_clears_both_finalization_markers(marked_draft: DocumentDraft) -> None:
+    framed_draft = marked_draft.with_page_framing(FIRST, FRAMING)
+
+    assert (framed_draft.finalization_started_at, framed_draft.finished_document) == (None, None)
+
+
+def test_with_page_framing_keeps_the_name_and_creation_moment(draft: DocumentDraft) -> None:
+    named_draft = draft.renamed("Contrato").with_page_framing(FIRST, FRAMING)
+
+    assert (named_draft.name, named_draft.created_at) == ("Contrato", draft.created_at)
+
+
+def test_the_estimated_document_size_counts_a_page_without_framing_once() -> None:
+    assert build_document_draft(2).estimated_document_size_in_bytes == 2 * build_document_page(FIRST).size_in_bytes
+
+
+def test_the_estimated_document_size_doubles_a_page_that_needs_rendering() -> None:
+    plain_draft = build_document_draft(2)
+    framed_draft = plain_draft.with_page_framing(FIRST, FRAMING)
+    page_size = plain_draft.pages[0].size_in_bytes
+
+    assert framed_draft.estimated_document_size_in_bytes == 3 * page_size
+
+
+def test_the_estimated_size_of_the_draft_on_disk_ignores_the_framing(draft: DocumentDraft) -> None:
+    assert draft.with_page_framing(FIRST, FRAMING).estimated_size_in_bytes == draft.estimated_size_in_bytes

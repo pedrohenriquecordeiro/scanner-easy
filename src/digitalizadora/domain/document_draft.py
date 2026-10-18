@@ -8,12 +8,15 @@ from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
+from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.scan_result import ScanResult
 
 PAGE_IDENTIFIER_PATTERN = re.compile(r"[0-9a-f]{16}")
 PAGE_IDENTIFIER_SIZE_IN_BYTES = 8
 DRAFT_SESSION_SIZE_IN_BYTES = 8
 FIRST_PAGE_POSITION = 1
+# A page with a rotation or a crop is re-encoded when the PDF is written, and the new JPEG may be bigger.
+RENDERED_PAGE_SIZE_FACTOR = 2
 
 
 def generate_page_identifier() -> str:
@@ -35,6 +38,8 @@ class DocumentPage:
     dots_per_inch: int
     color_mode: ColorMode
     size_in_bytes: int
+    # Last field with a default: every five-argument construction keeps working and means an unframed page.
+    framing: PageFraming = UNFRAMED
 
 
 @dataclass(frozen=True)
@@ -80,6 +85,14 @@ class DocumentDraft:
     def estimated_size_in_bytes(self) -> int:
         return sum(page.size_in_bytes for page in self.pages)
 
+    @property
+    def estimated_document_size_in_bytes(self) -> int:
+        """What the PDF may take: the pages that need rendering come out re-encoded."""
+        return sum(
+            page.size_in_bytes * (RENDERED_PAGE_SIZE_FACTOR if page.framing.needs_rendering else 1)
+            for page in self.pages
+        )
+
     def position_of(self, page_identifier: str) -> int:
         if page_identifier not in self.page_identifiers:
             raise PageNotFoundError(f"Page {page_identifier!r} is not in the draft")
@@ -94,6 +107,16 @@ class DocumentDraft:
             self.name,
             tuple(
                 replacement if position == replaced_position else page
+                for position, page in enumerate(self.pages, FIRST_PAGE_POSITION)
+            ),
+        )
+
+    def with_page_framing(self, page_identifier: str, framing: PageFraming) -> "DocumentDraft":
+        framed_position = self.position_of(page_identifier)
+        return self._with_content(
+            self.name,
+            tuple(
+                replace(page, framing=framing) if position == framed_position else page
                 for position, page in enumerate(self.pages, FIRST_PAGE_POSITION)
             ),
         )
