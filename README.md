@@ -19,7 +19,7 @@ Ou dê duplo clique em `iniciar-digitalizadora.command`: ele prepara o ambiente 
 
 ## Como usar
 
-- **Rápido** (padrão): Espaço digitaliza e grava um arquivo. **Documento**: Espaço acrescenta uma página; **Enter** (ou **Finalizar PDF**) grava um PDF com todas. Na grade dá para reordenar (arrastar, ◀ ▶ ou **Mover para…**), excluir, **Descartar última** (Backspace) e **Cancelar documento**. Um documento em andamento sobrevive a quedas.
+- **Rápido** (padrão): Espaço digitaliza e grava um arquivo. **Documento**: Espaço acrescenta uma página; **Enter** (ou **Salvar**) grava um PDF com todas. Na grade dá para reordenar (arrastar, ◀ ▶ ou **Mover para…**), excluir, **Descartar última** (Backspace) e **Cancelar documento**. Um documento em andamento sobrevive a quedas.
 - **Cortar automaticamente**: acha até 2 fotos (ou uma folha menor que o vidro, inclusive tortas) e dá uma **moldura** a cada uma. **Ampliar** abre o editor: arraste cantos, lados, o interior ou a alça de giro; **Girar ↻** gira a página; **Detectar automaticamente** refaz as molduras; **Aplicar** grava.
 - O original do scanner fica guardado sem alterações. Cada **Aplicar**, **Girar** ou **Detectar** gera arquivos novos a partir dele, em qualidade JPEG 100, e mantém os anteriores. Uma imagem sem corte e sem giro mantém os bytes do scanner.
 - **Onde ficam os arquivos**: na pasta de saída (padrão `~/Pictures/Digitalizadora`). Nome: `AAAA_MM_DD__HH_MM_SS_NNNNNNNNN.pdf` ou `.jpg` (data e hora locais e nanossegundos). Uma gravação com vários arquivos (duas fotos) repete o nome e acrescenta `__1`, `__2`, na ordem de leitura. No modo Documento com nome, o PDF vira `<nome>.pdf`, e um nome repetido vira `<nome> (2).pdf`. O app nunca sobrescreve nem apaga arquivos da pasta de saída.
@@ -53,16 +53,8 @@ O registro fica em `~/Library/Logs/Digitalizadora/digitalizadora.log`.
 
 ## Desenvolvimento
 
-```
-make test            # testes, sem rede e sem impressora
-make lint            # ruff
-make check           # lint + testes
-make simulator       # impressora de mentira em http://127.0.0.1:8080/eSCL
-make run-simulated   # app apontando para o simulador, com dados em ~/Digitalizadora-simulador
-make test-hardware   # testes com a impressora real (cabo USB, folha no vidro)
-```
+Para mudar o código: `make check` (lint e testes) antes de commitar. Comandos, convenções, testes e receitas estão em [docs/desenvolvimento.md](docs/desenvolvimento.md).
 
 - [docs/arquitetura.md](docs/arquitetura.md): camadas, pacotes, fluxos, dados em disco, API e regras que não podem quebrar.
-- [docs/desenvolvimento.md](docs/desenvolvimento.md): ambiente, convenções, testes e receitas para mudanças comuns.
 - [docs/acceptance-checklist.md](docs/acceptance-checklist.md): checklist manual de aceitação.
 - [docs/historico/](docs/historico/README.md): planejamento, pesquisa, Gate 0 e specs antigos.

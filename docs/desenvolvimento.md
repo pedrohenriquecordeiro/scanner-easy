@@ -45,6 +45,7 @@ Variáveis do simulador: `DIGITALIZADORA_SIMULATOR_PORT` (padrão 8080), `DIGITA
 `tests/architecture/` roda junto com os demais:
 
 - `test_layer_dependencies.py` lê os `import` de cada módulo com `ast` (inclusive os dentro de funções e de `TYPE_CHECKING`) e recusa imports que violem a regra de dependência, imports relativos e qualquer import de `composition_root` fora do ponto de entrada.
+- `test_import_cycles.py` falha se dois módulos, ou dois pacotes de funcionalidade (`services/application`, `domain/output`...), se importam em círculo. Os módulos soltos na raiz de uma camada (`domain/ports.py`, `domain/errors.py`) ficam fora da checagem de pacotes. Para quebrar um ciclo, mova o tipo compartilhado para o pacote que os dois já usam.
 - `test_module_naming.py` exige snake_case nos módulos e nas pastas de pacotes.
 
 Se um teste falhar com "must not import ...", não adapte o teste: mova a regra para a camada certa. Costuma ser uma destas saídas: declarar uma porta (Protocol) em `domain/ports.py` e injetar a implementação pelo construtor; mover o tipo compartilhado para `domain`; ou montar o objeto no `composition_root.py`. Um pacote ou módulo novo na raiz de `src/digitalizadora/` precisa de uma linha em `ALLOWED_LAYERS`.
@@ -68,7 +69,7 @@ Exemplo guia: `crop_margin`, o último ajuste que entrou.
 
 ### Adicionar um endpoint HTTP
 
-1. Se há um erro novo: uma classe com `code` em `domain/errors.py` e a mensagem em português em `controllers/shared/error_message_catalog.py` (`tests/controllers/shared/test_error_message_catalog.py` confere os dois). Mapeie o código ao status HTTP no controller (o padrão para "ocupado" é 409).
+1. Se há um erro novo: uma classe com `code` em `domain/errors.py` e a mensagem em português em `controllers/shared/error_message_catalog.py`. Acrescente a mensagem também em `EXPECTED_MESSAGES` e aumente `DOMAIN_ERROR_CLASS_COUNT` em `tests/controllers/shared/test_error_message_catalog.py` (os dois testes comparam com valores fixos). Mapeie o código ao status HTTP no controller (o padrão para "ocupado" é 409).
 2. Regra de negócio num service em `services/<grupo>/`; o controller só traduz HTTP.
 3. Controller em `controllers/<grupo>/` com `build_router()` e o corpo da requisição validado por Pydantic (use tipos estritos: `StrictInt`, `StrictBool`).
 4. Registre o controller: campo em `ApplicationControllers` e no laço de `include_router` (`application_factory.py`) e a construção em `_build_controllers` (`composition_root.py`). Se o corpo inválido deve responder um código próprio, acrescente o caminho em `VALIDATION_ERROR_CODE_PATTERNS`.

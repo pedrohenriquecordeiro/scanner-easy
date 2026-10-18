@@ -4,8 +4,7 @@ App local para macOS (FastAPI em `127.0.0.1` + página em JS puro) que digitaliz
 
 ## Comandos
 
-- `make setup` cria o `.venv`; `make run` roda o app; `make simulator` e `make run-simulated` rodam a impressora falsa e o app apontado para ela.
-- `make test` (`.venv/bin/python -m pytest -q`), `make lint` (`ruff check src tests`), `make check` (os dois). Rode `make check` antes de commitar.
+- Tabela completa dos alvos do `make` (setup, run, simulator, run-simulated, test, lint, check, test-hardware): `docs/desenvolvimento.md`. `make check` deve terminar verde antes de commitar.
 - `make test-hardware` usa a impressora real; só o usuário pede isso.
 
 ## Arquitetura
@@ -22,7 +21,7 @@ Camadas: `controllers -> services -> domain <- repositories / infrastructure`. I
 
 - TDD. Cada teste: menos de 100 ms, um conceito, sem rede e sem impressora. Relógio, `sleep` e espaço livre são injetados.
 - Fakes em `tests/fakes/`; interface testada no Node (`tests/web/`); testes de hardware só com `DIGITALIZADORA_HARDWARE_TESTS=1`.
-- Linha de base: 4430 passando, 19 pulados, ruff limpo. Não deixe a contagem cair sem motivo.
+- `make check` (pytest e ruff) deve terminar verde; não deixe a contagem de testes cair sem motivo.
 
 ## Cuidados
 
