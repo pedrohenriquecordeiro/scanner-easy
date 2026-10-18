@@ -159,7 +159,7 @@ def test_the_enlarged_view_of_the_last_scan_is_served_from_the_master(configurat
     assert (response.status_code, response.headers["content-type"]) == (200, "image/jpeg")
 
 
-def test_adjusting_the_frames_by_the_api_rewrites_the_files_under_the_same_names(configuration):
+def test_adjusting_the_frames_by_the_api_writes_a_new_file_and_keeps_the_old_ones(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
@@ -168,12 +168,11 @@ def test_adjusting_the_frames_by_the_api_rewrites_the_files_under_the_same_names
 
         response = put_last_crops(client, [crop_body(smaller)])
 
-    assert response.status_code == 200
-    assert response.json()["last_result"]["file_names"] == names_before[:1]
-    assert response.json()["deleted_file_names"] == names_before[1:]
+    new_names = response.json()["last_result"]["file_names"]
+    on_disk = sorted(path.name for path in configuration.default_output_folder.iterdir())
+    assert (response.status_code, len(new_names), on_disk) == (200, 1, sorted([*names_before, *new_names]))
 
-
-def test_removing_the_second_frame_deletes_the_second_file_and_says_so(configuration):
+def test_removing_the_second_frame_keeps_both_old_files_and_lists_only_the_new_one(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
@@ -181,14 +180,11 @@ def test_removing_the_second_frame_deletes_the_second_file_and_says_so(configura
 
         response = put_last_crops(client, [first_crop])
 
-    remaining = [path.name for path in configuration.default_output_folder.iterdir()]
-    assert (response.json()["deleted_file_names"], remaining) == (
-        state["last_result"]["file_names"][1:],
-        state["last_result"]["file_names"][:1],
-    )
+    on_disk = sorted(path.name for path in configuration.default_output_folder.iterdir())
+    listed = response.json()["last_result"]["file_names"]
+    assert (len(listed), on_disk) == (1, sorted([*state["last_result"]["file_names"], *listed]))
 
-
-def test_adding_a_second_frame_creates_the_next_numbered_file(configuration):
+def test_adding_a_second_frame_writes_two_new_files_next_to_the_first(configuration):
     with build_client(configuration, ONE_PHOTO) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
@@ -197,8 +193,7 @@ def test_adding_a_second_frame_creates_the_next_numbered_file(configuration):
         response = put_last_crops(client, [state["last_result"]["crops"][0], crop_body(other)])
 
     assert len(response.json()["last_result"]["file_names"]) == 2
-    assert len(list(configuration.default_output_folder.iterdir())) == 2
-
+    assert len(list(configuration.default_output_folder.iterdir())) == 3
 
 def test_the_state_reports_the_new_frames_and_a_new_revision_after_an_edit(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
@@ -243,33 +238,33 @@ def test_three_crops_are_refused(configuration):
     assert (response.status_code, response.json()["code"]) == (422, "invalid_crop")
 
 
-def test_turning_the_last_scan_turns_the_files_and_the_frames_with_the_page(configuration):
+def test_turning_the_last_scan_writes_turned_files_and_turns_the_frames_with_the_page(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
         sizes_before = [read_image_size(path) for path in last_result_paths(state)]
 
         response = turn_last_scan(client)
+        state_after = client.get("/api/state").json()
 
     assert response.json()["last_result"]["rotation_degrees"] == 90
-    sizes_after = [read_image_size(path) for path in last_result_paths(state)]
+    sizes_after = [read_image_size(path) for path in last_result_paths(state_after)]
     assert [side for size in sizes_after for side in size] == pytest.approx(
         [side for size in sizes_before for side in size[::-1]], abs=3
     )
 
-
 def test_a_turned_file_is_still_upright_in_its_own_orientation_after_four_turns(configuration):
     with build_client(configuration, ONE_PHOTO) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
-        state = scan_once(client)
+        scan_once(client)
         for _ in range(4):
             turn_last_scan(client)
+        state_after = client.get("/api/state").json()
 
-    with Image.open(last_result_paths(state)[0]) as image:
+    with Image.open(last_result_paths(state_after)[0]) as image:
         assert has_upright_markers(image)
 
-
-def test_turning_a_pdf_scan_rewrites_the_pdf_with_the_physical_size_swapped(configuration):
+def test_turning_a_pdf_scan_writes_a_new_pdf_with_the_physical_size_swapped(configuration):
     with build_client(configuration, ONE_PHOTO) as client:
         save_settings(client, configuration.default_output_folder, output_format="pdf", auto_crop=True)
         state = scan_once(client)
@@ -277,11 +272,11 @@ def test_turning_a_pdf_scan_rewrites_the_pdf_with_the_physical_size_swapped(conf
         with pikepdf.open(path) as pdf:
             before = (float(pdf.pages[0].mediabox[2]), float(pdf.pages[0].mediabox[3]))
         turn_last_scan(client)
-        with pikepdf.open(path) as pdf:
+        (turned_path,) = last_result_paths(client.get("/api/state").json())
+        with pikepdf.open(turned_path) as pdf:
             after = (float(pdf.pages[0].mediabox[2]), float(pdf.pages[0].mediabox[3]))
 
-    assert after == pytest.approx(before[::-1], abs=1.0)
-
+    assert (turned_path != path, after) == (True, pytest.approx(before[::-1], abs=1.0))
 
 def test_the_detection_finds_the_photos_of_a_scan_saved_whole(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:

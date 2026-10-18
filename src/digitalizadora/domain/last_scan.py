@@ -12,7 +12,7 @@ from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 class SavedScanFile:
     file_name: str
     size_in_bytes: int
-    # What the application saw right after writing: a file that no longer matches was edited by someone else.
+    # What the application saw right after writing the file.
     modified_at_nanoseconds: int
 
 

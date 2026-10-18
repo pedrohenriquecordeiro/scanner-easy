@@ -29,9 +29,7 @@ EXPECTED_METHOD_NAMES_BY_PORT = {
         "save",
         "save_in_folder",
         "save_document",
-        "replace_saved_scan",
         "describe_saved_scan",
-        "delete_saved_scan",
     },
     "QuickScanSlotRepository": {
         "storage_folder",

@@ -12,14 +12,13 @@ const LAST_SCAN_ACTIONS = Object.freeze({ ROTATE: "rotate", SET_CROPS: "set_crop
 const LAST_SCAN_RELOAD_ERROR_CODES = Object.freeze([
   "no_last_scan",
   "last_scan_replaced",
-  "last_scan_file_missing",
   "saved_scan_unreadable",
   "last_scan_not_editable",
 ]);
 const LAST_SCAN_SUBJECT_TEXT = "nesta digitalização";
 const LAST_SCAN_TITLE_TEXT = "Última digitalização: moldura de corte";
 const LAST_SCAN_GONE_TEXT = "Essa digitalização foi substituída por outra.";
-const LAST_SCAN_HINT_TEXT = "Ajustes regravam os arquivos salvos.";
+const LAST_SCAN_HINT_TEXT = "Cada ajuste salva arquivos novos e mantém os anteriores.";
 const LAST_SCAN_NOT_EDITABLE_HINT_TEXT =
   "O original desta digitalização não foi guardado; os arquivos foram salvos normalmente.";
 const LAST_SCAN_ROTATED_TEXT = "Última digitalização girada 90° para a direita.";
@@ -54,10 +53,6 @@ function join_names(names) {
   return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
 }
 
-function describe_file_count(file_count) {
-  return file_count === SINGLE_FILE_COUNT ? `${SINGLE_FILE_COUNT} arquivo` : `${file_count} arquivos`;
-}
-
 function describe_saved_scan_status(last_result) {
   const { file_names } = last_result;
   if (file_names.length === SINGLE_FILE_COUNT) {
@@ -66,37 +61,34 @@ function describe_saved_scan_status(last_result) {
   return `Pronto! ${file_names.length} arquivos salvos: ${join_names(file_names)}`;
 }
 
-function describe_deleted_files(deleted_file_names, remaining_file_count) {
-  // The files follow the positions of the frames, so no frame is named: the first file may now hold the other photo.
-  return deleted_file_names.map(
-    (file_name) => `O arquivo ${file_name} foi apagado porque agora há só ${describe_file_count(remaining_file_count)}.`,
-  );
+function describe_new_files(file_names) {
+  // Every adjustment writes its files under new names: the earlier ones are never replaced or deleted.
+  const count_text =
+    file_names.length === SINGLE_FILE_COUNT
+      ? `${SINGLE_FILE_COUNT} arquivo novo salvo`
+      : `${file_names.length} arquivos novos salvos`;
+  return `${count_text}: ${join_names(file_names)}.`;
 }
 
-function describe_kept_files(kept_file_names) {
-  return kept_file_names.map((file_name) => `Mantive ${file_name} porque ele foi alterado depois de gravado.`);
-}
-
-function describe_created_files(previous_file_names, current_file_names) {
-  const created_names = current_file_names.filter((file_name) => !previous_file_names.includes(file_name));
-  if (created_names.length === 0) {
+function describe_kept_files(previous_file_names) {
+  if (previous_file_names.length === 0) {
     return [];
   }
-  const lead = created_names.length === SINGLE_FILE_COUNT ? "Novo arquivo" : "Novos arquivos";
-  return [`${lead}: ${join_names(created_names)}.`];
+  return [
+    previous_file_names.length === SINGLE_FILE_COUNT
+      ? "O arquivo anterior foi mantido."
+      : "Os arquivos anteriores foram mantidos.",
+  ];
 }
 
 function describe_last_scan_action(action, edited_scan) {
-  const file_count = edited_scan.file_names.length;
   if (action === LAST_SCAN_ACTIONS.ROTATE) {
     return LAST_SCAN_ROTATED_TEXT;
   }
   if (action === LAST_SCAN_ACTIONS.DETECT) {
-    return `Molduras detectadas: ${describe_file_count(file_count)}.`;
+    return "Molduras detectadas.";
   }
-  return edited_scan.crops.length === 0
-    ? `Corte removido: ${describe_file_count(file_count)}.`
-    : `Moldura aplicada: ${describe_file_count(file_count)}.`;
+  return edited_scan.crops.length === 0 ? "Corte removido." : "Moldura aplicada.";
 }
 
 function describe_last_scan_edit(edit) {
@@ -108,9 +100,8 @@ function describe_last_scan_edit(edit) {
   const edited_scan = answer.last_result;
   return [
     describe_last_scan_action(action, edited_scan),
-    ...describe_created_files(previous_file_names, edited_scan.file_names),
-    ...describe_deleted_files(answer.deleted_file_names, edited_scan.file_names.length),
-    ...describe_kept_files(answer.kept_file_names),
+    describe_new_files(edited_scan.file_names),
+    ...describe_kept_files(previous_file_names),
   ].join(" ");
 }
 

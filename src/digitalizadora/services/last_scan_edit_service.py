@@ -7,10 +7,8 @@ from dataclasses import dataclass, replace
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     ImageAdjustmentFailedError,
-    LastScanFileMissingError,
     LastScanNotEditableError,
     NoLastScanError,
-    OutputFolderUnavailableError,
     SavedScanUnreadableError,
     ScanAlreadyRunningError,
     ScanFailedError,
@@ -40,8 +38,6 @@ class LastScanEditResult:
     last_scan: LastScan
     crops_detected: bool = False
     ignored_region_count: int = 0
-    deleted_file_names: tuple[str, ...] = ()
-    kept_file_names: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -65,20 +61,14 @@ class _PlannedFraming:
 
 
 @dataclass(frozen=True)
-class _RenderedFiles:
-    saved_files: tuple[SavedScanFile, ...]
-    deleted_file_names: tuple[str, ...]
-    kept_file_names: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class _EditOutcome:
     result: LastScanEditResult
     is_changed: bool
 
 
 class LastScanEditService:
-    """Adjusts the last quick scan: its rotation and its crops. The files are made again from the master.
+    """Adjusts the last quick scan: its rotation and its crops. New files are made from the master, each under a
+    fresh name; the files written before stay where they are, whatever happened to them.
 
     The slot keeps the master, the framing and, while a render is under way, a mark that lets the next start finish
     it. Only one edit runs at a time, and none runs during a scan.
@@ -168,36 +158,29 @@ class LastScanEditService:
             if planned.framing is None or planned.framing == current_scan.framing:
                 result = LastScanEditResult(current_scan, planned.crops_detected, planned.ignored_region_count)
                 return _EditOutcome(result, is_changed=False)
-            self._ensure_files_to_rewrite_exist(current_scan, planned.framing.output_count)
             pending_slot = replace(slot, last_scan=current_scan.with_framing(planned.framing), render_pending=True)
             self._slot_repository.commit(pending_slot)
-            finished_slot, rendered = self._finish_render(pending_slot, slot)
+            finished_slot = self._finish_render(pending_slot, slot)
         except ScanFailedError as error:
             raise SavedScanUnreadableError(f"The master of the last scan could not be read: {error}") from error
         except MemoryError as error:
             raise ImageAdjustmentFailedError("Not enough memory to adjust the last scan") from error
-        result = LastScanEditResult(
-            finished_slot.last_scan,
-            planned.crops_detected,
-            planned.ignored_region_count,
-            rendered.deleted_file_names,
-            rendered.kept_file_names,
-        )
+        result = LastScanEditResult(finished_slot.last_scan, planned.crops_detected, planned.ignored_region_count)
         return _EditOutcome(result, is_changed=True)
 
     def _finish_render(
         self, pending_slot: QuickScanSlot, previous_slot: QuickScanSlot
-    ) -> tuple[QuickScanSlot, _RenderedFiles]:
-        """Renders the files and confirms them; if that fails the manifest goes back to the framing of before."""
+    ) -> QuickScanSlot:
+        """Renders the new files and confirms them; if that fails the manifest goes back to the framing of before."""
         try:
-            rendered = self._render_outputs(pending_slot)
-            finished_scan = pending_slot.last_scan.with_saved_files(rendered.saved_files)
+            saved_files = self._render_outputs(pending_slot)
+            finished_scan = pending_slot.last_scan.with_saved_files(saved_files)
             finished_slot = replace(pending_slot, last_scan=finished_scan, render_pending=False)
             self._slot_repository.commit(finished_slot)
         except Exception:
             self._restore_previous_manifest(previous_slot)
             raise
-        return finished_slot, rendered
+        return finished_slot
 
     def _restore_previous_manifest(self, previous_slot: QuickScanSlot) -> None:
         try:
@@ -220,14 +203,8 @@ class LastScanEditService:
         except OSError as error:
             raise SavedScanUnreadableError(f"The master of {scan_identifier} cannot be read") from error
 
-    def _ensure_files_to_rewrite_exist(self, last_scan: LastScan, new_output_count: int) -> None:
-        """Before any write: a file that was deleted or moved cannot be made again where it was (7.3 step 2)."""
-        for saved_file in last_scan.saved_files[:new_output_count]:
-            if self._scan_output_repository.describe_saved_scan(last_scan.saved_file_path(saved_file)) is None:
-                raise LastScanFileMissingError(f"{saved_file.file_name} is not in the output folder any more")
-
-    def _render_outputs(self, slot: QuickScanSlot) -> _RenderedFiles:
-        """Makes the files of the slot's framing from its master: rewrites, creates and deletes (7.3 step 4)."""
+    def _render_outputs(self, slot: QuickScanSlot) -> tuple[SavedScanFile, ...]:
+        """Makes the files of the slot's framing from its master, each under a new name (7.3 step 4)."""
         last_scan = slot.last_scan
         identity = OutputIdentity(last_scan.scanned_at, slot.dots_per_inch, last_scan.output_format)
         request = OutputsRequest(last_scan.framing, identity)
@@ -237,38 +214,13 @@ class LastScanEditService:
         except OSError as error:
             raise SavedScanUnreadableError(f"The master of {last_scan.scan_identifier} cannot be read") from error
         saved_files = []
-        for index, encoded_scan in enumerate(outputs):
-            if index < len(last_scan.saved_files):
-                output_path = last_scan.saved_file_path(last_scan.saved_files[index])
-                self._scan_output_repository.replace_saved_scan(output_path, encoded_scan.content)
-            else:
-                output_path = self._scan_output_repository.save_in_folder(last_scan.output_folder, encoded_scan)
+        for encoded_scan in outputs:
+            output_path = self._scan_output_repository.save_in_folder(last_scan.output_folder, encoded_scan)
             described_file = self._scan_output_repository.describe_saved_scan(output_path)
             saved_files.append(
                 described_file or SavedScanFile(output_path.name, len(encoded_scan.content), UNKNOWN_MODIFICATION_TIME)
             )
-        if len({saved_file.file_name for saved_file in saved_files}) != len(saved_files):
-            raise OutputFolderUnavailableError("Two files of the last scan would have the same name")
-        deleted_file_names, kept_file_names = self._remove_files_without_a_frame(last_scan, len(outputs))
-        return _RenderedFiles(tuple(saved_files), deleted_file_names, kept_file_names)
-
-    def _remove_files_without_a_frame(
-        self, last_scan: LastScan, output_count: int
-    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        """Only a file the scan wrote and nobody touched since goes; anything else stays, and the screen says so."""
-        deleted_file_names: list[str] = []
-        kept_file_names: list[str] = []
-        for saved_file in last_scan.saved_files[output_count:]:
-            output_path = last_scan.saved_file_path(saved_file)
-            current_file = self._scan_output_repository.describe_saved_scan(output_path)
-            if current_file is None:
-                continue
-            if current_file == saved_file:
-                self._scan_output_repository.delete_saved_scan(output_path)
-                deleted_file_names.append(saved_file.file_name)
-            else:
-                kept_file_names.append(saved_file.file_name)
-        return tuple(deleted_file_names), tuple(kept_file_names)
+        return tuple(saved_files)
 
     def _restore_last_scan(self) -> None:
         slot = self._slot_repository.load()
@@ -297,10 +249,8 @@ class LastScanEditService:
         )
 
     def _finish_interrupted_render(self, slot: QuickScanSlot) -> QuickScanSlot:
-        rendered = self._render_outputs(slot)
-        finished_slot = replace(
-            slot, last_scan=slot.last_scan.with_saved_files(rendered.saved_files), render_pending=False
-        )
+        saved_files = self._render_outputs(slot)
+        finished_slot = replace(slot, last_scan=slot.last_scan.with_saved_files(saved_files), render_pending=False)
         self._slot_repository.commit(finished_slot)
         return finished_slot
 

@@ -71,7 +71,7 @@ class LastScanPanel {
       image_alt_text: LAST_SCAN_ENLARGED_ALT_TEXT,
       subject_text: LAST_SCAN_SUBJECT_TEXT,
       gone_text: LAST_SCAN_GONE_TEXT,
-      progress_text: FRAME_REWRITING_TEXT,
+      progress_text: FRAME_SAVING_TEXT,
       rotation_degrees: result.rotation_degrees,
       crops: result.crops,
       build_preview_address: (rotation_degrees) => build_last_scan_preview_address(scan_identifier, rotation_degrees),
@@ -175,7 +175,7 @@ class LastScanPanel {
   async attempt_edit(edit_request) {
     const previous_file_names = this.last_result === null ? [] : [...this.last_result.file_names];
     this.is_edit_pending = true;
-    this.show_status(FRAME_REWRITING_TEXT);
+    this.show_status(FRAME_SAVING_TEXT);
     this.notify_activity_change();
     let answer = null;
     let failure = null;

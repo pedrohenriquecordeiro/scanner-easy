@@ -6,7 +6,7 @@
 
 const FRAME_CHANGES_DISCARDED_TEXT = "Alterações da moldura descartadas.";
 const FRAME_LIMIT_TEXT = "Só dá para ter 2 molduras.";
-const FRAME_REWRITING_TEXT = "Regravando…";
+const FRAME_SAVING_TEXT = "Salvando…";
 const INVALID_FRAME_MOVE_TEXT = "Esse movimento deixaria a moldura torta demais. Ela ficou como estava.";
 const MORE_THAN_TWO_PHOTOS_TEXT = "Achei mais de 2 fotos; usei as 2 maiores.";
 const MOVE_HANDLE_LABEL = "Mover a moldura";

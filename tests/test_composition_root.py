@@ -353,7 +353,7 @@ def test_the_last_quick_scan_of_a_previous_run_comes_back_when_the_container_is_
     with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
         last_result = client.get("/api/state").json()["last_result"]
 
-    assert (last_result["file_names"], last_result["is_editable"]) == (["2026-10-13_15-30-12-000000000.jpg"], True)
+    assert (last_result["file_names"], last_result["is_editable"]) == (["2026_10_13__15_30_12_000000000.jpg"], True)
 
 
 def test_the_thumbnail_of_the_restored_scan_is_served(

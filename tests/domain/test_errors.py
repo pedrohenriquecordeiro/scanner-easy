@@ -35,7 +35,6 @@ from digitalizadora.domain import errors
         (errors.NoLastScanError, "no_last_scan"),
         (errors.LastScanReplacedError, "last_scan_replaced"),
         (errors.InvalidScanIdentifierError, "invalid_scan_identifier"),
-        (errors.LastScanFileMissingError, "last_scan_file_missing"),
         (errors.SavedScanUnreadableError, "saved_scan_unreadable"),
         (errors.UnreadableQuickScanError, "saved_scan_unreadable"),
         (errors.LastScanNotEditableError, "last_scan_not_editable"),

@@ -8,10 +8,10 @@ import pikepdf
 import pytest
 from PIL import Image
 
+from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import (
     InvalidCropError,
     LastScanBusyError,
-    LastScanFileMissingError,
     LastScanNotEditableError,
     NoLastScanError,
     OutputFolderUnavailableError,
@@ -41,9 +41,9 @@ from tests.fakes.quick_scan_parts import (
 from tests.fakes.scripted_file_writer import ScriptedFileWriter
 from tests.fakes.synthetic_scans import build_scan_jpeg
 
-FIRST_FILE = "2026-10-13_15-30-12-000000000.jpg"
-SECOND_FILE = "2026-10-13_15-30-12-000000001.jpg"
-THIRD_FILE = "2026-10-13_15-30-12-000000002.jpg"
+FIRST_FILE = "2026_10_13__15_30_12_000000000.jpg"
+SECOND_FILE = "2026_10_13__15_30_12_000000001.jpg"
+THIRD_FILE = "2026_10_13__15_30_12_000000002.jpg"
 LEFT_BOX = rectangle((0.05, 0.05, 0.45, 0.45))
 RIGHT_BOX = rectangle((0.55, 0.55, 0.95, 0.95))
 TILTED_BOX = quadrilateral((0.30, 0.10), (0.80, 0.22), (0.70, 0.60), (0.20, 0.48))
@@ -71,6 +71,14 @@ def file_size(parts: QuickScanParts, file_name: str) -> tuple[int, int]:
     return read_image_size(parts.output_folder / file_name)
 
 
+def latest_file_names(parts: QuickScanParts) -> list[str]:
+    return [saved_file.file_name for saved_file in current_last_scan(parts).saved_files]
+
+
+def latest_file_size(parts: QuickScanParts, file_index: int = 0) -> tuple[int, int]:
+    return file_size(parts, latest_file_names(parts)[file_index])
+
+
 def two_photo_scan(parts: QuickScanParts, output_format: OutputFormat = OutputFormat.JPEG) -> None:
     parts.scan(TWO_PHOTOS, build_job(output_format, WITH_AUTO_CROP))
 
@@ -87,34 +95,30 @@ async def test_turning_the_scan_turns_its_rotation(parts, service):
     assert current_last_scan(parts).framing.rotation is PageRotation.CLOCKWISE_90
 
 
-async def test_turning_a_jpg_swaps_the_dimensions_of_the_file(parts, service):
+async def test_turning_a_jpg_writes_a_new_file_with_the_dimensions_swapped(parts, service):
     one_whole_scan(parts)
 
     await service.rotate_clockwise()
 
-    assert file_size(parts, FIRST_FILE) == SCENE_SIZE[::-1]
+    assert latest_file_size(parts) == SCENE_SIZE[::-1]
 
-
-async def test_turning_a_pdf_writes_it_again_with_the_physical_size_swapped(parts, service):
+async def test_turning_a_pdf_writes_a_new_one_with_the_physical_size_swapped(parts, service):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.PDF))
-    pdf_path = parts.output_folder / "2026-10-13_15-30-12-000000000.pdf"
 
     await service.rotate_clockwise()
 
-    with pikepdf.open(pdf_path) as pdf:
+    with pikepdf.open(parts.output_folder / latest_file_names(parts)[0]) as pdf:
         assert (float(pdf.pages[0].mediabox[2]), float(pdf.pages[0].mediabox[3])) == pytest.approx(
             (SCENE_SIZE[1] * 72 / 300, SCENE_SIZE[0] * 72 / 300), abs=1.0
         )
-
 
 async def test_turning_keeps_the_density_of_the_file(parts, service):
     one_whole_scan(parts)
 
     await service.rotate_clockwise()
 
-    with Image.open(parts.output_folder / FIRST_FILE) as image:
+    with Image.open(parts.output_folder / latest_file_names(parts)[0]) as image:
         assert image.info["dpi"] == pytest.approx((300, 300), abs=1)
-
 
 async def test_turning_raises_the_revision_by_one(parts, service):
     one_whole_scan(parts)
@@ -148,8 +152,7 @@ async def test_four_turns_bring_the_file_back_to_its_size(parts, service):
     for _ in range(4):
         await service.rotate_clockwise()
 
-    assert file_size(parts, FIRST_FILE) == SCENE_SIZE
-
+    assert latest_file_size(parts) == SCENE_SIZE
 
 async def test_turning_leaves_the_master_in_the_slot_untouched(parts, service):
     one_whole_scan(parts)
@@ -171,13 +174,15 @@ async def test_turning_writes_the_slot_without_the_pending_mark(parts, service):
     assert (slot.render_pending, slot.last_scan.framing.rotation) == (False, PageRotation.CLOCKWISE_90)
 
 
-async def test_turning_updates_the_size_of_the_files_in_the_slot(parts, service):
+async def test_turning_lists_the_new_file_with_its_size_in_the_slot(parts, service):
     one_whole_scan(parts)
 
     result = await service.rotate_clockwise()
 
     saved_file = result.last_scan.saved_files[0]
-    assert saved_file.size_in_bytes == (parts.output_folder / FIRST_FILE).stat().st_size
+    new_file_size = (parts.output_folder / SECOND_FILE).stat().st_size
+    assert (saved_file.file_name, saved_file.size_in_bytes) == (SECOND_FILE, new_file_size)
+
 
 
 async def test_turning_answers_the_new_last_scan(parts, service):
@@ -188,16 +193,15 @@ async def test_turning_answers_the_new_last_scan(parts, service):
     assert result.last_scan == current_last_scan(parts)
 
 
-async def test_turning_two_framed_photos_rewrites_both_files(parts, service):
+async def test_turning_two_framed_photos_writes_two_new_files_turned(parts, service):
     two_photo_scan(parts)
-    sizes_before = [file_size(parts, name) for name in (FIRST_FILE, SECOND_FILE)]
+    sizes_before = [latest_file_size(parts, index) for index in (0, 1)]
 
     await service.rotate_clockwise()
 
-    assert [file_size(parts, name) for name in (FIRST_FILE, SECOND_FILE)] == pytest.approx(
+    assert [latest_file_size(parts, index) for index in (0, 1)] == pytest.approx(
         [size[::-1] for size in sizes_before], abs=2
     )
-
 
 async def test_turning_two_framed_photos_turns_their_frames_with_the_page(parts, service):
     two_photo_scan(parts)
@@ -214,32 +218,31 @@ async def test_setting_the_same_crops_changes_nothing(parts, service):
     two_photo_scan(parts)
     crops = current_last_scan(parts).framing.crops
     revision_before = revision_of(parts)
-    modified_before = [(parts.output_folder / n).stat().st_mtime_ns for n in (FIRST_FILE, SECOND_FILE)]
+    names_before = parts.saved_names()
 
     result = await service.set_crops(crops)
 
-    assert revision_of(parts) == revision_before
-    assert [(parts.output_folder / n).stat().st_mtime_ns for n in (FIRST_FILE, SECOND_FILE)] == modified_before
+    assert (revision_of(parts), parts.saved_names()) == (revision_before, names_before)
     assert result.last_scan == current_last_scan(parts)
 
-
-async def test_adding_a_second_frame_creates_the_next_numbered_file(parts, service):
+async def test_adding_a_second_frame_writes_two_new_files_and_keeps_the_old_one(parts, service):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert parts.saved_names() == [FIRST_FILE, SECOND_FILE]
+    assert (parts.saved_names(), latest_file_names(parts)) == (
+        [FIRST_FILE, SECOND_FILE, THIRD_FILE],
+        [SECOND_FILE, THIRD_FILE],
+    )
 
-
-async def test_a_frame_added_after_the_output_folder_changed_goes_next_to_the_first_file(parts, service, tmp_path):
+async def test_new_files_after_the_output_folder_changed_go_next_to_the_first_file(parts, service, tmp_path):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     settings = parts.settings_repository.load()
     parts.settings_repository.save(replace(settings, output_folder=tmp_path / "other-folder"))
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert parts.saved_names() == [FIRST_FILE, SECOND_FILE]
-
+    assert parts.saved_names() == [FIRST_FILE, SECOND_FILE, THIRD_FILE]
 
 async def test_a_scan_edited_after_the_output_folder_changed_can_still_be_turned(parts, service, tmp_path):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
@@ -262,93 +265,78 @@ async def test_a_slot_that_is_gone_makes_the_scan_not_editable(parts, service):
     assert current_last_scan(parts).is_editable is False
 
 
-async def test_adding_a_second_frame_lists_both_files_in_the_slot(parts, service):
+async def test_adding_a_second_frame_lists_only_the_new_files_in_the_slot(parts, service):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert [f.file_name for f in parts.slot_repository.load().last_scan.saved_files] == [FIRST_FILE, SECOND_FILE]
-
+    assert [f.file_name for f in parts.slot_repository.load().last_scan.saved_files] == [SECOND_FILE, THIRD_FILE]
 
 async def test_each_file_has_the_size_of_its_frame(parts, service):
     one_whole_scan(parts)
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert [file_size(parts, name) for name in (FIRST_FILE, SECOND_FILE)] == pytest.approx(
-        [(117, 160), (117, 160)], abs=2
-    )
+    assert [latest_file_size(parts, index) for index in (0, 1)] == pytest.approx([(117, 160), (117, 160)], abs=2)
 
-
-async def test_the_new_file_gets_a_name_after_the_existing_ones(parts, service):
+async def test_the_new_files_get_names_after_the_existing_ones(parts, service):
     one_whole_scan(parts)
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert parts.saved_names() == [FIRST_FILE, SECOND_FILE, THIRD_FILE]
+    assert latest_file_names(parts) == ["2026_10_13__15_30_12_000000002.jpg", "2026_10_13__15_30_12_000000003.jpg"]
 
-
-async def test_removing_a_frame_deletes_only_the_file_of_that_frame(parts, service):
+async def test_removing_a_frame_writes_one_new_file_and_deletes_nothing(parts, service):
     two_photo_scan(parts)
 
-    result = await service.set_crops(current_last_scan(parts).framing.crops[:1])
+    await service.set_crops(current_last_scan(parts).framing.crops[:1])
 
-    assert (parts.saved_names(), result.deleted_file_names, result.kept_file_names) == (
-        [FIRST_FILE],
-        (SECOND_FILE,),
-        (),
+    assert (parts.saved_names(), latest_file_names(parts)) == (
+        [FIRST_FILE, SECOND_FILE, THIRD_FILE],
+        [THIRD_FILE],
     )
 
-
-async def test_removing_the_first_frame_gives_the_first_file_the_content_of_the_second_photo(parts, service):
+async def test_removing_the_first_frame_writes_the_second_photo_as_the_new_file(parts, service):
     two_photo_scan(parts)
     second_crop = current_last_scan(parts).framing.crops[1]
 
     await service.set_crops([second_crop])
 
-    assert file_size(parts, FIRST_FILE) == pytest.approx(PHOTO_SIZE, abs=15)
-    assert parts.saved_names() == [FIRST_FILE]
+    assert latest_file_size(parts) == pytest.approx(PHOTO_SIZE, abs=15)
 
-
-async def test_a_file_edited_after_it_was_saved_is_kept_and_named(parts, service):
+async def test_a_file_edited_after_it_was_saved_stays_as_it_is(parts, service):
     two_photo_scan(parts)
     second_path = parts.output_folder / SECOND_FILE
-    second_path.write_bytes(second_path.read_bytes() + b"edited later")
+    edited_content = second_path.read_bytes() + b"edited later"
+    second_path.write_bytes(edited_content)
 
-    result = await service.set_crops(current_last_scan(parts).framing.crops[:1])
+    await service.set_crops(current_last_scan(parts).framing.crops[:1])
 
-    assert (second_path.exists(), result.deleted_file_names, result.kept_file_names) == (True, (), (SECOND_FILE,))
+    assert second_path.read_bytes() == edited_content
 
-
-async def test_a_file_that_is_already_gone_is_not_an_error_when_its_frame_is_removed(parts, service):
+async def test_an_edit_works_when_the_earlier_files_are_gone(parts, service):
     two_photo_scan(parts)
+    (parts.output_folder / FIRST_FILE).unlink()
     (parts.output_folder / SECOND_FILE).unlink()
 
-    result = await service.set_crops(current_last_scan(parts).framing.crops[:1])
+    await service.rotate_clockwise()
 
-    assert (result.deleted_file_names, result.kept_file_names) == ((), ())
+    assert parts.saved_names() == latest_file_names(parts)
 
-
-async def test_removing_all_the_frames_leaves_one_whole_file(parts, service):
+async def test_removing_all_the_frames_writes_one_whole_new_file(parts, service):
     two_photo_scan(parts)
 
-    result = await service.set_crops([])
+    await service.set_crops([])
 
-    assert (file_size(parts, FIRST_FILE), parts.saved_names(), result.deleted_file_names) == (
-        SCENE_SIZE,
-        [FIRST_FILE],
-        (SECOND_FILE,),
-    )
+    assert (latest_file_size(parts), len(parts.saved_names()), len(latest_file_names(parts))) == (SCENE_SIZE, 3, 1)
 
-
-async def test_a_new_frame_changes_the_file_to_a_crop(parts, service):
+async def test_a_new_frame_writes_a_cropped_file(parts, service):
     one_whole_scan(parts)
 
     await service.set_crops([TILTED_BOX])
 
-    assert file_size(parts, FIRST_FILE) != SCENE_SIZE
-
+    assert latest_file_size(parts) != SCENE_SIZE
 
 async def test_a_tilted_frame_is_written_upright_with_the_size_of_its_edges(parts, service):
     one_whole_scan(parts)
@@ -356,8 +344,7 @@ async def test_a_tilted_frame_is_written_upright_with_the_size_of_its_edges(part
     await service.set_crops([TILTED_BOX])
 
     top_edge = (0.5 * SCENE_SIZE[0], 0.12 * SCENE_SIZE[1])
-    assert file_size(parts, FIRST_FILE)[0] == pytest.approx((top_edge[0] ** 2 + top_edge[1] ** 2) ** 0.5, abs=2)
-
+    assert latest_file_size(parts)[0] == pytest.approx((top_edge[0] ** 2 + top_edge[1] ** 2) ** 0.5, abs=2)
 
 async def test_setting_crops_raises_the_revision(parts, service):
     one_whole_scan(parts)
@@ -375,39 +362,33 @@ async def test_setting_more_than_two_crops_is_refused(parts, service):
         await service.set_crops([LEFT_BOX, RIGHT_BOX, TILTED_BOX])
 
 
-async def test_a_missing_file_stops_the_edit_before_any_write(parts, service):
+async def test_every_edit_keeps_the_files_of_the_scan_as_they_were(parts, service):
     two_photo_scan(parts)
-    (parts.output_folder / FIRST_FILE).unlink()
-    second_before = (parts.output_folder / SECOND_FILE).read_bytes()
-    framing_before = current_last_scan(parts).framing
+    contents_before = {name: (parts.output_folder / name).read_bytes() for name in parts.saved_names()}
 
-    with pytest.raises(LastScanFileMissingError):
-        await service.rotate_clockwise()
+    await service.rotate_clockwise()
+    await service.set_crops([LEFT_BOX])
 
-    assert (current_last_scan(parts).framing, (parts.output_folder / SECOND_FILE).read_bytes()) == (
-        framing_before,
-        second_before,
-    )
+    assert all((parts.output_folder / name).read_bytes() == content for name, content in contents_before.items())
 
+async def test_two_equal_edits_in_a_row_write_files_with_different_names(parts, service):
+    one_whole_scan(parts)
 
-async def test_a_missing_file_leaves_the_slot_as_it_was(parts, service):
-    two_photo_scan(parts)
-    (parts.output_folder / FIRST_FILE).unlink()
-    slot_before = parts.slot_repository.load()
+    await service.rotate_clockwise()
+    await service.rotate_clockwise()
 
-    with pytest.raises(LastScanFileMissingError):
-        await service.rotate_clockwise()
+    assert len(set(parts.saved_names())) == 3
 
-    assert parts.slot_repository.load() == slot_before
-
-
-async def test_detecting_two_photos_on_a_scan_saved_whole_makes_two_files(parts, service):
+async def test_detecting_two_photos_on_a_scan_saved_whole_writes_two_new_files(parts, service):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WHOLE_IMAGE))
 
     result = await service.detect_crops()
 
-    assert (result.crops_detected, parts.saved_names()) == (True, [FIRST_FILE, SECOND_FILE])
-
+    assert (result.crops_detected, parts.saved_names(), latest_file_names(parts)) == (
+        True,
+        [FIRST_FILE, SECOND_FILE, THIRD_FILE],
+        [SECOND_FILE, THIRD_FILE],
+    )
 
 async def test_detecting_reports_no_regions_ignored_for_two_photos(parts, service):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WHOLE_IMAGE))
@@ -434,7 +415,7 @@ async def test_detecting_on_a_turned_scan_shows_the_crops_in_the_orientation_of_
 
     framing = current_last_scan(parts).framing
     assert (framing.rotation, len(framing.crops)) == (PageRotation.CLOCKWISE_90, 2)
-    assert file_size(parts, FIRST_FILE) == pytest.approx(PHOTO_SIZE[::-1], abs=15)
+    assert latest_file_size(parts) == pytest.approx(PHOTO_SIZE[::-1], abs=15)
 
 
 async def test_detecting_the_same_crops_again_changes_nothing(parts, service):
@@ -548,14 +529,14 @@ async def test_a_scan_that_starts_during_an_edit_is_refused_as_busy(tmp_path):
     one_whole_scan(parts)
     inside_edit = threading.Event()
     release_edit = threading.Event()
-    original_replace = parts.output_repository.replace_saved_scan
+    original_save = parts.output_repository.save_in_folder
 
-    def hold_the_edit(scan_path: Path, content: bytes) -> None:
+    def hold_the_edit(output_folder: Path, encoded_scan: EncodedScan) -> Path:
         inside_edit.set()
         release_edit.wait(timeout=5)
-        original_replace(scan_path, content)
+        return original_save(output_folder, encoded_scan)
 
-    parts.output_repository.replace_saved_scan = hold_the_edit
+    parts.output_repository.save_in_folder = hold_the_edit
     edit = asyncio.create_task(parts.last_scan_edit_service.rotate_clockwise())
     await asyncio.to_thread(inside_edit.wait, 5)
 

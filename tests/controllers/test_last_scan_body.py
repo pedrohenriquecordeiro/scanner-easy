@@ -9,8 +9,8 @@ from digitalizadora.domain.page_rotation import PageRotation
 from tests.fakes.page_crops import quadrilateral
 from tests.fakes.stored_scans import build_last_scan
 
-FIRST_FILE = SavedScanFile("2026-10-18_16-14-03-000000000.jpg", 42, 1)
-SECOND_FILE = SavedScanFile("2026-10-18_16-14-03-000000001.jpg", 100, 2)
+FIRST_FILE = SavedScanFile("2026_10_18__16_14_03_000000000.jpg", 42, 1)
+SECOND_FILE = SavedScanFile("2026_10_18__16_14_03_000000001.jpg", 100, 2)
 TILTED_CROP = quadrilateral((0.039, 0.28), (0.65, 0.019), (0.894, 0.321), (0.282, 0.582))
 
 
@@ -21,7 +21,7 @@ def test_a_last_scan_is_described_for_the_page() -> None:
 
     assert describe_last_scan(last_scan) == {
         "scan_identifier": "9f3c1a2b4d5e6f70",
-        "file_names": ["2026-10-18_16-14-03-000000000.jpg"],
+        "file_names": ["2026_10_18__16_14_03_000000000.jpg"],
         "output_folder": "/Volumes/External/scans",
         "output_format": "jpg",
         "total_size_in_bytes": 42,
@@ -49,7 +49,7 @@ def test_the_keys_come_in_the_documented_order() -> None:
 def test_two_files_are_listed_in_order_and_their_sizes_add_up() -> None:
     body = describe_last_scan(build_last_scan((FIRST_FILE, SECOND_FILE)))
 
-    expected_names = ["2026-10-18_16-14-03-000000000.jpg", "2026-10-18_16-14-03-000000001.jpg"]
+    expected_names = ["2026_10_18__16_14_03_000000000.jpg", "2026_10_18__16_14_03_000000001.jpg"]
     assert (body["file_names"], body["total_size_in_bytes"]) == (expected_names, 142)
 
 

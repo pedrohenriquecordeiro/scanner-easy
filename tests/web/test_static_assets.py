@@ -398,7 +398,7 @@ def test_last_scan_buttons_come_in_the_documented_order() -> None:
 
 
 def test_last_scan_hint_says_the_adjustments_rewrite_the_files() -> None:
-    assert "Ajustes regravam os arquivos salvos." in read_static_file("index.html")
+    assert "Cada ajuste salva arquivos novos e mantém os anteriores." in read_static_file("index.html")
 
 
 def test_last_scan_status_is_a_polite_live_region() -> None:

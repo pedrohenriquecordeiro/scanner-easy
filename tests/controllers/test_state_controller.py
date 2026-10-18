@@ -37,7 +37,7 @@ UNAVAILABLE_STORAGE = StorageState(
     free_space_in_bytes=0, estimated_pages_remaining=0, output_folder_available=False
 )
 LAST_SCAN = replace(
-    build_last_scan((SavedScanFile("2026-10-13_15-30-12-000000006.pdf", 734003, 1),)),
+    build_last_scan((SavedScanFile("2026_10_13__15_30_12_000000006.pdf", 734003, 1),)),
     output_folder=Path("/Volumes/External/scans"),
     scanned_at=SCANNED_AT,
 )
@@ -117,7 +117,7 @@ def test_state_describes_the_last_result(
 
     assert body["last_result"] == {
         "scan_identifier": "9f3c1a2b4d5e6f70",
-        "file_names": ["2026-10-13_15-30-12-000000006.pdf"],
+        "file_names": ["2026_10_13__15_30_12_000000006.pdf"],
         "output_folder": "/Volumes/External/scans",
         "output_format": "pdf",
         "total_size_in_bytes": 734003,

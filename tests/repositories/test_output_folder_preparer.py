@@ -32,7 +32,7 @@ def test_leaves_no_probe_file_behind(tmp_path: Path) -> None:
 
 
 def test_keeps_existing_files(tmp_path: Path) -> None:
-    existing_file = tmp_path / "2026-10-13_15-30-12-000000000.pdf"
+    existing_file = tmp_path / "2026_10_13__15_30_12_000000000.pdf"
     existing_file.write_bytes(b"pdf")
 
     prepare_output_folder(tmp_path)

@@ -30,7 +30,7 @@ def build_slot(scan_identifier: str = FIRST_IDENTIFIER) -> QuickScanSlot:
             scanned_at=MOMENT,
             output_folder=Path("/Users/pedro/Pictures/Digitalizadora"),
             output_format=OutputFormat.PDF,
-            saved_files=(SavedScanFile("2026-10-18_16-14-03-000000006.pdf", 1000, 1760802063123456789),),
+            saved_files=(SavedScanFile("2026_10_18__16_14_03_000000006.pdf", 1000, 1760802063123456789),),
         ),
         dots_per_inch=300,
         color_mode=ColorMode.COLOR,

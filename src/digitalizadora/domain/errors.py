@@ -123,10 +123,6 @@ class InvalidScanIdentifierError(DigitalizadoraError):
     code = "invalid_scan_identifier"
 
 
-class LastScanFileMissingError(DigitalizadoraError):
-    code = "last_scan_file_missing"
-
-
 class SavedScanUnreadableError(DigitalizadoraError):
     code = "saved_scan_unreadable"
 

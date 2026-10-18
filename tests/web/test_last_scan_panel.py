@@ -2,16 +2,19 @@ import pytest
 
 from tests.web.panel_scenario_runner import NODE_EXECUTABLE, run_last_scan_scenarios
 
-FIRST_FILE = "2026-10-18_16-14-03-000000006.pdf"
-SECOND_FILE = "2026-10-18_16-14-03-000000007.pdf"
+FIRST_FILE = "2026_10_18__16_14_03_000000006.pdf"
+SECOND_FILE = "2026_10_18__16_14_03_000000007.pdf"
 UPPER_OUTLINE = "5,2 90,2 90,55 5,55"
 LOWER_OUTLINE = "5,60 90,60 90,95 5,95"
 WHOLE_OUTLINE = "10,10 80,10 80,90 10,90"
 TURNED_OUTLINE = "10,20 90,20 90,80 10,80"
-ROTATED_TEXT = "Última digitalização girada 90° para a direita."
+ROTATED_TEXT = (
+    "Última digitalização girada 90° para a direita. "
+    "1 arquivo novo salvo: 2026_10_18__16_14_03_000000007.pdf. O arquivo anterior foi mantido."
+)
 NO_LAST_SCAN_MESSAGE = "Ainda não há uma digitalização para ajustar."
 NOT_EDITABLE_HINT = "O original desta digitalização não foi guardado; os arquivos foram salvos normalmente."
-REWRITING_TEXT = "Regravando…"
+SAVING_TEXT = "Salvando…"
 
 SCENARIO_NAMES = (
     "panel_after_two_photos",
@@ -127,8 +130,9 @@ def test_the_status_line_names_both_files(scenario_results: dict) -> None:
     )
 
 
-def test_the_hint_says_that_adjustments_rewrite_the_files(scenario_results: dict) -> None:
-    assert scenario_results["panel_after_two_photos"]["hint"] == "Ajustes regravam os arquivos salvos."
+def test_the_hint_says_that_adjustments_save_new_files_and_keep_the_old_ones(scenario_results: dict) -> None:
+    hint = scenario_results["panel_after_two_photos"]["hint"]
+    assert hint == "Cada ajuste salva arquivos novos e mantém os anteriores."
 
 
 def test_the_panel_offers_both_buttons_once_idle(scenario_results: dict) -> None:
@@ -153,7 +157,7 @@ def test_the_panel_is_hidden_in_the_document_mode(scenario_results: dict) -> Non
 def test_a_new_scan_replaces_the_files_the_frames_and_the_thumbnail(scenario_results: dict) -> None:
     panel = scenario_results["panel_follows_a_new_scan"]
     assert (panel["file_names"], visible_outlines(panel), panel["thumbnail_source"]) == (
-        f"{SECOND_FILE}\n2026-10-18_16-14-03-000000008.pdf",
+        f"{SECOND_FILE}\n2026_10_18__16_14_03_000000008.pdf",
         [UPPER_OUTLINE, LOWER_OUTLINE],
         "/api/scans/last/thumbnail?version=4",
     )
@@ -200,7 +204,7 @@ def test_space_after_clicking_the_rotation_scans_instead_of_rotating_again(scena
 
 
 def test_while_the_files_are_rewritten_the_panel_says_so(scenario_results: dict) -> None:
-    assert scenario_results["rotate_while_the_answer_is_pending"]["during"]["status"] == REWRITING_TEXT
+    assert scenario_results["rotate_while_the_answer_is_pending"]["during"]["status"] == SAVING_TEXT
 
 
 def test_while_the_files_are_rewritten_both_buttons_are_disabled_and_only_one_request_goes(
@@ -230,7 +234,7 @@ def test_rotating_again_empties_the_status_until_the_answer(scenario_results: di
         result["status_after_the_first"],
         result["status_while_the_second_is_pending"],
         result["status_after_the_second"],
-    ) == (ROTATED_TEXT, REWRITING_TEXT, ROTATED_TEXT)
+    ) == (ROTATED_TEXT, SAVING_TEXT, ROTATED_TEXT)
 
 
 def test_a_refused_rotation_shows_the_catalog_message_and_says_nothing_in_the_panel(scenario_results: dict) -> None:
@@ -267,4 +271,4 @@ def test_a_state_asked_for_before_an_adjustment_ended_does_not_undo_it(scenario_
 
 def test_a_state_that_arrives_while_an_adjustment_runs_is_not_applied(scenario_results: dict) -> None:
     panel = scenario_results["state_arriving_while_an_adjustment_runs"]
-    assert (panel["thumbnail_source"], panel["status"]) == ("/api/scans/last/thumbnail?version=3", REWRITING_TEXT)
+    assert (panel["thumbnail_source"], panel["status"]) == ("/api/scans/last/thumbnail?version=3", SAVING_TEXT)

@@ -286,8 +286,8 @@ def test_two_photos_with_the_crop_save_two_files_with_distinct_sorted_names(envi
     stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert [saved_file.file_name for saved_file in stored_scan.last_scan.saved_files] == [
-        "2026-10-13_15-30-12-000000000.jpg",
-        "2026-10-13_15-30-12-000000001.jpg",
+        "2026_10_13__15_30_12_000000000.jpg",
+        "2026_10_13__15_30_12_000000001.jpg",
     ]
 
 
@@ -334,7 +334,7 @@ def test_a_detection_that_fails_still_saves_the_whole_image(tmp_path):
 
     stored_scan = environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
-    saved_size = read_image_size(environment.output_folder / "2026-10-13_15-30-12-000000000.jpg")
+    saved_size = read_image_size(environment.output_folder / "2026_10_13__15_30_12_000000000.jpg")
     assert (stored_scan.last_scan.framing.crops, saved_size) == ((), TWO_PHOTOS_SIZE)
 
 
@@ -360,7 +360,7 @@ def test_a_master_that_the_disk_does_not_take_still_gives_the_files(tmp_path):
         ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
     )
 
-    expected_names = ["2026-10-13_15-30-12-000000000.jpg"]
+    expected_names = ["2026_10_13__15_30_12_000000000.jpg"]
     assert (stored_scan.last_scan.is_editable, environment.saved_names()) == (False, expected_names)
 
 
@@ -420,7 +420,7 @@ def test_the_next_scan_gets_a_later_name_than_the_first(environment):
 
     stored_scan = service.store(ONE_PHOTO, job_with(OutputFormat.JPEG))
 
-    assert stored_scan.last_scan.saved_files[0].file_name == "2026-10-13_15-30-12-000000002.jpg"
+    assert stored_scan.last_scan.saved_files[0].file_name == "2026_10_13__15_30_12_000000002.jpg"
 
 
 def test_an_encoder_error_propagates_and_nothing_is_saved(environment):
@@ -459,7 +459,7 @@ def test_a_failure_on_the_second_file_leaves_the_first_in_the_folder(environment
             TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
         )
 
-    assert environment.saved_names() == ["2026-10-13_15-30-12-000000000.jpg"]
+    assert environment.saved_names() == ["2026_10_13__15_30_12_000000000.jpg"]
 
 
 def test_the_frames_are_in_reading_order_in_the_last_scan(environment):

@@ -3,8 +3,10 @@ import pytest
 from tests.web.panel_scenario_runner import NODE_EXECUTABLE, run_last_scan_scenarios
 
 SCAN_IDENTIFIER = "9f3c1d2e4b5a6978"
-FIRST_FILE = "2026-10-18_16-14-03-000000006.pdf"
-SECOND_FILE = "2026-10-18_16-14-03-000000007.pdf"
+FIRST_FILE = "2026_10_18__16_14_03_000000006.pdf"
+SECOND_FILE = "2026_10_18__16_14_03_000000007.pdf"
+THIRD_FILE = "2026_10_18__16_14_03_000000008.pdf"
+APPLIED_STATUS = f"Moldura aplicada. 1 arquivo novo salvo: {SECOND_FILE}. O arquivo anterior foi mantido."
 UPPER_OUTLINE = "5,2 90,2 90,55 5,55"
 LOWER_OUTLINE = "5,60 90,60 90,95 5,95"
 WHOLE_OUTLINE = "10,10 80,10 80,90 10,90"
@@ -12,8 +14,8 @@ TURNED_OUTLINE = "10,20 90,20 90,80 10,80"
 DRAGGED_OUTLINE = "15,15 80,10 80,90 10,90"
 DETECTED_OUTLINE = "12,11 92,11 92,93 12,93"
 INVALID_CROP_MESSAGE = "A moldura de corte é inválida. Ajuste e tente de novo."
-FILE_MISSING_MESSAGE = "Um dos arquivos da última digitalização foi apagado ou movido. Digitalize de novo."
-REWRITING_TEXT = "Regravando…"
+SCAN_REPLACED_MESSAGE = "Essa digitalização já foi substituída por outra mais nova."
+SAVING_TEXT = "Salvando…"
 HEADERS = {"X-Requested-With": "digitalizadora"}
 
 SCENARIO_NAMES = (
@@ -24,13 +26,12 @@ SCENARIO_NAMES = (
     "enlarge_a_scan_whose_original_was_not_kept",
     "apply_a_dragged_frame_of_one_file",
     "apply_after_opening_by_keyboard",
-    "apply_a_second_frame_that_creates_a_file",
-    "apply_a_removed_frame_that_deletes_a_file",
-    "apply_a_removed_frame_whose_file_was_edited",
+    "apply_a_second_frame_that_writes_two_new_files",
+    "apply_a_removed_frame_that_writes_one_new_file",
     "apply_without_frames",
     "apply_while_the_answer_is_pending",
     "apply_refused",
-    "apply_when_a_file_is_missing",
+    "apply_when_the_scan_was_replaced",
     "detect_that_finds_two_photos",
     "detect_that_finds_nothing",
     "rotate_in_the_dialog",
@@ -113,7 +114,7 @@ def test_applying_sends_the_dragged_frame_to_the_crops_of_the_last_scan(scenario
 
 def test_applying_closes_the_dialog_and_the_panel_says_what_it_did(scenario_results: dict) -> None:
     result = scenario_results["apply_a_dragged_frame_of_one_file"]
-    assert (result["open"], result["panel"]["status"]) == (False, "Moldura aplicada: 1 arquivo.")
+    assert (result["open"], result["panel"]["status"]) == (False, APPLIED_STATUS)
 
 
 def test_applying_redraws_the_frame_of_the_panel(scenario_results: dict) -> None:
@@ -129,48 +130,43 @@ def test_applying_after_opening_by_keyboard_returns_to_the_enlarge_button(scenar
     assert scenario_results["apply_after_opening_by_keyboard"]["enlarge_button_focused"] is True
 
 
-def test_a_second_frame_creates_a_second_file_and_the_panel_names_it(scenario_results: dict) -> None:
-    panel = scenario_results["apply_a_second_frame_that_creates_a_file"]["panel"]
+def test_a_second_frame_writes_two_new_files_and_the_panel_names_them(scenario_results: dict) -> None:
+    panel = scenario_results["apply_a_second_frame_that_writes_two_new_files"]["panel"]
     assert (panel["status"], panel["file_names"]) == (
-        f"Moldura aplicada: 2 arquivos. Novo arquivo: {SECOND_FILE}.",
-        f"{FIRST_FILE}\n{SECOND_FILE}",
+        f"Moldura aplicada. 2 arquivos novos salvos: {SECOND_FILE} e {THIRD_FILE}. O arquivo anterior foi mantido.",
+        f"{SECOND_FILE}\n{THIRD_FILE}",
     )
 
 
 def test_a_second_frame_is_sent_with_the_first(scenario_results: dict) -> None:
-    body = scenario_results["apply_a_second_frame_that_creates_a_file"]["body"]
+    body = scenario_results["apply_a_second_frame_that_writes_two_new_files"]["body"]
     assert [crop["top_left"] for crop in body["crops"]] == [{"x": 0.1, "y": 0.1}, {"x": 0.55, "y": 0.3}]
 
 
-def test_a_removed_frame_says_which_file_was_deleted_without_naming_a_frame(scenario_results: dict) -> None:
-    panel = scenario_results["apply_a_removed_frame_that_deletes_a_file"]["panel"]
+def test_a_removed_frame_says_the_earlier_files_were_kept_without_naming_a_frame(scenario_results: dict) -> None:
+    panel = scenario_results["apply_a_removed_frame_that_writes_one_new_file"]["panel"]
     assert panel["status"] == (
-        f"Moldura aplicada: 1 arquivo. O arquivo {SECOND_FILE} foi apagado porque agora há só 1 arquivo."
+        f"Moldura aplicada. 1 arquivo novo salvo: {THIRD_FILE}. Os arquivos anteriores foram mantidos."
     )
 
 
-def test_a_removed_frame_leaves_one_file_in_the_panel(scenario_results: dict) -> None:
-    panel = scenario_results["apply_a_removed_frame_that_deletes_a_file"]["panel"]
-    assert (panel["file_names"], visible_outlines(panel)) == (FIRST_FILE, [UPPER_OUTLINE])
-
-
-def test_a_file_edited_after_it_was_written_is_kept_and_the_panel_says_so(scenario_results: dict) -> None:
-    status = scenario_results["apply_a_removed_frame_whose_file_was_edited"]["status"]
-    assert status == f"Moldura aplicada: 2 arquivos. Mantive {SECOND_FILE} porque ele foi alterado depois de gravado."
+def test_a_removed_frame_leaves_only_the_new_file_in_the_panel(scenario_results: dict) -> None:
+    panel = scenario_results["apply_a_removed_frame_that_writes_one_new_file"]["panel"]
+    assert (panel["file_names"], visible_outlines(panel)) == (THIRD_FILE, [UPPER_OUTLINE])
 
 
 def test_applying_without_frames_sends_an_empty_list_and_says_the_crop_is_gone(scenario_results: dict) -> None:
     result = scenario_results["apply_without_frames"]
     assert (result["body"], result["panel"]["status"], visible_outlines(result["panel"])) == (
         {"crops": []},
-        "Corte removido: 1 arquivo.",
+        f"Corte removido. 1 arquivo novo salvo: {SECOND_FILE}. O arquivo anterior foi mantido.",
         [],
     )
 
 
 def test_while_the_files_are_rewritten_the_dialog_and_the_panel_say_so(scenario_results: dict) -> None:
     result = scenario_results["apply_while_the_answer_is_pending"]
-    assert (result["dialog"]["status"], result["panel"]["status"]) == (REWRITING_TEXT, REWRITING_TEXT)
+    assert (result["dialog"]["status"], result["panel"]["status"]) == (SAVING_TEXT, SAVING_TEXT)
 
 
 def test_while_the_files_are_rewritten_the_edits_of_the_server_are_disabled(scenario_results: dict) -> None:
@@ -189,9 +185,9 @@ def test_a_refused_application_keeps_the_dialog_the_draft_and_says_why(scenario_
     ) == (True, INVALID_CROP_MESSAGE, [DRAGGED_OUTLINE], INVALID_CROP_MESSAGE, "")
 
 
-def test_a_missing_file_says_so_and_reads_the_state_again(scenario_results: dict) -> None:
-    result = scenario_results["apply_when_a_file_is_missing"]
-    assert (result["open"], result["banner_text"], result["extra_state_requests"]) == (True, FILE_MISSING_MESSAGE, 1)
+def test_a_replaced_scan_says_so_and_reads_the_state_again(scenario_results: dict) -> None:
+    result = scenario_results["apply_when_the_scan_was_replaced"]
+    assert (result["open"], result["banner_text"], result["extra_state_requests"]) == (True, SCAN_REPLACED_MESSAGE, 1)
 
 
 def test_detection_in_the_dialog_gives_the_two_photos_their_frames(scenario_results: dict) -> None:
@@ -205,7 +201,9 @@ def test_detection_in_the_dialog_gives_the_two_photos_their_frames(scenario_resu
 
 def test_detection_tells_the_panel_about_the_new_file(scenario_results: dict) -> None:
     panel = scenario_results["detect_that_finds_two_photos"]["panel"]
-    assert panel["status"] == f"Molduras detectadas: 2 arquivos. Novo arquivo: {SECOND_FILE}."
+    assert panel["status"] == (
+        f"Molduras detectadas. 2 arquivos novos salvos: {SECOND_FILE} e {THIRD_FILE}. O arquivo anterior foi mantido."
+    )
 
 
 def test_detection_that_finds_nothing_says_so_and_keeps_the_draft(scenario_results: dict) -> None:

@@ -21,9 +21,9 @@ const STAGE_BOX = Object.freeze({ left: 0, top: 0, width: 500, height: 400 });
 const CENTER_OF_THE_STAGE = Object.freeze({ x: 250, y: 200 });
 const SCAN_IDENTIFIER = "9f3c1d2e4b5a6978";
 const OTHER_SCAN_IDENTIFIER = "0a1b2c3d4e5f6071";
-const FIRST_FILE = "2026-10-18_16-14-03-000000006.pdf";
-const SECOND_FILE = "2026-10-18_16-14-03-000000007.pdf";
-const THIRD_FILE = "2026-10-18_16-14-03-000000008.pdf";
+const FIRST_FILE = "2026_10_18__16_14_03_000000006.pdf";
+const SECOND_FILE = "2026_10_18__16_14_03_000000007.pdf";
+const THIRD_FILE = "2026_10_18__16_14_03_000000008.pdf";
 const UPPER_CROP = rectangle_crop(0.05, 0.02, 0.9, 0.55);
 const LOWER_CROP = rectangle_crop(0.05, 0.6, 0.9, 0.95);
 const WHOLE_CROP = rectangle_crop(0.1, 0.1, 0.8, 0.9);
@@ -34,9 +34,9 @@ const CROPS_KEY = "PUT /api/scans/last/crops";
 const DETECT_KEY = "POST /api/scans/last/crops/detect";
 const SCAN_KEY = "POST /api/scans";
 const NO_LAST_SCAN_BODY = { code: "no_last_scan", message: "Ainda não há uma digitalização para ajustar." };
-const FILE_MISSING_BODY = {
-  code: "last_scan_file_missing",
-  message: "Um dos arquivos da última digitalização foi apagado ou movido. Digitalize de novo.",
+const SCAN_REPLACED_BODY = {
+  code: "last_scan_replaced",
+  message: "Essa digitalização já foi substituída por outra mais nova.",
 };
 const INVALID_CROP_BODY = { code: "invalid_crop", message: "A moldura de corte é inválida. Ajuste e tente de novo." };
 const BUSY_BODY = {
@@ -64,8 +64,10 @@ const ONE_FILE_RESULT = build_last_result({});
 const TWO_PHOTOS_RESULT = build_last_result({ file_names: [FIRST_FILE, SECOND_FILE], crops: [UPPER_CROP, LOWER_CROP] });
 const ONE_PHOTO_RESULT = build_last_result({ crops: [WHOLE_CROP] });
 
+const ONE_PHOTO_NEW_FILE_RESULT = build_last_result({ file_names: [SECOND_FILE], crops: [WHOLE_CROP] });
+
 function build_answer(last_result, extra) {
-  return { last_result, deleted_file_names: [], kept_file_names: [], ...extra };
+  return { last_result, ...extra };
 }
 
 function build_quick_state(last_result, changes) {
@@ -195,7 +197,7 @@ const SCENARIOS = {
     return read_panel(page);
   },
   async rotate_by_pointer() {
-    const turned_result = build_last_result({ rotation_degrees: 90, crops: [TURNED_CROP] });
+    const turned_result = build_last_result({ file_names: [SECOND_FILE], rotation_degrees: 90, crops: [TURNED_CROP] });
     const page = await load_quick_page(ONE_PHOTO_RESULT, {
       [ROTATE_KEY]: respond(build_answer(turned_result)),
     });
@@ -214,7 +216,7 @@ const SCENARIOS = {
   },
   async rotate_asks_for_the_state_at_once() {
     const page = await load_quick_page(ONE_PHOTO_RESULT, {
-      [ROTATE_KEY]: respond(build_answer(build_last_result({ rotation_degrees: 90, crops: [TURNED_CROP] }))),
+      [ROTATE_KEY]: respond(build_answer(build_last_result({ file_names: [SECOND_FILE], rotation_degrees: 90, crops: [TURNED_CROP] }))),
     });
     const state_requests_before = page.count_requests("GET /api/state");
     await page.click(page.element("last-scan-rotate-button"));
@@ -228,12 +230,12 @@ const SCENARIOS = {
     await page.click(page.element("last-scan-rotate-button"));
     await page.click(page.element("last-scan-rotate-button"));
     const during = read_panel(page);
-    rotation_answer.answer(respond(build_answer(ONE_PHOTO_RESULT)));
+    rotation_answer.answer(respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)));
     await page.flush();
     return { during, after: read_panel(page), rotation_requests: page.count_requests(ROTATE_KEY) };
   },
   async rotate_by_keyboard() {
-    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_RESULT)) });
+    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)) });
     await page.press_with_keyboard(page.element("last-scan-rotate-button"));
     return {
       rotation_requests: page.count_requests(ROTATE_KEY),
@@ -241,20 +243,20 @@ const SCENARIOS = {
     };
   },
   async space_after_clicking_rotate() {
-    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_RESULT)) });
+    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)) });
     await page.click(page.element("last-scan-rotate-button"));
     await page.press_key("Space");
     return { rotation_requests: page.count_requests(ROTATE_KEY), scan_requests: page.count_requests(SCAN_KEY) };
   },
   async rotate_again_empties_the_status_until_the_answer() {
-    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_RESULT)) });
+    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)) });
     await page.click(page.element("last-scan-rotate-button"));
     const status_after_the_first = read_panel(page).status;
     const second_answer = build_deferred_response();
     page.responses[ROTATE_KEY] = second_answer;
     await page.click(page.element("last-scan-rotate-button"));
     const status_while_the_second_is_pending = read_panel(page).status;
-    second_answer.answer(respond(build_answer(ONE_PHOTO_RESULT)));
+    second_answer.answer(respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)));
     await page.flush();
     return { status_after_the_first, status_while_the_second_is_pending, status_after_the_second: read_panel(page).status };
   },
@@ -292,7 +294,7 @@ const SCENARIOS = {
     page.dispatch_key("keydown", { code: "Space", target: page.document.body, repeat: false });
     await page.flush();
     const scan_requests_during = page.count_requests(SCAN_KEY);
-    rotation_answer.answer(respond(build_answer(ONE_PHOTO_RESULT)));
+    rotation_answer.answer(respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)));
     await page.flush();
     return {
       disabled_during,
@@ -301,13 +303,13 @@ const SCENARIOS = {
     };
   },
   async rotation_message_goes_away_with_the_next_scan() {
-    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_RESULT)) });
+    const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)) });
     await page.click(page.element("last-scan-rotate-button"));
     await page.press_key("Space");
     return { status: read_panel(page).status };
   },
   async older_state_arriving_after_an_adjustment() {
-    const turned_result = build_last_result({ rotation_degrees: 90, crops: [TURNED_CROP] });
+    const turned_result = build_last_result({ file_names: [SECOND_FILE], rotation_degrees: 90, crops: [TURNED_CROP] });
     const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(turned_result)) });
     const old_state_answer = build_deferred_response();
     page.responses["GET /api/state"] = old_state_answer;
@@ -324,7 +326,7 @@ const SCENARIOS = {
     await page.click(page.element("last-scan-rotate-button"));
     await poll_quick_state(page, ONE_PHOTO_RESULT, { last_result_revision: FIRST_REVISION + 1 });
     const panel = read_panel(page);
-    rotation_answer.answer(respond(build_answer(ONE_PHOTO_RESULT)));
+    rotation_answer.answer(respond(build_answer(ONE_PHOTO_NEW_FILE_RESULT)));
     await page.flush();
     return panel;
   },
@@ -356,7 +358,7 @@ const SCENARIOS = {
     return { open: page.element("page-frame-dialog").open };
   },
   async apply_a_dragged_frame_of_one_file() {
-    const applied_result = build_last_result({ crops: [rectangle_crop(0.15, 0.12, 0.8, 0.9)] });
+    const applied_result = build_last_result({ file_names: [SECOND_FILE], crops: [rectangle_crop(0.15, 0.12, 0.8, 0.9)] });
     const page = await load_quick_page(ONE_PHOTO_RESULT, { [CROPS_KEY]: respond(build_answer(applied_result)) });
     await open_the_dialog(page);
     await drag_the_first_corner(page);
@@ -378,38 +380,27 @@ const SCENARIOS = {
     await page.click(page.element("frame-apply-button"));
     return { enlarge_button_focused: page.is_focused("last-scan-enlarge-button") };
   },
-  async apply_a_second_frame_that_creates_a_file() {
-    const applied_result = build_last_result({ file_names: [FIRST_FILE, SECOND_FILE], crops: [WHOLE_CROP, LOWER_CROP] });
+  async apply_a_second_frame_that_writes_two_new_files() {
+    const applied_result = build_last_result({ file_names: [SECOND_FILE, THIRD_FILE], crops: [WHOLE_CROP, LOWER_CROP] });
     const page = await load_quick_page(ONE_PHOTO_RESULT, { [CROPS_KEY]: respond(build_answer(applied_result)) });
     await open_the_dialog(page);
     await page.click(page.element("frame-add-button"));
     await page.click(page.element("frame-apply-button"));
     return { body: page.find_request(CROPS_KEY).body, panel: read_panel(page) };
   },
-  async apply_a_removed_frame_that_deletes_a_file() {
-    const applied_result = build_last_result({ crops: [UPPER_CROP] });
-    const page = await load_quick_page(TWO_PHOTOS_RESULT, {
-      [CROPS_KEY]: respond(build_answer(applied_result, { deleted_file_names: [SECOND_FILE] })),
-    });
+  async apply_a_removed_frame_that_writes_one_new_file() {
+    const applied_result = build_last_result({ file_names: [THIRD_FILE], crops: [UPPER_CROP] });
+    const page = await load_quick_page(TWO_PHOTOS_RESULT, { [CROPS_KEY]: respond(build_answer(applied_result)) });
     await open_the_dialog(page);
     await page.click(page.element("frame-select-button"));
     await page.click(page.element("frame-remove-button"));
     await page.click(page.element("frame-apply-button"));
     return { body: page.find_request(CROPS_KEY).body, panel: read_panel(page) };
   },
-  async apply_a_removed_frame_whose_file_was_edited() {
-    const applied_result = build_last_result({ file_names: [FIRST_FILE, SECOND_FILE], crops: [UPPER_CROP] });
-    const page = await load_quick_page(TWO_PHOTOS_RESULT, {
-      [CROPS_KEY]: respond(build_answer(applied_result, { kept_file_names: [SECOND_FILE] })),
-    });
-    await open_the_dialog(page);
-    await page.click(page.element("frame-select-button"));
-    await page.click(page.element("frame-remove-button"));
-    await page.click(page.element("frame-apply-button"));
-    return read_panel(page);
-  },
   async apply_without_frames() {
-    const page = await load_quick_page(ONE_PHOTO_RESULT, { [CROPS_KEY]: respond(build_answer(ONE_FILE_RESULT)) });
+    const page = await load_quick_page(ONE_PHOTO_RESULT, {
+      [CROPS_KEY]: respond(build_answer(build_last_result({ file_names: [SECOND_FILE] }))),
+    });
     await open_the_dialog(page);
     await page.click(page.element("frame-clear-button"));
     await page.click(page.element("frame-apply-button"));
@@ -437,8 +428,8 @@ const SCENARIOS = {
       banner_text: page.element("error-banner-text").textContent,
     };
   },
-  async apply_when_a_file_is_missing() {
-    const page = await load_quick_page(ONE_PHOTO_RESULT, { [CROPS_KEY]: build_json_response(409, FILE_MISSING_BODY) });
+  async apply_when_the_scan_was_replaced() {
+    const page = await load_quick_page(ONE_PHOTO_RESULT, { [CROPS_KEY]: build_json_response(409, SCAN_REPLACED_BODY) });
     const state_requests_before = page.count_requests("GET /api/state");
     await open_the_dialog(page);
     await drag_the_first_corner(page);
@@ -452,7 +443,7 @@ const SCENARIOS = {
     };
   },
   async detect_that_finds_two_photos() {
-    const detected_result = build_last_result({ file_names: [FIRST_FILE, SECOND_FILE], crops: [UPPER_CROP, LOWER_CROP] });
+    const detected_result = build_last_result({ file_names: [SECOND_FILE, THIRD_FILE], crops: [UPPER_CROP, LOWER_CROP] });
     const page = await load_quick_page(ONE_FILE_RESULT, {
       [DETECT_KEY]: respond(
         build_answer(detected_result, { crops_detected: true, ignored_region_count: 0 }),
@@ -472,7 +463,7 @@ const SCENARIOS = {
     return { dialog: read_dialog(page), panel: read_panel(page) };
   },
   async rotate_in_the_dialog() {
-    const turned_result = build_last_result({ rotation_degrees: 90, crops: [TURNED_CROP] });
+    const turned_result = build_last_result({ file_names: [SECOND_FILE], rotation_degrees: 90, crops: [TURNED_CROP] });
     const page = await load_quick_page(ONE_PHOTO_RESULT, { [ROTATE_KEY]: respond(build_answer(turned_result)) });
     await open_the_dialog(page);
     await page.click(page.element("frame-rotate-button"));
@@ -514,7 +505,7 @@ const SCENARIOS = {
   async rotated_elsewhere_while_the_dialog_is_open() {
     const page = await load_quick_page(ONE_PHOTO_RESULT);
     await open_the_dialog(page);
-    const turned_result = build_last_result({ rotation_degrees: 90, crops: [TURNED_CROP] });
+    const turned_result = build_last_result({ file_names: [SECOND_FILE], rotation_degrees: 90, crops: [TURNED_CROP] });
     await poll_quick_state(page, turned_result, { last_result_revision: FIRST_REVISION + 1 });
     return read_dialog(page);
   },

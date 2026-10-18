@@ -65,13 +65,6 @@ class FileSystemScanOutputRepository:
             size_in_bytes=size_in_bytes,
         )
 
-    def replace_saved_scan(self, scan_path: Path, content: bytes) -> None:
-        """Swaps the content under the same name: the old file stays whole until the new one is complete."""
-        try:
-            self._file_writer.replace_file(scan_path, content)
-        except OSError as error:
-            raise translate_storage_error(error, f"Cannot replace {scan_path}") from error
-
     def describe_saved_scan(self, scan_path: Path) -> SavedScanFile | None:
         """The size and the modification time of a file the application saved, or None when it is gone."""
         try:
@@ -81,13 +74,6 @@ class FileSystemScanOutputRepository:
         except OSError as error:
             raise translate_storage_error(error, f"Cannot read the status of {scan_path}") from error
         return SavedScanFile(scan_path.name, file_status.st_size, file_status.st_mtime_ns)
-
-    def delete_saved_scan(self, scan_path: Path) -> None:
-        """Deletes a file the application saved; a file that is already gone is not an error."""
-        try:
-            scan_path.unlink(missing_ok=True)
-        except OSError as error:
-            raise translate_storage_error(error, f"Cannot delete {scan_path}") from error
 
     def _document_file_names(self, folder: Path, document_pdf: DocumentPdfToSave) -> Iterator[str]:
         if not document_pdf.document_name:

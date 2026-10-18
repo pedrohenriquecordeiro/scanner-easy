@@ -18,7 +18,6 @@ LAST_SCAN_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
         "last_scan_replaced": HTTPStatus.CONFLICT,
         "scan_already_running": HTTPStatus.CONFLICT,
         "last_scan_busy": HTTPStatus.CONFLICT,
-        "last_scan_file_missing": HTTPStatus.CONFLICT,
         "saved_scan_unreadable": HTTPStatus.CONFLICT,
         "last_scan_not_editable": HTTPStatus.CONFLICT,
         "invalid_crop": HTTPStatus.UNPROCESSABLE_ENTITY,
@@ -49,11 +48,7 @@ def respond_to_last_scan_error(error: DigitalizadoraError, error_message_catalog
 
 
 def describe_edit_result(result: LastScanEditResult) -> dict[str, Any]:
-    return {
-        "last_result": describe_last_scan(result.last_scan),
-        "deleted_file_names": list(result.deleted_file_names),
-        "kept_file_names": list(result.kept_file_names),
-    }
+    return {"last_result": describe_last_scan(result.last_scan)}
 
 
 class LastScanController:

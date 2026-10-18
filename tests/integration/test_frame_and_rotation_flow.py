@@ -536,13 +536,14 @@ def read_last_file(client: TestClient) -> Path:
     return Path(last_result["output_folder"]) / last_result["file_names"][0]
 
 
-def test_a_quick_jpg_is_turned_in_its_own_file(configuration: ApplicationConfiguration) -> None:
+def test_a_quick_jpg_is_turned_in_a_new_file_next_to_the_old_one(configuration: ApplicationConfiguration) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         scan_once(client, configuration, "jpg")
-        file_name = client.get("/api/state").json()["last_result"]["file_names"][0]
+        old_file = read_last_file(client)
         response = rotate_last_scan(client)
-        turned_size = read_page_size_of(read_last_file(client).read_bytes())
-    assert (response.status_code, response.json()["last_result"]["file_names"][0]) == (200, file_name)
+        turned_file = read_last_file(client)
+        turned_size = read_page_size_of(turned_file.read_bytes())
+    assert (response.status_code, turned_file != old_file, old_file.exists()) == (200, True, True)
     assert turned_size == GLASS_SIZE[::-1]
 
 
@@ -636,11 +637,12 @@ def test_a_document_page_is_not_a_last_scan_to_turn(configuration: ApplicationCo
     assert (response.status_code, response.json()["code"]) == (404, "no_last_scan")
 
 
-def test_turning_a_last_scan_that_was_deleted_answers_last_scan_file_missing(
+def test_turning_a_last_scan_whose_file_was_deleted_still_writes_the_turned_file(
     configuration: ApplicationConfiguration,
 ) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         scan_once(client, configuration, "jpg")
         read_last_file(client).unlink()
         response = rotate_last_scan(client)
-    assert (response.status_code, response.json()["code"]) == (409, "last_scan_file_missing")
+        turned_file_exists = read_last_file(client).exists()
+    assert (response.status_code, turned_file_exists) == (200, True)

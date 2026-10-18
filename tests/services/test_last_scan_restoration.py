@@ -18,8 +18,11 @@ from tests.fakes.quick_scan_parts import (
     read_image_size,
 )
 
-FIRST_FILE = "2026-10-13_15-30-12-000000000.jpg"
-SECOND_FILE = "2026-10-13_15-30-12-000000001.jpg"
+FIRST_FILE = "2026_10_13__15_30_12_000000000.jpg"
+SECOND_FILE = "2026_10_13__15_30_12_000000001.jpg"
+THIRD_FILE = "2026_10_13__15_30_12_000000002.jpg"
+FOURTH_FILE = "2026_10_13__15_30_12_000000003.jpg"
+FIFTH_FILE = "2026_10_13__15_30_12_000000004.jpg"
 
 
 @pytest.fixture
@@ -91,8 +94,7 @@ async def test_a_restored_scan_can_be_edited(parts):
 
     await restarted.last_scan_edit_service.rotate_clockwise()
 
-    assert read_image_size(restarted.output_folder / FIRST_FILE) == SCENE_SIZE[::-1]
-
+    assert read_image_size(restarted.output_folder / SECOND_FILE) == SCENE_SIZE[::-1]
 
 def test_a_restored_scan_keeps_the_framing_it_was_saved_with(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
@@ -167,15 +169,38 @@ def test_an_unreadable_manifest_leaves_the_panel_empty(parts):
     assert restarted.progress_tracker.snapshot().last_scan is None
 
 
-def test_a_pending_render_is_finished_at_start_up(parts):
+def test_a_pending_render_is_finished_at_start_up_in_a_new_file(parts):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
     commit_a_pending_render(parts, PageFraming(PageRotation.CLOCKWISE_90))
     restarted = restart(parts)
 
     restarted.last_scan_edit_service.restore_after_start()
 
-    assert read_image_size(restarted.output_folder / FIRST_FILE) == SCENE_SIZE[::-1]
+    assert read_image_size(restarted.output_folder / SECOND_FILE) == SCENE_SIZE[::-1]
 
+
+def test_a_pending_render_leaves_the_file_of_before_untouched(parts):
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
+    content_before = (parts.output_folder / FIRST_FILE).read_bytes()
+    commit_a_pending_render(parts, PageFraming(PageRotation.CLOCKWISE_90))
+    restarted = restart(parts)
+
+    restarted.last_scan_edit_service.restore_after_start()
+
+    assert (restarted.output_folder / FIRST_FILE).read_bytes() == content_before
+
+
+def test_a_pending_render_that_died_halfway_gets_its_own_complete_files(parts):
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
+    crops = parts.slot_repository.load().last_scan.framing.crops
+    commit_a_pending_render(parts, PageFraming(PageRotation.CLOCKWISE_90, crops))
+    (parts.output_folder / THIRD_FILE).write_bytes(b"written before the crash")
+    restarted = restart(parts)
+
+    restarted.last_scan_edit_service.restore_after_start()
+
+    saved_files = restarted.progress_tracker.snapshot().last_scan.saved_files
+    assert [saved_file.file_name for saved_file in saved_files] == [FOURTH_FILE, FIFTH_FILE]
 
 def test_a_finished_render_clears_the_pending_mark(parts):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
@@ -197,7 +222,7 @@ def test_a_finished_render_puts_the_new_framing_in_the_tracker(parts):
     assert restarted.progress_tracker.snapshot().last_scan.framing.rotation is PageRotation.CLOCKWISE_90
 
 
-def test_a_pending_render_with_two_new_frames_creates_the_second_file(parts):
+def test_a_pending_render_with_two_new_frames_writes_two_new_files(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WHOLE_IMAGE))
     detecting_parts = build_quick_scan_parts(parts.output_folder.parent / "other")
     detected = detecting_parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
@@ -207,10 +232,9 @@ def test_a_pending_render_with_two_new_frames_creates_the_second_file(parts):
 
     restarted.last_scan_edit_service.restore_after_start()
 
-    assert restarted.saved_names() == [FIRST_FILE, SECOND_FILE]
+    assert restarted.saved_names() == [FIRST_FILE, SECOND_FILE, THIRD_FILE]
 
-
-def test_a_pending_render_with_one_frame_less_deletes_the_file_of_that_frame(parts):
+def test_a_pending_render_with_one_frame_less_keeps_every_earlier_file(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     one_frame = PageFraming().with_crops(parts.slot_repository.load().last_scan.framing.crops[:1])
     commit_a_pending_render(parts, one_frame)
@@ -218,8 +242,7 @@ def test_a_pending_render_with_one_frame_less_deletes_the_file_of_that_frame(par
 
     restarted.last_scan_edit_service.restore_after_start()
 
-    assert restarted.saved_names() == [FIRST_FILE]
-
+    assert restarted.saved_names() == [FIRST_FILE, SECOND_FILE, THIRD_FILE]
 
 def test_restoring_never_raises_when_the_slot_cannot_be_read(parts, monkeypatch):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))

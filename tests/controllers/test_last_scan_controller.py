@@ -13,7 +13,6 @@ from digitalizadora.domain.errors import (
     InsufficientDraftStorageError,
     InsufficientStorageError,
     LastScanBusyError,
-    LastScanFileMissingError,
     LastScanNotEditableError,
     LastScanReplacedError,
     NoLastScanError,
@@ -44,7 +43,6 @@ EXPECTED_FAILURES = [
     (LastScanReplacedError("newer"), HTTPStatus.CONFLICT),
     (ScanAlreadyRunningError("running"), HTTPStatus.CONFLICT),
     (LastScanBusyError("busy"), HTTPStatus.CONFLICT),
-    (LastScanFileMissingError("gone"), HTTPStatus.CONFLICT),
     (SavedScanUnreadableError("broken"), HTTPStatus.CONFLICT),
     (LastScanNotEditableError("no master"), HTTPStatus.CONFLICT),
     (InsufficientStorageError("full"), HTTPStatus.INSUFFICIENT_STORAGE),
@@ -80,7 +78,7 @@ def test_rotating_the_last_scan_answers_the_scan_and_the_lists_of_files(client: 
         {
             "last_result": {
                 "scan_identifier": "9f3c1a2b4d5e6f70",
-                "file_names": ["2026-10-13_15-30-12-000000000.pdf"],
+                "file_names": ["2026_10_13__15_30_12_000000000.pdf"],
                 "output_folder": "/Volumes/Scans",
                 "output_format": "pdf",
                 "total_size_in_bytes": 1234,
@@ -89,22 +87,8 @@ def test_rotating_the_last_scan_answers_the_scan_and_the_lists_of_files(client: 
                 "crops": [],
                 "is_editable": True,
             },
-            "deleted_file_names": [],
-            "kept_file_names": [],
         },
     )
-
-
-def test_the_answer_lists_the_files_deleted_and_the_files_kept(
-    client: TestClient, edit_service: StubLastScanEditService
-) -> None:
-    edit_service.result = LastScanEditResult(
-        build_last_scan(), deleted_file_names=("a.pdf",), kept_file_names=("b.pdf",)
-    )
-
-    body = client.post(ROTATION_PATH).json()
-
-    assert (body["deleted_file_names"], body["kept_file_names"]) == (["a.pdf"], ["b.pdf"])
 
 
 @pytest.mark.parametrize(("method", "path", "body"), EDIT_REQUESTS)
@@ -166,7 +150,6 @@ def test_the_error_statuses_cover_the_documented_codes() -> None:
         "last_scan_replaced": 409,
         "scan_already_running": 409,
         "last_scan_busy": 409,
-        "last_scan_file_missing": 409,
         "saved_scan_unreadable": 409,
         "last_scan_not_editable": 409,
         "invalid_crop": 422,

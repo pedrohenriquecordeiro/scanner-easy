@@ -182,7 +182,7 @@ def test_write_document_without_a_name_uses_the_timestamp_name(
 ):
     result = finalizer.write_document(seeded_input)
 
-    assert result.output_path == output_folder / "2026-10-17_10-00-00-000000000.pdf"
+    assert result.output_path == output_folder / "2026_10_17__10_00_00_000000000.pdf"
 
 
 def test_pdf_title_is_the_document_name(finalizer, seeded_input):

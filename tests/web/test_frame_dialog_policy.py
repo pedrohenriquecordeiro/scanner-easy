@@ -21,7 +21,7 @@ TEXT_CASES = [
         "Girar a moldura 1 em 90 graus para a direita: muda o lado de cima da foto recortada",
         id="rotate-frame-button",
     ),
-    pytest.param("FRAME_REWRITING_TEXT", "Regravando…", id="rewriting"),
+    pytest.param("FRAME_SAVING_TEXT", "Salvando…", id="saving"),
     pytest.param("FRAME_CHANGES_DISCARDED_TEXT", "Alterações da moldura descartadas.", id="changes-discarded"),
     pytest.param(
         "INVALID_FRAME_MOVE_TEXT",
