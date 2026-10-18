@@ -54,6 +54,12 @@ class PageFrameEditor {
     this.elements.frame_cancel_button.addEventListener("click", () => this.close_with(CLOSE_OUTCOMES.CANCELLED));
     this.elements.frame_apply_button.addEventListener("click", () => this.apply_frames());
     page_frame_dialog.addEventListener("close", () => this.finish_session());
+    // Esc does not close the dialog while an edit is on its way: the answer would find the dialog gone.
+    page_frame_dialog.addEventListener("cancel", (cancel_event) => {
+      if (this.is_locked()) {
+        cancel_event.preventDefault();
+      }
+    });
     for (const event_type of DIALOG_KEY_EVENT_TYPES_HIDDEN_FROM_THE_PAGE) {
       page_frame_dialog.addEventListener(event_type, (key_event) => this.keep_page_shortcuts_out(key_event), true);
     }
@@ -95,6 +101,7 @@ class PageFrameEditor {
       outcome: CLOSE_OUTCOMES.CANCELLED,
       drag: null,
       is_opening_status_shown: false,
+      is_edit_pending: false,
     };
     this.show_image();
     this.elements.page_frame_dialog.showModal();
@@ -130,8 +137,13 @@ class PageFrameEditor {
     (has_frame ? this.elements.frame_move_button : this.elements.frame_add_button).focus();
   }
 
+  // True while a change of the page or of the frames is being sent: nothing else in the dialog changes meanwhile.
+  is_locked() {
+    return this.session !== null && this.session.is_edit_pending;
+  }
+
   close_with(outcome) {
-    if (this.session === null) {
+    if (this.session === null || (this.is_locked() && outcome === CLOSE_OUTCOMES.CANCELLED)) {
       return;
     }
     this.session.outcome = outcome;
@@ -303,9 +315,12 @@ class PageFrameEditor {
     const can_edit = session.owner.can_edit();
     const frame_count = session.draft_frames.length;
     const has_frame = session.active_index !== NO_FRAME_INDEX;
-    this.elements.frame_add_button.disabled = frame_count >= MAXIMUM_FRAMES;
-    this.elements.frame_remove_button.disabled = !has_frame;
-    this.elements.frame_turn_button.disabled = !has_frame;
+    const is_locked = session.is_edit_pending;
+    this.elements.frame_add_button.disabled = is_locked || frame_count >= MAXIMUM_FRAMES;
+    this.elements.frame_remove_button.disabled = is_locked || !has_frame;
+    this.elements.frame_turn_button.disabled = is_locked || !has_frame;
+    this.elements.frame_clear_button.disabled = is_locked;
+    this.elements.frame_cancel_button.disabled = is_locked;
     this.elements.frame_turn_button.setAttribute(
       "aria-label",
       has_frame ? describe_rotate_frame_label(session.active_index + 1) : "Girar a moldura 90 graus para a direita",
@@ -342,7 +357,7 @@ class PageFrameEditor {
 
   start_drag(drag_start) {
     const { grip_element, grip, pointer_event } = drag_start;
-    if (this.session === null || this.session.active_index === NO_FRAME_INDEX) {
+    if (this.session === null || this.session.active_index === NO_FRAME_INDEX || this.is_locked()) {
       return;
     }
     // A second finger on another handle does not take the drag from the first one.
@@ -423,6 +438,9 @@ class PageFrameEditor {
       return;
     }
     key_event.preventDefault();
+    if (this.is_locked()) {
+      return;
+    }
     const nudged_frame = this.measure_nudged_frame({ grip, direction, key_event });
     if (nudged_frame === null) {
       this.show_status(INVALID_FRAME_MOVE_TEXT);
@@ -464,7 +482,7 @@ class PageFrameEditor {
 
   select_other_frame() {
     const session = this.session;
-    if (session === null || session.draft_frames.length !== MAXIMUM_FRAMES) {
+    if (session === null || session.draft_frames.length !== MAXIMUM_FRAMES || this.is_locked()) {
       return;
     }
     session.active_index = MAXIMUM_FRAMES - 1 - session.active_index;
@@ -477,7 +495,7 @@ class PageFrameEditor {
 
   add_frame() {
     const session = this.session;
-    if (session === null) {
+    if (session === null || this.is_locked()) {
       return;
     }
     const new_frame = suggest_new_frame(session.draft_frames);
@@ -494,7 +512,7 @@ class PageFrameEditor {
 
   remove_frame() {
     const session = this.session;
-    if (session === null || session.active_index === NO_FRAME_INDEX) {
+    if (session === null || session.active_index === NO_FRAME_INDEX || this.is_locked()) {
       return;
     }
     const removed_number = session.active_index + 1;
@@ -507,7 +525,7 @@ class PageFrameEditor {
 
   turn_frame_output() {
     const session = this.session;
-    if (session === null || session.active_index === NO_FRAME_INDEX) {
+    if (session === null || session.active_index === NO_FRAME_INDEX || this.is_locked()) {
       return;
     }
     this.replace_active_frame(turn_frame_output_clockwise(this.read_active_frame()));
@@ -517,7 +535,7 @@ class PageFrameEditor {
 
   clear_frames() {
     const session = this.session;
-    if (session === null) {
+    if (session === null || this.is_locked()) {
       return;
     }
     session.draft_frames = [];
@@ -598,13 +616,22 @@ class PageFrameEditor {
     if (session.target.progress_text !== null) {
       this.show_status(session.target.progress_text);
     }
-    const { body, failure } = await session.owner.attempt_edit(edit_request);
+    session.is_edit_pending = true;
+    this.render_controls();
+    let answer;
+    try {
+      answer = await session.owner.attempt_edit(edit_request);
+    } finally {
+      session.is_edit_pending = false;
+    }
+    const { body, failure } = answer;
     if (failure !== null) {
       session.owner.report_failure(failure);
       this.show_status(failure.message);
     }
     // The buttons were disabled while the edit ran, which took the focus off the one that was used.
-    if (this.session !== null) {
+    if (this.session === session) {
+      this.render_controls();
       button.focus();
     }
     return body;

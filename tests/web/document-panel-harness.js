@@ -391,6 +391,23 @@ const SCENARIOS = {
       finalize_requests: page.count_requests("POST /api/document/finalize"),
     };
   },
+  async a_page_with_two_frames_counts_two_pages_in_the_pdf() {
+    const page = await load_page({
+      "GET /api/document": respond(
+        build_document_body({
+          revision: 1,
+          page_identifiers: THREE_PAGES,
+          framings: { [FIRST_PAGE]: { rotation_degrees: 0, crops: [UPPER_CROP, LOWER_CROP] } },
+        }),
+      ),
+    });
+    page.element("scan-button").focus();
+    await page.press_key("Enter");
+    return {
+      summary_text: page.element("document-summary").textContent,
+      question: page.element("confirmation-text").textContent,
+    };
+  },
   async held_enter() {
     const page = await load_page({});
     page.element("scan-button").focus();

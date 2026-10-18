@@ -227,6 +227,7 @@ def test_state_contains_the_document_summary(client: TestClient) -> None:
         "draft_session": STUB_DRAFT_SESSION,
         "revision": 2,
         "page_count": 2,
+        "output_page_count": 2,
         "estimated_size_in_bytes": 6,
         "draft_storage": {
             "free_space_in_bytes": 80_000_000_000,

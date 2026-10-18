@@ -18,6 +18,7 @@ SAVED_SETTINGS = {
 
 SCENARIO_NAMES = (
     "idle_document_page",
+    "a_page_with_two_frames_counts_two_pages_in_the_pdf",
     "grid_tiles",
     "during_finalization",
     "older_answer_after_a_newer_one",
@@ -74,6 +75,12 @@ def test_output_format_choice_is_hidden_in_document_mode(scenario_results: dict)
 
 def test_document_bar_shows_the_page_count_and_size(scenario_results: dict) -> None:
     assert scenario_results["idle_document_page"]["summary_text"] == "3 páginas · ~2,4 MB"
+
+
+def test_document_bar_counts_the_pages_of_the_pdf_when_a_page_has_two_frames(scenario_results: dict) -> None:
+    scenario = scenario_results["a_page_with_two_frames_counts_two_pages_in_the_pdf"]
+
+    assert scenario["summary_text"] == "3 páginas (4 no PDF) · ~2,4 MB"
 
 
 def test_output_folder_space_line_is_hidden_in_document_mode(scenario_results: dict) -> None:

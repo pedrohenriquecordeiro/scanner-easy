@@ -9,7 +9,6 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from digitalizadora.controllers.document_controller import DocumentController
@@ -22,6 +21,7 @@ from digitalizadora.controllers.last_scan_controller import LastScanController
 from digitalizadora.controllers.local_request_guard import LocalRequestGuard
 from digitalizadora.controllers.preview_controller import PreviewController
 from digitalizadora.controllers.printer_controller import PrinterController
+from digitalizadora.controllers.revalidated_static_files import REVALIDATE_ALWAYS_HEADERS, RevalidatedStaticFiles
 from digitalizadora.controllers.scan_controller import ScanController
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.controllers.state_controller import StateController
@@ -39,7 +39,7 @@ STATIC_ROUTE = "/static"
 VALIDATION_ERROR_CODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"/api/document/page-order"), InvalidPageOrderError.code),
     (re.compile(r"/api/document/name"), InvalidDocumentNameError.code),
-    (re.compile(r"/api/document/pages/[^/]+/crops?(/detect)?"), InvalidCropError.code),
+    (re.compile(r"/api/document/pages/[^/]+/crops(/detect)?"), InvalidCropError.code),
     (re.compile(r"/api/document/pages/[^/]+/(thumbnail|preview)"), InvalidPageRotationError.code),
     (re.compile(r"/api/scans/last/crops"), InvalidCropError.code),
     (re.compile(r"/api/scans/last/preview"), InvalidPageRotationError.code),
@@ -148,11 +148,11 @@ def create_application(
     index_file = web_configuration.static_directory / INDEX_FILE_NAME
 
     async def serve_index() -> FileResponse:
-        return FileResponse(index_file)
+        return FileResponse(index_file, headers=REVALIDATE_ALWAYS_HEADERS)
 
     application.add_api_route("/", serve_index, methods=["GET"], include_in_schema=False)
     application.mount(
-        STATIC_ROUTE, StaticFiles(directory=web_configuration.static_directory), name="static"
+        STATIC_ROUTE, RevalidatedStaticFiles(directory=web_configuration.static_directory), name="static"
     )
     application.add_middleware(LocalRequestGuard, allowed_hosts=web_configuration.allowed_hosts)
     return application

@@ -35,6 +35,8 @@ const PRINTER_POLL_INTERVAL_MILLISECONDS = 15000;
 // Gate 0: the printer reports Processing for 4 to 5 s after each delivery.
 const POST_SCAN_PRINTER_REFRESH_DELAY_MILLISECONDS = 6000;
 const IMMEDIATE_REFRESH_MILLISECONDS = 0;
+// A key held on the quality slider changes it many times a second: only the last value is saved.
+const QUALITY_SAVE_DELAY_MILLISECONDS = 300;
 
 const BYTES_PER_UNIT = 1000;
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
@@ -338,6 +340,10 @@ class ScanPage {
     this.scan_phase = IDLE_PHASE;
     this.is_start_request_pending = false;
     this.saved_settings = null;
+    this.quality_edit_count = 0;
+    this.quality_edits_sent = 0;
+    this.quality_requests_pending = 0;
+    this.quality_save_timer = null;
     this.last_state = null;
     this.state_timer = null;
     this.printer_timer = null;
@@ -390,13 +396,34 @@ class ScanPage {
       this.change_setting_then_focus_scan_button({ auto_crop: auto_crop_checkbox.checked }),
     );
     const { jpeg_quality_input, jpeg_quality_value } = this.elements;
-    // The number follows the slider while it moves (a screen reader reads it); the setting is saved when it is let go.
+    // The number follows the slider while it moves (a screen reader reads it); the setting is saved a moment after
+    // the slider is let go or the last key press.
     jpeg_quality_input.addEventListener("input", () => {
       jpeg_quality_value.textContent = String(parse_jpeg_quality(jpeg_quality_input.value));
     });
-    jpeg_quality_input.addEventListener("change", () =>
-      this.change_setting({ jpeg_quality: parse_jpeg_quality(jpeg_quality_input.value) }),
-    );
+    jpeg_quality_input.addEventListener("change", () => this.schedule_quality_save());
+  }
+
+  schedule_quality_save() {
+    this.quality_edit_count += 1;
+    window.clearTimeout(this.quality_save_timer);
+    this.quality_save_timer = window.setTimeout(() => this.save_quality(), QUALITY_SAVE_DELAY_MILLISECONDS);
+  }
+
+  async save_quality() {
+    this.quality_save_timer = null;
+    this.quality_edits_sent = this.quality_edit_count;
+    this.quality_requests_pending += 1;
+    try {
+      await this.change_setting({ jpeg_quality: parse_jpeg_quality(this.elements.jpeg_quality_input.value) });
+    } finally {
+      this.quality_requests_pending -= 1;
+    }
+  }
+
+  // An answer about an older value never takes the slider back from a newer one the person already chose.
+  has_newer_quality_than_the_answer() {
+    return this.quality_edit_count > this.quality_edits_sent || this.quality_requests_pending > 1;
   }
 
   capture_mode() {
@@ -633,7 +660,8 @@ class ScanPage {
   render_pending_document(document_summary) {
     const page_count = document_summary === undefined ? 0 : document_summary.page_count;
     this.elements.document_pending_notice.hidden = this.is_document_mode() || page_count === 0;
-    this.elements.document_pending_text.textContent = page_count === 0 ? "" : describe_pending_document(page_count);
+    this.elements.document_pending_text.textContent =
+      page_count === 0 ? "" : describe_pending_document(page_count, document_summary.output_page_count);
   }
 
   render_capture_mode() {
@@ -720,6 +748,9 @@ class ScanPage {
   render_adjustment_controls(settings) {
     const { auto_crop_checkbox, jpeg_quality_input, jpeg_quality_value } = this.elements;
     auto_crop_checkbox.checked = settings.auto_crop === true;
+    if (this.has_newer_quality_than_the_answer()) {
+      return;
+    }
     const jpeg_quality = parse_jpeg_quality(settings.jpeg_quality);
     jpeg_quality_input.value = String(jpeg_quality);
     jpeg_quality_value.textContent = String(jpeg_quality);

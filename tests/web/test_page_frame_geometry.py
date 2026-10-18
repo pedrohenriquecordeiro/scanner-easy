@@ -416,7 +416,7 @@ DESCRIPTION_CASES = [
 HANDLE_POINT_CASES = [
     pytest.param(
         f"[find_rotate_handle_point({frame(MIDDLE)}, {SQUARE_SURFACE})].map((point) => [point.x, point.y])",
-        [[0.4, 0.21]],
+        [[0.4, 0.17]],
         id="the-rotate-handle-sits-above-the-middle-of-the-top-edge",
     ),
     pytest.param(
@@ -424,8 +424,24 @@ HANDLE_POINT_CASES = [
             f"[find_rotate_handle_point({frame([[0.2, 0.0], [0.6, 0.0], [0.6, 0.5], [0.2, 0.5]])}, {SQUARE_SURFACE})]"
             ".map((point) => [point.x, point.y])"
         ),
-        [[0.4, 0.02]],
-        id="the-rotate-handle-stays-inside-the-page",
+        [[0.4, 0.13]],
+        id="the-rotate-handle-goes-inside-the-frame-when-there-is-no-room-above-it",
+    ),
+    pytest.param(
+        (
+            f"[find_rotate_handle_point({frame([[0.2, 0.3], [0.6, 0.3], [0.6, 0.8], [0.2, 0.8]])}, "
+            "{width: 200, height: 200})].map((point) => [point.x, point.y])"
+        ),
+        [[0.4, 0.3 - 52 / 200]],
+        id="the-rotate-handle-keeps-52-pixels-from-the-top-edge-on-a-small-screen",
+    ),
+    pytest.param(
+        (
+            f"[find_rotate_handle_point({frame([[0.2, 0.0], [0.6, 0.0], [0.6, 0.1], [0.2, 0.1]])}, {SQUARE_SURFACE})]"
+            ".map((point) => [point.x, point.y])"
+        ),
+        [[0.4, 0.05]],
+        id="the-rotate-handle-of-a-low-frame-stays-inside-it",
     ),
 ]
 

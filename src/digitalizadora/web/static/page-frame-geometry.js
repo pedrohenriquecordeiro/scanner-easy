@@ -30,6 +30,8 @@ const COARSE_NUDGE_STEP = 0.05;
 const FINE_ROTATION_NUDGE_DEGREES = 0.5;
 const COARSE_ROTATION_NUDGE_DEGREES = 5;
 const ROTATE_HANDLE_OFFSET_SHARE = 0.06;
+// The handles are 44 px touch areas: the rotate handle keeps a gap from the handle of the top edge.
+const MINIMUM_ROTATE_HANDLE_OFFSET_PIXELS = 52;
 const MINIMUM_HANDLE_POSITION = 0.02;
 const QUARTER_TURN_DEGREES = 90;
 const HALF_TURN_DEGREES = 180;
@@ -486,10 +488,35 @@ function find_rotate_handle_point(frame, surface) {
     (frame.bottom_left.x - frame.top_left.x) * width,
     (frame.bottom_left.y - frame.top_left.y) * height,
   );
-  const offset = ROTATE_HANDLE_OFFSET_SHARE * Math.min(width, height) + frame_height * ROTATE_HANDLE_OFFSET_SHARE;
+  const offset = Math.max(
+    ROTATE_HANDLE_OFFSET_SHARE * Math.min(width, height) + frame_height * ROTATE_HANDLE_OFFSET_SHARE,
+    MINIMUM_ROTATE_HANDLE_OFFSET_PIXELS,
+  );
+  const outside_point = move_along_edge_normal(midpoint, { normal, offset }, { width, height });
+  if (is_inside_handle_area(outside_point)) {
+    return outside_point;
+  }
+  // No room above the frame: the handle goes inside it, on the same line, instead of sitting on the edge handle.
+  const inward_offset = Math.min(offset, frame_height / 2);
+  return limit_to_handle_area(move_along_edge_normal(midpoint, { normal, offset: -inward_offset }, { width, height }));
+}
+
+function move_along_edge_normal(point, shift, surface) {
+  const { normal, offset } = shift;
+  return { x: point.x + (normal.x * offset) / surface.width, y: point.y + (normal.y * offset) / surface.height };
+}
+
+function is_inside_handle_area(point) {
+  const highest = 1 - MINIMUM_HANDLE_POSITION;
+  return (
+    point.x >= MINIMUM_HANDLE_POSITION && point.x <= highest && point.y >= MINIMUM_HANDLE_POSITION && point.y <= highest
+  );
+}
+
+function limit_to_handle_area(point) {
   return {
-    x: limit_between(midpoint.x + (normal.x * offset) / width, MINIMUM_HANDLE_POSITION, 1 - MINIMUM_HANDLE_POSITION),
-    y: limit_between(midpoint.y + (normal.y * offset) / height, MINIMUM_HANDLE_POSITION, 1 - MINIMUM_HANDLE_POSITION),
+    x: limit_between(point.x, MINIMUM_HANDLE_POSITION, 1 - MINIMUM_HANDLE_POSITION),
+    y: limit_between(point.y, MINIMUM_HANDLE_POSITION, 1 - MINIMUM_HANDLE_POSITION),
   };
 }
 

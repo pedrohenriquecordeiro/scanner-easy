@@ -202,6 +202,22 @@ def test_static_files_are_served_below_static(client: TestClient) -> None:
     assert (response.status_code, response.text) == (HTTPStatus.OK, STYLESHEET)
 
 
+def test_the_index_page_is_revalidated_at_every_load(client: TestClient) -> None:
+    assert client.get("/").headers["cache-control"] == "no-cache"
+
+
+def test_static_files_are_revalidated_at_every_load(client: TestClient) -> None:
+    assert client.get("/static/application.css").headers["cache-control"] == "no-cache"
+
+
+def test_a_static_file_that_did_not_change_answers_304_with_the_same_policy(client: TestClient) -> None:
+    entity_tag = client.get("/static/application.css").headers["etag"]
+
+    response = client.get("/static/application.css", headers={"If-None-Match": entity_tag})
+
+    assert (response.status_code, response.headers["cache-control"]) == (HTTPStatus.NOT_MODIFIED, "no-cache")
+
+
 def test_missing_static_file_answers_404(client: TestClient) -> None:
     assert client.get("/static/missing.js").status_code == HTTPStatus.NOT_FOUND
 
@@ -532,7 +548,7 @@ def test_the_patterns_of_the_validation_codes_name_only_the_routes_with_a_body_o
     assert [(pattern.pattern, code) for pattern, code in VALIDATION_ERROR_CODE_PATTERNS] == [
         ("/api/document/page-order", "invalid_page_order"),
         ("/api/document/name", "invalid_document_name"),
-        ("/api/document/pages/[^/]+/crops?(/detect)?", "invalid_crop"),
+        ("/api/document/pages/[^/]+/crops(/detect)?", "invalid_crop"),
         ("/api/document/pages/[^/]+/(thumbnail|preview)", "invalid_page_rotation"),
         ("/api/scans/last/crops", "invalid_crop"),
         ("/api/scans/last/preview", "invalid_page_rotation"),

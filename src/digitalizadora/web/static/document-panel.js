@@ -428,6 +428,7 @@ class DocumentPanel {
     const { position, page_count, page } = tile_state;
     tile.position = position;
     const frames = read_frames_from_crops(page.crops);
+    tile.output_page_count = Math.max(frames.length, 1);
     tile.item.setAttribute("aria-label", describe_tile_label({ position, page_count, crop_count: frames.length }));
     tile.item.classList.toggle(DAMAGED_PAGE_CLASS, tile.page_identifier === this.damaged_page_identifier);
     this.show_thumbnail(tile, page.rotation_degrees);
@@ -475,9 +476,13 @@ class DocumentPanel {
       this.elements.document_summary,
       draft === null
         ? null
-        : `${describe_page_count(draft.page_count)} · ~${format_byte_count(draft.estimated_size_in_bytes)}`,
+        : `${describe_pages_of_the_pdf(draft.page_count, draft.output_page_count)} · ~${format_byte_count(draft.estimated_size_in_bytes)}`,
     );
     this.elements.document_large_warning.hidden = draft === null || !should_warn_about_large_document(draft);
+  }
+
+  count_pages_of_the_pdf() {
+    return [...this.page_tiles.values()].reduce((total, tile) => total + tile.output_page_count, 0);
   }
 
   render_controls() {
@@ -848,7 +853,7 @@ class DocumentPanel {
       return;
     }
     const is_confirmed = await this.confirm_action({
-      question: `Salvar o PDF com ${describe_page_count(this.page_tiles.size)}?`,
+      question: `Salvar o PDF com ${describe_page_count(this.count_pages_of_the_pdf())}?`,
       accept_label: SAVE_ACCEPT_LABEL,
       initial_focus: DIALOG_INITIAL_FOCUS.ACCEPT,
       opened_by_keyboard: action_origin.is_keyboard_initiated,

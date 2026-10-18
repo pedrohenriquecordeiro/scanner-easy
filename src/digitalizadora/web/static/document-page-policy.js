@@ -376,6 +376,14 @@ function describe_page_rotation_result(rotation_result) {
   return crop_count === 1 ? `${rotation_text} A moldura acompanhou o giro.` : `${rotation_text} As molduras acompanharam o giro.`;
 }
 
+function describe_pages_of_the_pdf(page_count, output_page_count) {
+  // A page with two frames becomes two pages of the PDF, so the count of the scanned pages is not the count of the PDF.
+  if (output_page_count === page_count) {
+    return describe_page_count(page_count);
+  }
+  return `${describe_page_count(page_count)} (${output_page_count.toLocaleString(NUMBER_LOCALE)} no PDF)`;
+}
+
 function describe_tile_label(tile_label) {
   const { position, page_count, crop_count } = tile_label;
   const position_text = `Página ${position} de ${page_count}`;
@@ -484,8 +492,8 @@ function describe_possible_previous_save(document) {
   return null;
 }
 
-function describe_pending_document(page_count) {
-  return `Documento em andamento: ${describe_page_count(page_count)}`;
+function describe_pending_document(page_count, output_page_count) {
+  return `Documento em andamento: ${describe_pages_of_the_pdf(page_count, output_page_count)}`;
 }
 
 function describe_finished_document(last_finished_document) {

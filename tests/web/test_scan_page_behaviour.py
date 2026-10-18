@@ -304,6 +304,16 @@ def test_letting_the_slider_go_keeps_the_focus_on_it(scenario_results: dict) -> 
     assert (result["slider_focused"], result["scan_button_focused"]) == (True, False)
 
 
+def test_a_key_held_on_the_slider_saves_only_the_last_quality_once(scenario_results: dict) -> None:
+    result = scenario_results["hold_a_key_on_the_quality_slider"]
+    assert (result["requests_while_holding"], result["requests_after"], result["saved_quality"]) == (0, 1, 70)
+
+
+def test_an_answer_about_an_older_quality_does_not_take_the_slider_back(scenario_results: dict) -> None:
+    controls = scenario_results["answer_about_an_older_quality_while_the_slider_moved_on"]
+    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("60", "60")
+
+
 def test_another_setting_goes_with_the_saved_quality(scenario_results: dict) -> None:
     body = scenario_results["quality_kept_while_another_setting_changes"]["settings_request_body"]
     assert (body["jpeg_quality"], body["dots_per_inch"]) == (60, 600)

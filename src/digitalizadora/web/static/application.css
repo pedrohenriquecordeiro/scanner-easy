@@ -697,6 +697,24 @@ button:disabled {
 .frame-dialog {
   width: min(60rem, calc(100vw - 2 * var(--size-gutter)));
   max-width: none;
+  max-height: calc(100dvh - 2 * var(--size-gutter));
+  overflow: hidden;
+}
+
+/* The page scrolls inside the dialog and the buttons stay in sight: Cancelar and Aplicar are never below the fold. */
+.frame-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.frame-dialog > * {
+  flex: none;
+}
+
+.frame-dialog > .frame-stage-row {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .frame-dialog .dialog-text {
@@ -737,7 +755,8 @@ button:disabled {
   width: auto;
   max-width: 100%;
   height: auto;
-  max-height: 60vh;
+  /* What is left of the screen after the title, the hints, the status line and the buttons. */
+  max-height: min(60dvh, max(12rem, calc(100dvh - 28rem)));
   outline: 1px solid var(--color-border);
   outline-offset: -1px;
 }
@@ -778,10 +797,11 @@ button:disabled {
   cursor: pointer;
 }
 
+/* Hatched, so the focus shows over a white sheet and over a dark one; the clip-path cuts it to the frame. */
 .frame-move:focus-visible,
 .frame-select:focus-visible {
   outline: 0;
-  background: rgb(255 255 255 / 22%);
+  background: repeating-linear-gradient(45deg, rgb(0 0 0 / 35%) 0 6px, rgb(255 255 255 / 35%) 6px 12px);
 }
 
 .frame-handle {
@@ -872,8 +892,27 @@ button:disabled {
     padding: 1.25rem 0.75rem;
   }
 
+  /* On a phone the hints and the buttons take most of the screen: the whole dialog scrolls and only the last row,
+     with Cancelar and Aplicar, stays in sight. */
+  .frame-dialog[open] {
+    overflow-y: auto;
+  }
+
+  .frame-dialog > .frame-stage-row {
+    flex: none;
+    overflow: visible;
+  }
+
+  .frame-dialog > .frame-actions:last-child {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    padding-top: 0.5rem;
+    background: var(--color-surface);
+  }
+
   .frame-image {
-    max-height: 40vh;
+    max-height: 40dvh;
   }
 
   .frame-actions button {

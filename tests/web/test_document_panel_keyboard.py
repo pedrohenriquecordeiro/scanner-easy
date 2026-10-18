@@ -15,6 +15,7 @@ SCENARIO_NAMES = (
     "keyboard_delete",
     "held_backspace",
     "enter_on_the_scan_button",
+    "a_page_with_two_frames_counts_two_pages_in_the_pdf",
     "held_enter",
     "second_enter_confirms",
     "space_in_the_confirmation",
@@ -107,6 +108,12 @@ def test_finalize_confirmation_opens_on_its_accept_button(scenario_results: dict
 
 def test_finalize_confirmation_asks_with_the_page_count(scenario_results: dict) -> None:
     assert scenario_results["enter_on_the_scan_button"]["question"] == "Salvar o PDF com 3 páginas?"
+
+
+def test_finalize_confirmation_counts_the_pages_of_the_pdf_when_a_page_has_two_frames(scenario_results: dict) -> None:
+    scenario = scenario_results["a_page_with_two_frames_counts_two_pages_in_the_pdf"]
+
+    assert scenario["question"] == "Salvar o PDF com 4 páginas?"
 
 
 def test_held_enter_opens_the_confirmation_without_finalizing(scenario_results: dict) -> None:

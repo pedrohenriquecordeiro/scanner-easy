@@ -3,11 +3,12 @@
 // Runs the real static scripts in the fake browser of fake-browser.js (fake DOM, timers and fetch), plays each
 // scenario and prints one JSON object with what the page did. tests/web/test_scan_page_behaviour.py asserts on it.
 
-const { BrowserPage, build_json_response } = require("./fake-browser.js");
+const { BrowserPage, build_deferred_response, build_json_response } = require("./fake-browser.js");
 
 const ACTIVE_POLL_DELAY_MILLISECONDS = 500;
 const PRINTER_POLL_DELAY_MILLISECONDS = 15000;
 const POST_SCAN_PRINTER_DELAY_MILLISECONDS = 6000;
+const QUALITY_SAVE_DELAY_MILLISECONDS = 300;
 const BYTE_COUNTS = [0, 999, 1000, 999949, 999950, 1234567, 5e9];
 const PAGE_COUNTS = [0, 1, 1234];
 
@@ -112,8 +113,22 @@ class PageUnderTest extends BrowserPage {
     await this.flush();
   }
 
+  async choose_quality_without_waiting(value) {
+    const slider = this.element("jpeg-quality-input");
+    slider.value = value;
+    this.dispatch_simple_event(slider, "input");
+    this.dispatch_simple_event(slider, "change");
+    await this.flush();
+  }
+
+  async let_the_quality_save_run() {
+    this.timers.run_pending_with_delay(QUALITY_SAVE_DELAY_MILLISECONDS);
+    await this.flush();
+  }
+
   async release_quality_slider() {
     this.dispatch_simple_event(this.element("jpeg-quality-input"), "change");
+    this.timers.run_pending_with_delay(QUALITY_SAVE_DELAY_MILLISECONDS);
     await this.flush();
   }
 
@@ -188,6 +203,29 @@ const SCENARIOS = {
       slider_focused: page.is_focused("jpeg-quality-input"),
       scan_button_focused: page.is_focused("scan-button"),
     };
+  },
+  async hold_a_key_on_the_quality_slider() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 70 }) });
+    for (let value = 89; value >= 70; value -= 1) {
+      await page.choose_quality_without_waiting(String(value));
+    }
+    const requests_while_holding = page.count_requests("PUT /api/settings");
+    await page.let_the_quality_save_run();
+    return {
+      requests_while_holding,
+      requests_after: page.count_requests("PUT /api/settings"),
+      saved_quality: page.settings_request_body().jpeg_quality,
+    };
+  },
+  async answer_about_an_older_quality_while_the_slider_moved_on() {
+    const first_answer = build_deferred_response();
+    const page = await load_page({ "PUT /api/settings": first_answer });
+    await page.choose_quality_without_waiting("70");
+    await page.let_the_quality_save_run();
+    await page.choose_quality_without_waiting("60");
+    first_answer.answer(build_json_response(200, { ...SETTINGS, jpeg_quality: 70 }));
+    await page.flush();
+    return page.read_settings_controls();
   },
   async refused_quality() {
     const page = await load_page({ "PUT /api/settings": build_json_response(422, INVALID_SETTINGS_BODY) });

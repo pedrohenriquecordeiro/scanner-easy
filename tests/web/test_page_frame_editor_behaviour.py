@@ -113,6 +113,7 @@ def test_the_dialog_opens_with_nothing_to_apply_and_every_edit_available(scenari
         "clear": False,
         "rotate": False,
         "apply": True,
+        "cancel": False,
     }
 
 
@@ -145,9 +146,9 @@ def test_the_edge_handles_sit_in_the_middle_of_the_edges(scenario_results: dict)
     ]
 
 
-def test_the_rotate_handle_sits_above_the_top_edge(scenario_results: dict) -> None:
+def test_the_rotate_handle_of_a_frame_at_the_top_of_the_page_sits_inside_the_frame(scenario_results: dict) -> None:
     handle = scenario_results["open_by_the_enlarge_button"]["dialog"]["rotate_handle"]
-    assert (handle["left"], handle["top"]) == ("52.2%", "2%")
+    assert (handle["left"], handle["top"]) == ("52.2%", "24.5%")
 
 
 def test_the_handles_are_named_in_portuguese(scenario_results: dict) -> None:
@@ -392,7 +393,7 @@ def test_a_frame_turned_a_quarter_says_where_its_top_side_went(scenario_results:
 
 def test_the_rotate_handle_follows_the_turned_frame(scenario_results: dict) -> None:
     handle = scenario_results["drag_the_rotate_handle"]["rotate_handle"]
-    assert (handle["left"], handle["top"]) == ("92.47%", "51.5%")
+    assert (handle["left"], handle["top"]) == ("94.27%", "51.5%")
 
 
 def test_a_drag_is_measured_from_where_it_began(scenario_results: dict) -> None:

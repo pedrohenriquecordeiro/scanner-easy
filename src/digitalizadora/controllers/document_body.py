@@ -34,6 +34,7 @@ def build_document_summary_body(draft_snapshot: DraftSnapshot, draft_storage: Dr
         "draft_session": draft_snapshot.draft_session,
         "revision": draft_snapshot.revision,
         "page_count": EMPTY_PAGE_COUNT if draft is None else draft.page_count,
+        "output_page_count": EMPTY_PAGE_COUNT if draft is None else draft.output_page_count,
         "estimated_size_in_bytes": EMPTY_SIZE_IN_BYTES if draft is None else draft.estimated_size_in_bytes,
         "draft_storage": {
             "free_space_in_bytes": draft_storage.free_space_in_bytes,
@@ -59,6 +60,7 @@ def _describe_draft(draft: DocumentDraft | None) -> dict[str, Any] | None:
         "name": draft.name,
         "created_at": draft.created_at.isoformat(),
         "page_count": draft.page_count,
+        "output_page_count": draft.output_page_count,
         "estimated_size_in_bytes": draft.estimated_size_in_bytes,
         "finalization_started_at": _moment_text(draft.finalization_started_at),
         "finished_document_path": None if finished_document is None else str(finished_document.output_path),

@@ -46,6 +46,7 @@ SCENARIO_NAMES = (
     "rotate_a_page_with_two_frames_in_the_dialog",
     "rotate_a_page_without_a_frame_in_the_dialog",
     "rotate_while_the_request_is_pending",
+    "apply_while_the_request_is_pending",
 )
 
 pytestmark = pytest.mark.skipif(
@@ -302,3 +303,26 @@ def test_the_edit_buttons_are_disabled_while_a_rotation_runs(scenario_results: d
 def test_the_edit_buttons_are_enabled_again_after_the_rotation(scenario_results: dict) -> None:
     disabled = scenario_results["rotate_while_the_request_is_pending"]["after"]["disabled"]
     assert (disabled["rotate"], disabled["detect"]) == (False, False)
+
+
+def test_every_editing_button_is_disabled_while_the_frames_are_being_applied(scenario_results: dict) -> None:
+    disabled = scenario_results["apply_while_the_request_is_pending"]["during"]["disabled"]
+    assert disabled == {
+        "add": True,
+        "remove": True,
+        "turn": True,
+        "detect": True,
+        "clear": True,
+        "rotate": True,
+        "apply": True,
+        "cancel": True,
+    }
+
+
+def test_cancel_does_not_close_the_dialog_while_the_frames_are_being_applied(scenario_results: dict) -> None:
+    assert scenario_results["apply_while_the_request_is_pending"]["open_after_cancel"] is True
+
+
+def test_the_frames_applied_after_a_cancel_click_are_never_announced_as_discarded(scenario_results: dict) -> None:
+    announcement = scenario_results["apply_while_the_request_is_pending"]["announcement"]
+    assert "descartadas" not in announcement

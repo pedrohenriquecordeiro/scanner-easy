@@ -732,6 +732,18 @@ const SCENARIOS = {
     await page.flush();
     return { during, after: read_dialog(page) };
   },
+  async apply_while_the_request_is_pending() {
+    const crops_answer = build_deferred_response();
+    const page = await open_framed_second_page({ [PUT_CROPS_KEY]: crops_answer });
+    await drag_the_left_edge(page);
+    await page.click(page.element("frame-apply-button"));
+    const during = read_dialog(page);
+    await page.click(page.element("frame-cancel-button"));
+    const open_after_cancel = page.element("page-frame-dialog").open;
+    crops_answer.answer(respond(build_body({ revision: 2, framings: build_framings(0, [WEST_DRAGGED_CROP]) })));
+    await page.flush();
+    return { during, open_after_cancel, announcement: announcement(page), open_after_answer: read_dialog(page).open };
+  },
   async cancel_after_a_drag() {
     const page = await open_framed_second_page({});
     await drag_the_left_edge(page);

@@ -56,6 +56,7 @@ function read_dialog(page) {
       clear: page.element("frame-clear-button").disabled,
       rotate: page.element("frame-rotate-button").disabled,
       apply: page.element("frame-apply-button").disabled,
+      cancel: page.element("frame-cancel-button").disabled,
     },
   };
 }

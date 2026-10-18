@@ -17,6 +17,8 @@ from digitalizadora.services.document_draft_store import UNAVAILABLE_DRAFT_STORA
 from tests.fakes.document_drafts import build_document_draft, page_identifier_at
 from tests.fakes.page_crops import quadrilateral, rectangle
 
+LEFT_CROP = rectangle((0.05, 0.05, 0.45, 0.45))
+RIGHT_CROP = rectangle((0.55, 0.55, 0.95, 0.95))
 DRAFT_SESSION = "5c0f9a2e7b1d4c38"
 REVISION = 4
 FINALIZED_AT = datetime(2026, 10, 17, 10, 5, 30, tzinfo=timezone(timedelta(hours=-3)))
@@ -69,6 +71,7 @@ def test_document_describes_the_draft_and_its_pages_in_order() -> None:
         "name": "Contrato do apartamento",
         "created_at": "2026-10-17T10:00:00-03:00",
         "page_count": 2,
+        "output_page_count": 2,
         "estimated_size_in_bytes": 6,
         "finalization_started_at": None,
         "finished_document_path": None,
@@ -131,6 +134,7 @@ def test_document_keys_come_in_the_documented_order() -> None:
         "name",
         "created_at",
         "page_count",
+        "output_page_count",
         "estimated_size_in_bytes",
         "finalization_started_at",
         "finished_document_path",
@@ -190,6 +194,7 @@ def test_summary_without_a_draft_counts_zero_pages() -> None:
         "draft_session": DRAFT_SESSION,
         "revision": REVISION,
         "page_count": 0,
+        "output_page_count": 0,
         "estimated_size_in_bytes": 0,
         "draft_storage": {
             "free_space_in_bytes": 80_000_000_000,
@@ -197,6 +202,16 @@ def test_summary_without_a_draft_counts_zero_pages() -> None:
             "available": True,
         },
     }
+
+
+def test_summary_counts_a_page_with_two_crops_as_two_pages_of_the_pdf() -> None:
+    draft = TWO_PAGE_SNAPSHOT.draft.with_page_framing(
+        page_identifier_at(2), PageFraming(PageRotation.NONE, (LEFT_CROP, RIGHT_CROP))
+    )
+
+    body = build_document_summary_body(replace(TWO_PAGE_SNAPSHOT, draft=draft), DRAFT_STORAGE)
+
+    assert (body["page_count"], body["output_page_count"]) == (2, 3)
 
 
 def test_summary_counts_the_pages_and_their_size() -> None:
@@ -210,6 +225,7 @@ def test_summary_keys_come_in_the_documented_order() -> None:
         "draft_session",
         "revision",
         "page_count",
+        "output_page_count",
         "estimated_size_in_bytes",
         "draft_storage",
     ]

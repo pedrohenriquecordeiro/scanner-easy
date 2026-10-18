@@ -308,6 +308,9 @@ DURATION_AND_COUNT_CASES = [
     pytest.param("describe_page_count(1)", "1 página", id="one-page"),
     pytest.param("describe_page_count(2)", "2 páginas", id="two-pages"),
     pytest.param("describe_page_count(1234)", "1.234 páginas", id="thousands"),
+    pytest.param("describe_pages_of_the_pdf(2, 2)", "2 páginas", id="pdf-as-scanned"),
+    pytest.param("describe_pages_of_the_pdf(2, 3)", "2 páginas (3 no PDF)", id="pdf-with-a-page-of-two-frames"),
+    pytest.param("describe_pages_of_the_pdf(1, 2)", "1 página (2 no PDF)", id="pdf-with-one-page-of-two-frames"),
 ]
 
 STATUS_CASES = [
@@ -426,8 +429,11 @@ DOCUMENT_TEXT_CASES = [
     ),
     pytest.param("describe_possible_previous_save(draft_document({}))", None, id="no-marker"),
     pytest.param("describe_possible_previous_save(null)", None, id="no-document"),
-    pytest.param("describe_pending_document(3)", "Documento em andamento: 3 páginas", id="pending-pages"),
-    pytest.param("describe_pending_document(1)", "Documento em andamento: 1 página", id="pending-page"),
+    pytest.param("describe_pending_document(3, 3)", "Documento em andamento: 3 páginas", id="pending-pages"),
+    pytest.param("describe_pending_document(1, 1)", "Documento em andamento: 1 página", id="pending-page"),
+    pytest.param(
+        "describe_pending_document(2, 4)", "Documento em andamento: 2 páginas (4 no PDF)", id="pending-framed-pages"
+    ),
     pytest.param(
         "describe_finished_document({file_name: 'Contrato.pdf', output_folder: '/Volumes/Arquivo', page_count: 3, "
         "size_in_bytes: 2418369, finalized_at: '2026-10-17T10:05:00-03:00'})",

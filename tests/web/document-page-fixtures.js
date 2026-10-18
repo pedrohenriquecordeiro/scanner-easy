@@ -137,14 +137,16 @@ function build_page(page_identifier, framing) {
 
 function build_draft(draft_parts) {
   const { page_identifiers, name, framings } = draft_parts;
+  const pages = page_identifiers.map((page_identifier) => build_page(page_identifier, (framings ?? {})[page_identifier]));
   return {
     name,
     created_at: SCANNED_AT,
     page_count: page_identifiers.length,
+    output_page_count: pages.reduce((total, page) => total + Math.max(page.crops.length, 1), 0),
     estimated_size_in_bytes: page_identifiers.length * PAGE_SIZE_IN_BYTES,
     finalization_started_at: null,
     finished_document_path: null,
-    pages: page_identifiers.map((page_identifier) => build_page(page_identifier, (framings ?? {})[page_identifier])),
+    pages,
   };
 }
 
@@ -174,6 +176,7 @@ function build_state(state_parts) {
       draft_session: DRAFT_SESSION,
       revision,
       page_count,
+      output_page_count: state_parts.output_page_count ?? page_count,
       estimated_size_in_bytes: page_count * PAGE_SIZE_IN_BYTES,
       draft_storage: DRAFT_STORAGE,
     },
