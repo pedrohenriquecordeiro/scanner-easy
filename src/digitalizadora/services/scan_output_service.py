@@ -3,7 +3,8 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from digitalizadora.domain.errors import DigitalizadoraError
+from digitalizadora.domain.encoded_scan import EncodedScan
+from digitalizadora.domain.errors import DigitalizadoraError, ImageAdjustmentFailedError
 from digitalizadora.domain.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.ports import QuickScanSlotRepository, ScanOutputRepository
@@ -104,13 +105,19 @@ class ScanOutputService:
         identity = OutputIdentity(job.started_at, job.request.settings.dots_per_inch, job.request.output_format)
         request = OutputsRequest(framing, job.request.adjustment.jpeg_quality, identity)
         saved_files = []
-        for encoded_scan in self._output_renderer.render_outputs(io.BytesIO(master_jpeg), request):
+        for encoded_scan in self._render_outputs(master_jpeg, request):
             output_path = self._scan_output_repository.save(encoded_scan)
             described_file = self._scan_output_repository.describe_saved_scan(output_path)
             saved_files.append(
                 described_file or SavedScanFile(output_path.name, len(encoded_scan.content), UNKNOWN_MODIFICATION_TIME)
             )
         return tuple(saved_files)
+
+    def _render_outputs(self, master_jpeg: bytes, request: OutputsRequest) -> tuple[EncodedScan, ...]:
+        try:
+            return self._output_renderer.render_outputs(io.BytesIO(master_jpeg), request)
+        except MemoryError as error:
+            raise ImageAdjustmentFailedError("Not enough memory to make the files of the scan") from error
 
     def _commit_slot(self, last_scan: LastScan, job: ScanJob) -> LastScan:
         slot = QuickScanSlot(last_scan, job.request.settings.dots_per_inch, job.request.settings.color_mode)

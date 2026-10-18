@@ -4,7 +4,7 @@ fake scanner, at 75 dots per inch so that a scan takes a few milliseconds."""
 import asyncio
 import io
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import httpx
@@ -39,11 +39,19 @@ def read_abundant_free_space(folder: Path) -> int:
     return ABUNDANT_FREE_SPACE_BYTES
 
 
-def build_client(configuration: ApplicationConfiguration, behavior: FakeScannerBehavior) -> TestClient:
+async def wait_two_milliseconds(seconds: float) -> None:
+    await asyncio.sleep(0.002)
+
+
+def build_client(
+    configuration: ApplicationConfiguration,
+    behavior: FakeScannerBehavior,
+    sleep: Callable[[float], Awaitable[None]] = yield_without_waiting,
+) -> TestClient:
     scanner_application = create_fake_escl_scanner_app(behavior)
     overrides = ContainerOverrides(
         scanner_transport=httpx.ASGITransport(app=scanner_application),
-        gateway_timing=EsclGatewayTiming(sleep=yield_without_waiting),
+        gateway_timing=EsclGatewayTiming(sleep=sleep),
         free_space_reader=read_abundant_free_space,
     )
     container = build_container(configuration, overrides)

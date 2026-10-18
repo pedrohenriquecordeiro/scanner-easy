@@ -1,7 +1,9 @@
 """The quick mode through the whole application: the master in the slot, the frames, the files, the edits."""
 
 import dataclasses
+import functools
 import shutil
+import threading
 from pathlib import Path
 
 import pikepdf
@@ -29,6 +31,8 @@ from tests.integration.flow_support import (
     read_image_size,
     save_settings,
     scan_once,
+    wait_for_state,
+    wait_two_milliseconds,
 )
 
 TWO_PHOTOS = FakeScannerBehavior(scene=PhotoScene.PHOTOS_TWO)
@@ -405,3 +409,30 @@ def test_the_edit_routes_refuse_a_request_without_the_header(configuration):
         ]
 
     assert [response.status_code for response in responses] == [403, 403, 403]
+
+
+def test_edits_answer_409_during_a_scan_but_the_views_keep_working(configuration):
+    slow_scanner = FakeScannerBehavior(scene=PhotoScene.PHOTOS_ONE, busy_polls_before_document=100)
+    with build_client(configuration, slow_scanner, wait_two_milliseconds) as client:
+        save_settings(client, configuration.default_output_folder, auto_crop=True)
+        scan_once(client)
+        identifier = client.get("/api/state").json()["last_result"]["scan_identifier"]
+        # The test client holds the answer of a scan until its background task ends, so the scan runs apart.
+        post_the_scan = functools.partial(client.post, "/api/scans", headers=STATE_CHANGING_HEADERS)
+        scanning = threading.Thread(target=post_the_scan)
+        scanning.start()
+        wait_for_state(client, lambda state: state["scan_phase"] != "idle")
+
+        responses = [
+            edit(client, "POST", "/rotation"),
+            edit(client, "PUT", "/crops", {"crops": []}),
+            edit(client, "POST", "/crops/detect"),
+        ]
+        thumbnail = client.get("/api/scans/last/thumbnail")
+        preview = client.get(f"/api/scans/last/preview?scan_identifier={identifier}&rotation_degrees=0")
+        scanning.join()
+
+    assert [(response.status_code, response.json()["code"]) for response in responses] == [
+        (409, "scan_already_running")
+    ] * 3
+    assert (thumbnail.status_code, preview.status_code) == (200, 200)

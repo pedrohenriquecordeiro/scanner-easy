@@ -11,6 +11,7 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
+    ImageAdjustmentFailedError,
     InsufficientStorageError,
     OutputFolderUnavailableError,
     ScanFailedError,
@@ -489,3 +490,13 @@ def test_the_master_files_keep_the_scanner_bytes_exactly(environment):
     expected = JpegResolutionService().with_resolution(ONE_PHOTO.content, 300)
     master_path = environment.slot_repository.master_file_path(stored_scan.last_scan.scan_identifier)
     assert master_path.read_bytes() == expected
+
+
+def test_running_out_of_memory_while_making_the_files_is_an_image_adjustment_failure(environment, monkeypatch):
+    def exhaust_memory(*arguments: object) -> object:
+        raise MemoryError
+
+    monkeypatch.setattr(PageFramingRenderer, "render_jpeg", exhaust_memory)
+
+    with pytest.raises(ImageAdjustmentFailedError):
+        environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True))
