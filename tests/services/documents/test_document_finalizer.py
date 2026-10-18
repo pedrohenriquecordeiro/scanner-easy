@@ -8,7 +8,6 @@ from typing import BinaryIO
 import pikepdf
 import pytest
 
-from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.documents.document_draft_reconciliation import page_file_name
 from digitalizadora.domain.errors import (
     DocumentAssemblyFailedError,
@@ -18,17 +17,18 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.imaging.page_framing import PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
-from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.domain.output.output_format import OutputFormat
+from digitalizadora.domain.output.scan_file_naming_policy import ScanFileNamingPolicy
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
-from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
+from digitalizadora.repositories.storage.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.services.application.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, StorageGuardService
 from digitalizadora.services.documents.document_finalizer import DocumentFinalizer
 from digitalizadora.services.documents.document_pdf_assembler import DocumentAssemblyInput, DocumentPdfAssembler
 from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
-from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
-from digitalizadora.services.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, StorageGuardService
+from digitalizadora.services.output.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, seed_draft_folder
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository

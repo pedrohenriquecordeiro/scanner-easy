@@ -18,7 +18,7 @@ from digitalizadora.domain.errors import (
 from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.imaging.page_crop import PageCrop
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scan_result import ScanResult

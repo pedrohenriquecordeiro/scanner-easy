@@ -9,29 +9,29 @@ from digitalizadora.domain.errors import ImageAdjustmentFailedError, Insufficien
 from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.imaging.page_framing import UNFRAMED
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.domain.scanning.scan_job import ScanJob
 from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,
 )
-from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
-from digitalizadora.services.documents.document_page_capture import DocumentPageCapture
-from digitalizadora.services.imaging.page_crop_detection_service import DetectedCrops, PageCropDetectionService
-from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
-from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
-from digitalizadora.services.scan_encoder import EncodedMaster, ScanEncoder
-from digitalizadora.services.storage_guard_service import (
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
+from digitalizadora.services.application.storage_guard_service import (
     MINIMUM_FREE_SPACE_BYTES,
     SAFETY_MARGIN_PAGES,
     StorageGuardService,
     estimated_page_bytes,
 )
+from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
+from digitalizadora.services.documents.document_page_capture import DocumentPageCapture
+from digitalizadora.services.imaging.page_crop_detection_service import DetectedCrops, PageCropDetectionService
+from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
+from digitalizadora.services.output.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.output.pdf_assembly_service import PdfAssemblyService
+from digitalizadora.services.output.scan_encoder import EncodedMaster, ScanEncoder
 from tests.fakes.document_drafts import page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg

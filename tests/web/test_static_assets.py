@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from digitalizadora.domain.scan_quality import SUPPORTED_DOTS_PER_INCH
+from digitalizadora.domain.settings.scan_quality import SUPPORTED_DOTS_PER_INCH
 
 STATIC_DIRECTORY = Path(__file__).resolve().parents[2] / "src" / "digitalizadora" / "web" / "static"
 SCRIPT_FILE_NAMES = [

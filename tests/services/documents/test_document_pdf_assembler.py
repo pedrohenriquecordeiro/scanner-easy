@@ -13,7 +13,7 @@ from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
 from digitalizadora.services.documents.document_pdf_assembler import DocumentAssemblyInput, DocumentPdfAssembler
 from digitalizadora.services.imaging.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
-from digitalizadora.services.pdf_assembly_service import PdfAssemblyService, PdfDocumentMetadata
+from digitalizadora.services.output.pdf_assembly_service import PdfAssemblyService, PdfDocumentMetadata
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, seed_draft_folder
 from tests.fakes.page_crops import rectangle
 from tests.fakes.sample_images import build_sample_jpeg

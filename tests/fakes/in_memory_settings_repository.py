@@ -1,4 +1,4 @@
-from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
 
 
 class InMemoryApplicationSettingsRepository:

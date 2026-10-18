@@ -9,11 +9,11 @@ import uvicorn
 from digitalizadora.__main__ import configure_logging, ensure_port_is_available, run_application
 from digitalizadora.composition_root import DRAFTS_FOLDER_NAME
 from digitalizadora.configuration import ApplicationConfiguration
-from digitalizadora.controllers.error_message_catalog import ERROR_MESSAGES
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.controllers.shared.error_message_catalog import ERROR_MESSAGES
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,
 )
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
 from tests.fakes.document_drafts import DRAFT_CREATED_AT
 from tests.fakes.fixed_clock import FixedClock
 

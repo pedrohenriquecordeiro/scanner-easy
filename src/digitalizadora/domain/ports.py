@@ -3,11 +3,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.documents.document_draft import DocumentDraft, DocumentPageFiles
 from digitalizadora.domain.documents.document_draft_reconciliation import DraftFileInventory
 from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
-from digitalizadora.domain.encoded_scan import EncodedScan
+from digitalizadora.domain.output.encoded_scan import EncodedScan
 from digitalizadora.domain.quick_scan.last_scan import QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
 from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
@@ -15,6 +14,7 @@ from digitalizadora.domain.scanner.scanner_status import ScannerStatus
 from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
 
 
 class Clock(Protocol):

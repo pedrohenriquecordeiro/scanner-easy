@@ -16,11 +16,11 @@ from digitalizadora.domain.errors import (
     InsufficientDraftStorageError,
     UnreadableDraftError,
 )
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,
     translate_draft_storage_error,
 )
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
 from tests.fakes.document_drafts import (
     DRAFT_CREATED_AT,
     build_document_draft,

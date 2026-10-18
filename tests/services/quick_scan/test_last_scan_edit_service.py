@@ -9,7 +9,6 @@ import pikepdf
 import pytest
 from PIL import Image
 
-from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import (
     InvalidCropError,
     LastScanBusyError,
@@ -20,11 +19,12 @@ from digitalizadora.domain.errors import (
     ScanAlreadyRunningError,
 )
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.encoded_scan import EncodedScan
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
-from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.repositories.storage.file_system_scan_output_repository import FileSystemScanOutputRepository
 from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditService
 from tests.fakes.page_crops import quadrilateral, rectangle
 from tests.fakes.quick_scan_parts import (

@@ -11,20 +11,20 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from digitalizadora.controllers.application.printer_controller import PrinterController
+from digitalizadora.controllers.application.settings_controller import SettingsController
+from digitalizadora.controllers.application.state_controller import StateController
 from digitalizadora.controllers.documents.document_controller import DocumentController
-from digitalizadora.controllers.error_message_catalog import (
+from digitalizadora.controllers.quick_scan.last_scan_controller import LastScanController
+from digitalizadora.controllers.quick_scan.preview_controller import PreviewController
+from digitalizadora.controllers.quick_scan.scan_controller import ScanController
+from digitalizadora.controllers.shared.error_message_catalog import (
     UNEXPECTED_ERROR_CODE,
     ErrorMessageCatalog,
     build_error_body,
 )
-from digitalizadora.controllers.local_request_guard import LocalRequestGuard
-from digitalizadora.controllers.printer_controller import PrinterController
-from digitalizadora.controllers.quick_scan.last_scan_controller import LastScanController
-from digitalizadora.controllers.quick_scan.preview_controller import PreviewController
-from digitalizadora.controllers.quick_scan.scan_controller import ScanController
-from digitalizadora.controllers.revalidated_static_files import REVALIDATE_ALWAYS_HEADERS, RevalidatedStaticFiles
-from digitalizadora.controllers.settings_controller import SettingsController
-from digitalizadora.controllers.state_controller import StateController
+from digitalizadora.controllers.shared.local_request_guard import LocalRequestGuard
+from digitalizadora.controllers.shared.revalidated_static_files import REVALIDATE_ALWAYS_HEADERS, RevalidatedStaticFiles
 from digitalizadora.domain.errors import (
     InvalidCropError,
     InvalidDocumentNameError,

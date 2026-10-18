@@ -4,8 +4,8 @@ from http import HTTPStatus
 import pytest
 from fastapi.testclient import TestClient
 
-from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.quick_scan.last_scan_controller import LAST_SCAN_ERROR_STATUSES, LastScanController
+from digitalizadora.controllers.shared.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     DraftStorageUnavailableError,

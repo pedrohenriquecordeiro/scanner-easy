@@ -15,10 +15,10 @@ from digitalizadora.repositories.documents.file_system_document_draft_repository
     CURRENT_DRAFT_FOLDER_NAME,
     FileSystemDocumentDraftRepository,
 )
+from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.documents.document_page_crop_detector import CropDetectionResult, DocumentPageCropDetector
 from digitalizadora.services.imaging.page_crop_detection_service import DetectedCrops, PageCropDetectionService
-from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, page_identifier_at, seed_draft_folder
 from tests.fakes.document_service_parts import InstantFileWriter
 from tests.fakes.fixed_clock import FixedClock

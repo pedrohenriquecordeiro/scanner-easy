@@ -7,34 +7,34 @@ from pathlib import Path
 
 from PIL import Image
 
-from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
+from digitalizadora.domain.output.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
-from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
-from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.domain.scanning.scan_job import ScanJob
 from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
-from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,
 )
+from digitalizadora.repositories.storage.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
 from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
-from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
+from digitalizadora.services.output.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.output.pdf_assembly_service import PdfAssemblyService
+from digitalizadora.services.output.scan_encoder import ScanEncoder
 from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditParts, LastScanEditService
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import QuickScanOutputRenderer
 from digitalizadora.services.quick_scan.scan_output_service import ScanOutputParts, ScanOutputService
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
-from digitalizadora.services.scan_encoder import ScanEncoder
-from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_service_parts import InstantFileWriter
 from tests.fakes.fixed_clock import TickingClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository

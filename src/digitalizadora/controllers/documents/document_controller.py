@@ -10,8 +10,7 @@ from pydantic import BaseModel
 
 from digitalizadora.controllers.documents.crop_request_body import PageCropsRequestBody
 from digitalizadora.controllers.documents.document_body import build_document_body
-from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
-from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.controllers.shared.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.domain.errors import (
     DamagedDocumentPageError,
     DigitalizadoraError,
@@ -20,7 +19,8 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.imaging.page_crop import PageCrop
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.services.application_settings_service import ApplicationSettingsService
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.services.application.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.documents.document_draft_service import DocumentDraftService
 
 logger = logging.getLogger(__name__)

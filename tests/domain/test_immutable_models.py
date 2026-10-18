@@ -4,17 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from digitalizadora.domain.application_settings import ApplicationSettings
-from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.imaging.page_crop import CropCorner, RectangleEdges
 from digitalizadora.domain.imaging.page_framing import PageFraming
 from digitalizadora.domain.imaging.pixel_region import PixelCorner, PixelRegion
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.encoded_scan import EncodedScan
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
-from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
 from digitalizadora.domain.scanner.scanner_endpoint import ScannerEndpoint
 from digitalizadora.domain.scanner.scanner_route import ScannerRoute
@@ -25,6 +23,8 @@ from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from tests.fakes.page_crops import rectangle
 
 MOMENT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=timezone(timedelta(hours=-3)))

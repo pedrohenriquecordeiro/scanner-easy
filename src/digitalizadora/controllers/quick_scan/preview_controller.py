@@ -4,8 +4,8 @@ from types import MappingProxyType
 from fastapi import APIRouter, Response
 
 from digitalizadora.controllers.documents.document_controller import parse_page_rotation
-from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.quick_scan.last_scan_controller import respond_to_last_scan_error
+from digitalizadora.controllers.shared.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.domain.errors import DigitalizadoraError
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 

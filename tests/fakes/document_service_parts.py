@@ -5,20 +5,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
-from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.documents.document_draft import DocumentDraft
 from digitalizadora.domain.documents.document_draft_reconciliation import MANIFEST_FILE_NAME
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
-from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.output.output_format import OutputFormat
+from digitalizadora.domain.output.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.repositories.documents.document_manifest_codec import decode_manifest
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     CURRENT_DRAFT_FOLDER_NAME,
     FileSystemDocumentDraftRepository,
 )
-from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
+from digitalizadora.repositories.storage.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.documents.document_draft_service import DocumentDraftCollaborators, DocumentDraftService
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.documents.document_finalizer import DocumentFinalizer
@@ -30,12 +31,11 @@ from digitalizadora.services.imaging.page_crop_detection_service import PageCrop
 from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
 from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
-from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
+from digitalizadora.services.output.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.output.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
+from digitalizadora.services.output.scan_encoder import ScanEncoder
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
-from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.scanner.scan_service import ScanService
-from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository

@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from digitalizadora.domain.application_settings import ApplicationSettings
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.output.output_format import OutputFormat
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 
 INITIAL_SETTINGS = ApplicationSettings(Path("/scans"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings)

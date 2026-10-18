@@ -20,11 +20,11 @@ from digitalizadora.domain.errors import (
     ScanRejectedError,
     ScanTimedOutError,
 )
-from digitalizadora.domain.scan_quality import scan_timeout_multiplier
 from digitalizadora.domain.scanner.scanner_capabilities import ScannerCapabilities
 from digitalizadora.domain.scanner.scanner_status import ScannerStatus
 from digitalizadora.domain.scanning.scan_settings import ScanSettings
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
+from digitalizadora.domain.settings.scan_quality import scan_timeout_multiplier
 from digitalizadora.infrastructure.escl.escl_protocol import (
     build_scan_settings_xml,
     extract_job_path,

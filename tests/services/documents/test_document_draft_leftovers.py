@@ -7,15 +7,15 @@ import pytest
 
 from digitalizadora.domain.documents.document_draft import DocumentDraft
 from digitalizadora.domain.errors import DraftStorageUnavailableError
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.scan_result import ScanResult
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,
 )
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
+from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.documents.document_draft_store import CapturedPage, DocumentDraftStore, DraftIdentitySource
-from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_page, page_identifier_at, write_draft_folder
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader

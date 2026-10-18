@@ -25,13 +25,20 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.domain.scanning.scan_settings import ScanSettings
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,
+)
+from digitalizadora.services.application.storage_guard_service import (
+    MINIMUM_FREE_SPACE_BYTES,
+    SAFETY_MARGIN_PAGES,
+    StorageGuardService,
+    estimated_page_bytes,
+    read_free_space_in_bytes,
 )
 from digitalizadora.services.documents.document_draft_store import (
     UNAVAILABLE_DRAFT_STORAGE_STATE,
@@ -39,13 +46,6 @@ from digitalizadora.services.documents.document_draft_store import (
     DocumentDraftStore,
     DraftIdentitySource,
     DraftStorageState,
-)
-from digitalizadora.services.storage_guard_service import (
-    MINIMUM_FREE_SPACE_BYTES,
-    SAFETY_MARGIN_PAGES,
-    StorageGuardService,
-    estimated_page_bytes,
-    read_free_space_in_bytes,
 )
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, page_identifier_at
 from tests.fakes.fixed_clock import FixedClock

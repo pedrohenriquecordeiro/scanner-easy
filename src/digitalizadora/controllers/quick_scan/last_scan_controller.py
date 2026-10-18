@@ -7,8 +7,8 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from digitalizadora.controllers.documents.crop_request_body import PageCropsRequestBody
-from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.controllers.quick_scan.last_scan_body import describe_last_scan
+from digitalizadora.controllers.shared.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.domain.errors import DigitalizadoraError, InvalidCropError
 from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditResult, LastScanEditService
 

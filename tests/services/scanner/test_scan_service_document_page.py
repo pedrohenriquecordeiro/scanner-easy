@@ -11,13 +11,13 @@ from digitalizadora.domain.errors import (
     ScanAlreadyRunningError,
     ScannerUnreachableError,
 )
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
-from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scanning.scan_job import ScanJob
 from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scanner.scan_service import ScanService
 from tests.fakes.document_drafts import build_document_page, page_identifier_at

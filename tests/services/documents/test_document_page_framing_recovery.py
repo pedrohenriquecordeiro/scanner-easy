@@ -11,12 +11,12 @@ from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.domain.scanning.scan_settings import ScanSettings
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     FileSystemDocumentDraftRepository,
 )
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
+from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.documents.document_draft_store import CapturedPage, DocumentDraftStore, DraftIdentitySource
-from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.page_crops import rectangle

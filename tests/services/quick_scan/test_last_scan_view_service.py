@@ -13,7 +13,7 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.imaging.page_framing import PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from tests.fakes.quick_scan_parts import ONE_PHOTO, SCENE_SIZE, QuickScanParts, build_job, build_quick_scan_parts
 

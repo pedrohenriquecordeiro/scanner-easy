@@ -18,14 +18,14 @@ from digitalizadora.domain.errors import (
     ScanRejectedError,
     ScanTimedOutError,
 )
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.ports import ScannerGateway
 from digitalizadora.domain.quick_scan.last_scan import LastScan, SavedScanFile
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
-from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scanning.scan_job import ScanJob
 from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scanner.scan_service import ScanService
 from tests.fakes.fixed_clock import FixedClock

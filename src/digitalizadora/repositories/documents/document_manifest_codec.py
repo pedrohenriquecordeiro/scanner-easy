@@ -11,10 +11,10 @@ from digitalizadora.domain.errors import InvalidCropError, UnreadableDraftError
 from digitalizadora.domain.imaging.page_crop import PageCrop
 from digitalizadora.domain.imaging.page_framing import MAXIMUM_CROPS_PER_PAGE, PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.domain.scanning.scan_result import ScanResult
-from digitalizadora.repositories.crop_codec import decode_crop, decode_legacy_rectangle, encode_crop
+from digitalizadora.repositories.storage.crop_codec import decode_crop, decode_legacy_rectangle, encode_crop
 
 LOGGER = logging.getLogger(__name__)
 

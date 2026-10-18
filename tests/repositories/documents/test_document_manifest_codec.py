@@ -12,7 +12,7 @@ from digitalizadora.domain.documents.document_draft import DocumentDraft, Docume
 from digitalizadora.domain.errors import UnreadableDraftError
 from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.repositories.documents.document_manifest_codec import (

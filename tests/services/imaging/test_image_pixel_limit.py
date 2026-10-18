@@ -3,7 +3,7 @@ import io
 import pytest
 from PIL import Image
 
-from digitalizadora.domain.scan_quality import pixels_per_page
+from digitalizadora.domain.settings.scan_quality import pixels_per_page
 from digitalizadora.services.imaging.image_pixel_limit import (
     MAXIMUM_SCANNER_IMAGE_PIXELS,
     raise_decompression_limit_to_scanner_size,

@@ -16,10 +16,10 @@ from PIL import Image
 
 from digitalizadora.composition_root import QUICK_SCAN_FOLDER_NAME
 from digitalizadora.configuration import ApplicationConfiguration
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,
 )
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
 from digitalizadora.simulator.fake_escl_scanner_app import FakeScannerBehavior
 from digitalizadora.simulator.photo_scene_page import PHOTO_PLACEMENTS_BY_SCENE, PhotoScene, photo_corners
 from tests.fakes.configuration_builder import build_application_configuration

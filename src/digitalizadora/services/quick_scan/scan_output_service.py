@@ -3,19 +3,19 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import DigitalizadoraError, ImageAdjustmentFailedError
 from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.output.encoded_scan import EncodedScan
 from digitalizadora.domain.ports import QuickScanSlotRepository, ScanOutputRepository
 from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scanning.scan_job import ScanJob
 from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
+from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.output.scan_encoder import EncodedMaster, OutputIdentity, ScanEncoder
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import OutputsRequest, QuickScanOutputRenderer
-from digitalizadora.services.scan_encoder import EncodedMaster, OutputIdentity, ScanEncoder
-from digitalizadora.services.storage_guard_service import StorageGuardService
 
 LOGGER = logging.getLogger(__name__)
 UNKNOWN_MODIFICATION_TIME = 0

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.scan_settings import ScanSettings
 
 

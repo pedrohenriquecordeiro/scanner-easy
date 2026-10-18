@@ -24,14 +24,14 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.color_mode import ColorMode
 from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
+from digitalizadora.domain.settings.scan_preset import ScanPreset
+from digitalizadora.services.application.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, estimated_page_bytes
 from digitalizadora.services.documents.document_draft_service import DocumentDraftService
 from digitalizadora.services.documents.document_draft_store import DraftStorageState
-from digitalizadora.services.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, estimated_page_bytes
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, build_document_page, page_identifier_at
 from tests.fakes.document_service_parts import (
     DRAFT_SESSION,

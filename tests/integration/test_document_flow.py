@@ -13,7 +13,7 @@ from digitalizadora.composition_root import DRAFTS_FOLDER_NAME, ContainerOverrid
 from digitalizadora.configuration import ApplicationConfiguration
 from digitalizadora.domain.documents.document_draft_reconciliation import MANIFEST_FILE_NAME, page_file_name
 from digitalizadora.domain.errors import DraftFolderInUseError
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.infrastructure.escl.escl_scanner_gateway import EsclGatewayTiming
 from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME

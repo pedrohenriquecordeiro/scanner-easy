@@ -19,9 +19,13 @@ from digitalizadora.domain.documents.document_draft_reconciliation import (
 )
 from digitalizadora.domain.errors import DigitalizadoraError, DraftFolderInUseError, as_draft_storage_error
 from digitalizadora.domain.ports import Clock
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter, flush_to_disk, is_temporary_file_name
 from digitalizadora.repositories.documents.document_manifest_codec import decode_manifest, encode_manifest
-from digitalizadora.repositories.output_folder_preparer import (
+from digitalizadora.repositories.storage.atomic_file_writer import (
+    AtomicFileWriter,
+    flush_to_disk,
+    is_temporary_file_name,
+)
+from digitalizadora.repositories.storage.output_folder_preparer import (
     WRITE_PROBE_FILE_PREFIX,
     prepare_output_folder,
     translate_storage_error,

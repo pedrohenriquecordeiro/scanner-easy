@@ -7,17 +7,17 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.quick_scan.preview_controller import PreviewController
+from digitalizadora.controllers.shared.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.domain.imaging.page_framing import PageFraming
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.last_scan import QuickScanMasterFiles
-from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scanning.scan_request import ScanRequest
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.domain.settings.scan_preset import ScanPreset
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,
 )
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
 from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker

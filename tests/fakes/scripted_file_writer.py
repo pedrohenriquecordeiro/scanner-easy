@@ -2,7 +2,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import BinaryIO
 
-from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
 
 
 class ScriptedFileWriter(AtomicFileWriter):

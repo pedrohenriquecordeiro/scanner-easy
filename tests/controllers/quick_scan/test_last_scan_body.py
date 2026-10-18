@@ -4,7 +4,7 @@ from pathlib import Path
 from digitalizadora.controllers.quick_scan.last_scan_body import describe_last_scan
 from digitalizadora.domain.imaging.page_framing import PageFraming
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.output.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.last_scan import SavedScanFile
 from tests.fakes.page_crops import quadrilateral
 from tests.fakes.stored_scans import build_last_scan

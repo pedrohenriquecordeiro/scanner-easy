@@ -10,7 +10,7 @@ import uvicorn
 from digitalizadora.application_factory import create_application
 from digitalizadora.composition_root import build_container
 from digitalizadora.configuration import ApplicationConfiguration
-from digitalizadora.controllers.error_message_catalog import ERROR_MESSAGES
+from digitalizadora.controllers.shared.error_message_catalog import ERROR_MESSAGES
 from digitalizadora.domain.errors import DraftFolderInUseError
 
 LOG_FILE_NAME = "digitalizadora.log"

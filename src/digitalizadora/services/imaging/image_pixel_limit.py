@@ -2,7 +2,7 @@ from math import ceil
 
 from PIL import Image
 
-from digitalizadora.domain.scan_quality import HIGHEST_DOTS_PER_INCH, pixels_per_page
+from digitalizadora.domain.settings.scan_quality import HIGHEST_DOTS_PER_INCH, pixels_per_page
 
 PIXEL_LIMIT_MARGIN = 1.05
 # The estimate of a full page at 1200 dpi is 143,085,600 pixels; the glass the printer really delivers has 143,126,400.

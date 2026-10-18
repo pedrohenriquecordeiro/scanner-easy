@@ -12,8 +12,7 @@ from digitalizadora.controllers.documents.document_controller import (
     THUMBNAIL_CACHE_HEADERS,
     DocumentController,
 )
-from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
-from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.controllers.shared.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.domain.errors import (
     DamagedDocumentPageError,
     DigitalizadoraError,
@@ -37,9 +36,10 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.imaging.page_rotation import PageRotation
-from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.services.application_settings_service import ApplicationSettingsService
+from digitalizadora.domain.output.output_format import OutputFormat
+from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.domain.settings.scan_preset import ScanPreset
+from digitalizadora.services.application.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
 from tests.fakes.document_drafts import page_identifier_at
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
