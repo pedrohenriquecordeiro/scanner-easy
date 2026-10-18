@@ -45,7 +45,7 @@ from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.synthetic_scans import read_jpeg_size
 
 JPEG_QUALITY = 90
-WHOLE_PAGE_CROP = rectangle(0.0, 0.0, 1.0, 1.0)
+WHOLE_PAGE_CROP = rectangle((0.0, 0.0, 1.0, 1.0))
 
 SETTINGS = ScanPreset.DOCUMENT.settings
 PHOTO_SETTINGS = ScanPreset.PHOTO.settings
@@ -619,7 +619,7 @@ async def test_rotate_page_without_a_draft_raises_no_open_document(service):
         await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
 
-SAMPLE_CROP = rectangle(0.125, 0.115, 0.9, 0.925)
+SAMPLE_CROP = rectangle((0.125, 0.115, 0.9, 0.925))
 
 
 async def test_set_page_crop_stores_the_crop_in_the_page(service):
@@ -716,7 +716,7 @@ async def test_a_rotated_page_goes_into_the_saved_pdf_with_its_new_orientation(s
 async def test_a_cropped_page_goes_into_the_saved_pdf_with_the_size_of_its_frame(service, parts):
     await add_pages(service, 1)
     page_width, page_height = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
-    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle(0.0, 0.0, 0.5, 1.0)])
+    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle((0.0, 0.0, 0.5, 1.0))])
 
     finalization = await service.finalize(JPEG_QUALITY)
 

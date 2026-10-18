@@ -69,10 +69,11 @@ ONE_PHOTO = ScannedImage(
 WHITE_PAGE = ScannedImage(build_scan_jpeg((200, 280)), "image/jpeg")
 
 
-def job_with(
-    output_format: OutputFormat = OutputFormat.PDF, auto_crop: bool = False, jpeg_quality: int = 90
-) -> ScanJob:
-    adjustment = ImageAdjustment(auto_crop=auto_crop, jpeg_quality=jpeg_quality)
+WHOLE_IMAGE = ImageAdjustment(auto_crop=False, jpeg_quality=90)
+WITH_AUTO_CROP = ImageAdjustment(auto_crop=True, jpeg_quality=90)
+
+
+def job_with(output_format: OutputFormat = OutputFormat.PDF, adjustment: ImageAdjustment = WHOLE_IMAGE) -> ScanJob:
     return ScanJob(ScanRequest(SETTINGS, output_format, adjustment), STARTED_AT)
 
 
@@ -281,7 +282,7 @@ def test_the_last_scan_describes_the_output_folder_and_the_moment(environment):
 
 
 def test_one_photo_with_the_crop_saves_one_cropped_file(environment):
-    stored_scan = environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True))
+    stored_scan = environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     saved_path = environment.output_folder / stored_scan.last_scan.saved_files[0].file_name
     assert len(stored_scan.last_scan.framing.crops) == 1
@@ -289,7 +290,7 @@ def test_one_photo_with_the_crop_saves_one_cropped_file(environment):
 
 
 def test_two_photos_with_the_crop_save_two_files_with_consecutive_names(environment):
-    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True))
+    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert [saved_file.file_name for saved_file in stored_scan.last_scan.saved_files] == [
         "2026-10-13_00001.jpg",
@@ -298,20 +299,20 @@ def test_two_photos_with_the_crop_save_two_files_with_consecutive_names(environm
 
 
 def test_two_photos_with_the_crop_keep_two_frames_in_the_last_scan(environment):
-    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True))
+    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert len(stored_scan.last_scan.framing.crops) == 2
 
 
 def test_each_file_of_two_photos_has_the_size_of_its_photo(environment):
-    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True))
+    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     sizes = [read_image_size(environment.output_folder / f.file_name) for f in stored_scan.last_scan.saved_files]
     assert sizes == [pytest.approx((240, 300), abs=30), pytest.approx((240, 300), abs=30)]
 
 
 def test_two_photos_saved_as_pdf_make_two_pdf_files_of_one_page(environment):
-    environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.PDF, auto_crop=True))
+    environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.PDF, WITH_AUTO_CROP))
 
     page_counts = []
     for name in environment.saved_names():
@@ -321,7 +322,7 @@ def test_two_photos_saved_as_pdf_make_two_pdf_files_of_one_page(environment):
 
 
 def test_the_two_files_come_from_one_master(environment):
-    environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True))
+    environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     slot_names = sorted(path.name for path in environment.slot_folder.iterdir())
     master_names = [name for name in slot_names if name.startswith("master")]
@@ -329,7 +330,7 @@ def test_the_two_files_come_from_one_master(environment):
 
 
 def test_a_white_page_with_the_crop_is_saved_whole(environment):
-    stored_scan = environment.build_service().store(WHITE_PAGE, job_with(OutputFormat.JPEG, auto_crop=True))
+    stored_scan = environment.build_service().store(WHITE_PAGE, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert (stored_scan.last_scan.framing.crops, len(stored_scan.last_scan.saved_files)) == ((), 1)
 
@@ -338,7 +339,7 @@ def test_a_detection_that_fails_still_saves_the_whole_image(tmp_path):
     environment = Environment(tmp_path)
     environment.detection_service = StubCropDetectionService(ScanFailedError("x"))
 
-    stored_scan = environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True))
+    stored_scan = environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     saved_size = read_image_size(environment.output_folder / "2026-10-13_00001.jpg")
     assert (stored_scan.last_scan.framing.crops, saved_size) == ((), TWO_PHOTOS_SIZE)
@@ -349,7 +350,7 @@ def test_a_detection_that_fails_is_reported_in_the_log(tmp_path, caplog):
     environment.detection_service = StubCropDetectionService(ScanFailedError("x"))
 
     with caplog.at_level(logging.WARNING):
-        environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True))
+        environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert "automatic crop of the scan failed" in caplog.text
 
@@ -357,8 +358,8 @@ def test_a_detection_that_fails_is_reported_in_the_log(tmp_path, caplog):
 def test_a_lower_quality_gives_smaller_files(environment, tmp_path):
     high = Environment(tmp_path / "high")
     low = Environment(tmp_path / "low")
-    high.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True, jpeg_quality=95))
-    low.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True, jpeg_quality=60))
+    high.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, ImageAdjustment(auto_crop=True, jpeg_quality=95)))
+    low.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, ImageAdjustment(auto_crop=True, jpeg_quality=60)))
 
     sizes = [(env.output_folder / "2026-10-13_00001.jpg").stat().st_size for env in (high, low)]
     assert sizes[1] < sizes[0]
@@ -373,7 +374,7 @@ def test_a_master_that_the_disk_does_not_take_still_gives_the_files(tmp_path):
     )
 
     stored_scan = environment.build_service(slot_repository=failing_slot).store(
-        ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True)
+        ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
     )
 
     assert (stored_scan.last_scan.is_editable, environment.saved_names()) == (False, ["2026-10-13_00001.jpg"])
@@ -431,7 +432,7 @@ def test_the_next_scan_deletes_the_master_of_the_previous_one(environment):
 
 def test_the_next_scan_continues_the_sequence_of_the_day(environment):
     service = environment.build_service()
-    service.store(TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True))
+    service.store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     stored_scan = service.store(ONE_PHOTO, job_with(OutputFormat.JPEG))
 
@@ -460,7 +461,7 @@ def test_a_failure_on_the_second_file_keeps_the_slot_of_the_previous_scan(enviro
 
     with pytest.raises(DigitalizadoraError):
         environment.build_service(output_repository=failing_repository).store(
-            TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True)
+            TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
         )
 
     assert environment.slot_repository.load().last_scan.scan_identifier == SCAN_IDENTIFIERS[0]
@@ -471,14 +472,14 @@ def test_a_failure_on_the_second_file_leaves_the_first_in_the_folder(environment
 
     with pytest.raises(DigitalizadoraError):
         environment.build_service(output_repository=failing_repository).store(
-            TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True)
+            TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
         )
 
     assert environment.saved_names() == ["2026-10-13_00001.jpg"]
 
 
 def test_the_frames_are_in_reading_order_in_the_last_scan(environment):
-    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, auto_crop=True))
+    stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     crops = stored_scan.last_scan.framing.crops
     assert crops[0].bounding_edges.top < crops[1].bounding_edges.top
@@ -499,4 +500,4 @@ def test_running_out_of_memory_while_making_the_files_is_an_image_adjustment_fai
     monkeypatch.setattr(PageFramingRenderer, "render_jpeg", exhaust_memory)
 
     with pytest.raises(ImageAdjustmentFailedError):
-        environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, auto_crop=True))
+        environment.build_service().store(ONE_PHOTO, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))

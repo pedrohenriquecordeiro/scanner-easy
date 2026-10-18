@@ -237,7 +237,7 @@ def test_two_crops_are_passed_in_the_order_given(client: TestClient, edit_servic
 
     client.put(CROPS_PATH, json={"crops": [UPPER_CROP_BODY, lower_body]})
 
-    assert edit_service.received_crops == [[UPPER_CROP, rectangle(0.17, 0.6, 0.88, 0.95)]]
+    assert edit_service.received_crops == [[UPPER_CROP, rectangle((0.17, 0.6, 0.88, 0.95))]]
 
 
 def test_a_crop_outside_the_page_answers_422_and_never_reaches_the_service(

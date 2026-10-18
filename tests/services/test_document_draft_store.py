@@ -52,7 +52,7 @@ from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.scripted_file_writer import ScriptedFileWriter
 from tests.fakes.sequential_page_identifiers import SequentialPageIdentifiers
 
-WHOLE_PAGE_CROP = rectangle(0.0, 0.0, 1.0, 1.0)
+WHOLE_PAGE_CROP = rectangle((0.0, 0.0, 1.0, 1.0))
 
 DRAFT_SESSION = "5c0f9a2e7b1d4c38"
 NOW = DRAFT_CREATED_AT + timedelta(minutes=15)
@@ -896,8 +896,8 @@ def test_read_page_content_of_a_file_with_another_size_raises_damaged_document_p
         draft_store.read_page_content(FIRST_PAGE_IDENTIFIER)
 
 
-SAMPLE_CROP = rectangle(0.125, 0.115, 0.9, 0.925)
-TURNED_SAMPLE_CROP = rectangle(0.075, 0.125, 0.885, 0.9)
+SAMPLE_CROP = rectangle((0.125, 0.115, 0.9, 0.925))
+TURNED_SAMPLE_CROP = rectangle((0.075, 0.125, 0.885, 0.9))
 
 
 def test_turning_a_page_adds_a_quarter_turn_to_its_rotation(draft_store):
@@ -1006,8 +1006,8 @@ def test_setting_a_crop_stores_it_in_the_page(draft_store):
 
 def test_setting_two_crops_stores_them_in_reading_order(draft_store):
     add_pages(draft_store, 1)
-    left_crop = rectangle(0.05, 0.1, 0.45, 0.9)
-    right_crop = rectangle(0.55, 0.1, 0.95, 0.9)
+    left_crop = rectangle((0.05, 0.1, 0.45, 0.9))
+    right_crop = rectangle((0.55, 0.1, 0.95, 0.9))
 
     draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [right_crop, left_crop])
 

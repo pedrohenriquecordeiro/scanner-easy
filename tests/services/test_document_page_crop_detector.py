@@ -37,7 +37,7 @@ WHITE_PAGE = build_scan_jpeg(LID_SIZE)
 FIRST_PAGE_IDENTIFIER = page_identifier_at(1)
 UNKNOWN_PAGE_IDENTIFIER = "00000000000000ff"
 ABUNDANT_FREE_SPACE = 100 * 1024**3
-SAMPLE_CROP = rectangle(0.1, 0.1, 0.9, 0.9)
+SAMPLE_CROP = rectangle((0.1, 0.1, 0.9, 0.9))
 
 
 class StubCropDetectionService(PageCropDetectionService):
@@ -121,13 +121,13 @@ def test_nothing_found_leaves_the_frame_and_the_revision_alone(drafts_folder):
 
 def test_a_frame_found_on_the_master_is_stored_in_the_displayed_orientation(drafts_folder):
     store, detector = build_detector(
-        drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(rectangle(0.0, 0.0, 0.5, 1.0),))
+        drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(rectangle((0.0, 0.0, 0.5, 1.0)),))
     )
     store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
-    assert result.draft.pages[0].framing.crops == (rectangle(0.0, 0.0, 1.0, 0.5),)
+    assert result.draft.pages[0].framing.crops == (rectangle((0.0, 0.0, 1.0, 0.5)),)
 
 
 def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
@@ -141,7 +141,7 @@ def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
 
 def test_a_found_frame_replaces_the_frame_of_before(drafts_folder):
     store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crops=(SAMPLE_CROP,)))
-    store.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle(0.3, 0.3, 0.6, 0.6)])
+    store.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle((0.3, 0.3, 0.6, 0.6))])
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
@@ -219,8 +219,8 @@ def test_a_page_without_a_frame_stays_unframed_when_nothing_is_found(drafts_fold
     assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER).draft.pages[0].framing == UNFRAMED
 
 
-LEFT_CROP = rectangle(0.05, 0.1, 0.45, 0.9)
-RIGHT_CROP = rectangle(0.55, 0.1, 0.95, 0.9)
+LEFT_CROP = rectangle((0.05, 0.1, 0.45, 0.9))
+RIGHT_CROP = rectangle((0.55, 0.1, 0.95, 0.9))
 
 
 def test_two_frames_found_are_both_stored_in_reading_order(drafts_folder):

@@ -16,8 +16,8 @@ from tests.fakes.synthetic_scans import build_marked_scan_jpeg, find_marker_corn
 PAGE_SIZE = (100, 200)
 DOTS_PER_INCH = 300
 JPEG_QUALITY = 90
-TOP_RIGHT_QUADRANT = rectangle(0.5, 0.0, 1.0, 0.5)
-TOP_LEFT_QUADRANT = rectangle(0.0, 0.0, 0.5, 0.5)
+TOP_RIGHT_QUADRANT = rectangle((0.5, 0.0, 1.0, 0.5))
+TOP_LEFT_QUADRANT = rectangle((0.0, 0.0, 0.5, 0.5))
 MARKER_REDNESS_THRESHOLD = 30
 LID_LEVEL_FLOOR = 240
 QUARTER_TURN = PageFraming(rotation=PageRotation.CLOCKWISE_90)
@@ -30,9 +30,13 @@ def page_file(tmp_path: Path) -> Path:
     return page_path
 
 
-def render(page_file: Path, framing: PageFraming, frame_index: int = 0, jpeg_quality: int = JPEG_QUALITY) -> bytes:
+def render_request(page_file: Path, request: FrameRenderRequest) -> bytes:
     with page_file.open("rb") as master:
-        return PageFramingRenderer().render_jpeg(master, FrameRenderRequest(framing, frame_index, jpeg_quality))
+        return PageFramingRenderer().render_jpeg(master, request)
+
+
+def render(page_file: Path, framing: PageFraming) -> bytes:
+    return render_request(page_file, FrameRenderRequest(framing, 0, JPEG_QUALITY))
 
 
 def read_redness(jpeg_content: bytes, position: tuple[int, int]) -> int:
@@ -83,7 +87,7 @@ def test_a_crop_alone_keeps_what_is_inside_the_frame(page_file):
 
 
 def test_a_crop_away_from_the_marker_leaves_the_marker_out(page_file):
-    cropped = render(page_file, PageFraming(crops=(rectangle(0.5, 0.5, 1.0, 1.0),)))
+    cropped = render(page_file, PageFraming(crops=(rectangle((0.5, 0.5, 1.0, 1.0)),)))
 
     assert read_redness(cropped, (8, 8)) < MARKER_REDNESS_THRESHOLD
 
@@ -98,7 +102,7 @@ def test_a_rotation_and_a_crop_together_crop_in_the_displayed_orientation(page_f
 
 def test_the_displayed_crop_that_misses_the_turned_marker_misses_it_in_the_result(page_file):
     # The marker is at the top-left of the stored page, so at the top-right once the page is turned.
-    framing = PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.0, 0.5, 0.5, 1.0),))
+    framing = PageFraming(PageRotation.CLOCKWISE_90, (rectangle((0.0, 0.5, 0.5, 1.0)),))
 
     rendered = render(page_file, framing)
 
@@ -219,7 +223,8 @@ def test_each_frame_of_a_page_with_two_crops_is_rendered_alone(tmp_path):
     page_path.write_bytes(build_photo_scene_jpeg(CANVAS_SIZE, [TILTED_PHOTO, SECOND_PHOTO]))
     framing = PageFraming().with_crops([crop_around(TILTED_PHOTO), crop_around(SECOND_PHOTO)])
 
-    sizes = [read_jpeg_size(render(page_path, framing, frame_index=index)) for index in range(2)]
+    requests = [FrameRenderRequest(framing, index, JPEG_QUALITY) for index in range(2)]
+    sizes = [read_jpeg_size(render_request(page_path, request)) for request in requests]
 
     assert sizes == [
         pytest.approx(TILTED_PHOTO.size, abs=2),
@@ -230,30 +235,31 @@ def test_each_frame_of_a_page_with_two_crops_is_rendered_alone(tmp_path):
 def test_a_lower_quality_gives_a_smaller_file(tilted_page_file):
     framing = PageFraming(crops=(crop_around(TILTED_PHOTO),))
 
-    sizes = [len(render(tilted_page_file, framing, jpeg_quality=quality)) for quality in (60, 95)]
+    sizes = [len(render_request(tilted_page_file, FrameRenderRequest(framing, 0, quality))) for quality in (60, 95)]
 
     assert sizes[0] < sizes[1]
 
 
 def test_the_quality_reaches_the_jpeg_of_a_rectangular_crop(page_file):
-    sizes = [len(render(page_file, PageFraming(crops=(TOP_LEFT_QUADRANT,)), jpeg_quality=q)) for q in (50, 100)]
+    framing = PageFraming(crops=(TOP_LEFT_QUADRANT,))
+    sizes = [len(render_request(page_file, FrameRenderRequest(framing, 0, quality))) for quality in (50, 100)]
 
     assert sizes[0] < sizes[1]
 
 
 def test_the_quality_reaches_the_jpeg_of_a_rotation_alone(page_file):
-    sizes = [len(render(page_file, QUARTER_TURN, jpeg_quality=quality)) for quality in (50, 100)]
+    sizes = [len(render_request(page_file, FrameRenderRequest(QUARTER_TURN, 0, quality))) for quality in (50, 100)]
 
     assert sizes[0] < sizes[1]
 
 
 def test_an_untouched_master_ignores_the_quality(page_file):
-    assert render(page_file, UNFRAMED, jpeg_quality=50) == page_file.read_bytes()
+    assert render_request(page_file, FrameRenderRequest(UNFRAMED, 0, 50)) == page_file.read_bytes()
 
 
 def test_a_frame_index_beyond_the_crops_raises_scan_failed(page_file):
     with pytest.raises(ScanFailedError):
-        render(page_file, PageFraming(crops=(TOP_LEFT_QUADRANT,)), frame_index=1)
+        render_request(page_file, FrameRenderRequest(PageFraming(crops=(TOP_LEFT_QUADRANT,)), 1, JPEG_QUALITY))
 
 
 def test_a_memory_error_while_straightening_is_not_hidden(tilted_page_file, monkeypatch):

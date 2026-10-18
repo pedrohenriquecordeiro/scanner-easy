@@ -23,7 +23,7 @@ from digitalizadora.repositories.document_manifest_codec import (
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft
 from tests.fakes.page_crops import quadrilateral, rectangle
 
-FRAMED = PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.125, 0.115, 0.924, 0.925),))
+FRAMED = PageFraming(PageRotation.CLOCKWISE_90, (rectangle((0.125, 0.115, 0.924, 0.925)),))
 TILTED_CROP = quadrilateral((0.039, 0.28), (0.65, 0.019), (0.894, 0.321), (0.282, 0.582))
 LOWER_CROP = quadrilateral((0.171, 0.604), (0.878, 0.584), (0.896, 0.931), (0.189, 0.951))
 TWO_CROPS = PageFraming(PageRotation.NONE, (TILTED_CROP, LOWER_CROP))
@@ -249,7 +249,7 @@ def test_a_manifest_with_the_old_rectangle_reads_it_as_a_list_of_one_crop():
 
     framing = decode_manifest(encode_document(document)).pages[0].framing
 
-    assert framing.crops == (rectangle(0.125, 0.115, 0.924, 0.925),)
+    assert framing.crops == (rectangle((0.125, 0.115, 0.924, 0.925)),)
 
 
 def test_the_new_key_wins_over_the_old_one():

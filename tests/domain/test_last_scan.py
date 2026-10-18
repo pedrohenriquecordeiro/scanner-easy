@@ -32,7 +32,7 @@ def test_a_new_scan_is_unframed_and_editable():
 
 
 def test_with_framing_replaces_only_the_framing():
-    framing = PageFraming(PageRotation.CLOCKWISE_90).with_crops([rectangle(0.1, 0.1, 0.5, 0.5)])
+    framing = PageFraming(PageRotation.CLOCKWISE_90).with_crops([rectangle((0.1, 0.1, 0.5, 0.5))])
 
     framed = LAST_SCAN.with_framing(framing)
 

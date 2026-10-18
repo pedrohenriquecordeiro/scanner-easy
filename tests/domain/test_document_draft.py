@@ -286,7 +286,7 @@ def test_generate_draft_session_returns_sixteen_lowercase_hexadecimal_digits() -
     assert re.fullmatch(r"[0-9a-f]{16}", generate_draft_session()) is not None
 
 
-FRAMING = PageFraming(rotation=PageRotation.CLOCKWISE_90, crops=(rectangle(0.1, 0.2, 0.5, 0.9),))
+FRAMING = PageFraming(rotation=PageRotation.CLOCKWISE_90, crops=(rectangle((0.1, 0.2, 0.5, 0.9)),))
 
 
 def test_a_page_starts_unframed() -> None:
@@ -326,7 +326,7 @@ def test_with_page_framing_keeps_the_name_and_creation_moment(draft: DocumentDra
     assert (named_draft.name, named_draft.created_at) == ("Contrato", draft.created_at)
 
 
-TWO_PHOTOS = PageFraming(crops=(rectangle(0.05, 0.1, 0.45, 0.9), rectangle(0.55, 0.1, 0.95, 0.9)))
+TWO_PHOTOS = PageFraming(crops=(rectangle((0.05, 0.1, 0.45, 0.9)), rectangle((0.55, 0.1, 0.95, 0.9))))
 
 
 def test_a_draft_without_crops_has_as_many_output_pages_as_pages(draft: DocumentDraft) -> None:

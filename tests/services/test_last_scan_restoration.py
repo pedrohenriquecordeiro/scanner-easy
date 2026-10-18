@@ -10,6 +10,8 @@ from tests.fakes.quick_scan_parts import (
     ONE_PHOTO,
     SCENE_SIZE,
     TWO_PHOTOS,
+    WHOLE_IMAGE,
+    WITH_AUTO_CROP,
     QuickScanParts,
     build_job,
     build_quick_scan_parts,
@@ -94,7 +96,7 @@ async def test_a_restored_scan_can_be_edited(parts):
 
 
 def test_a_restored_scan_keeps_the_framing_it_was_saved_with(parts):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     restarted = restart(parts)
 
     restarted.last_scan_edit_service.restore_after_start(JPEG_QUALITY)
@@ -133,7 +135,7 @@ def test_an_output_folder_that_is_not_reachable_restores_no_panel(parts):
 
 
 def test_a_slot_with_at_least_one_file_is_restored(parts):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     (parts.output_folder / SECOND_FILE).unlink()
     restarted = restart(parts)
 
@@ -197,9 +199,9 @@ def test_a_finished_render_puts_the_new_framing_in_the_tracker(parts):
 
 
 def test_a_pending_render_with_two_new_frames_creates_the_second_file(parts):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=False))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WHOLE_IMAGE))
     detecting_parts = build_quick_scan_parts(parts.output_folder.parent / "other")
-    detected = detecting_parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=True))
+    detected = detecting_parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     two_frames = PageFraming().with_crops(detected.last_scan.framing.crops)
     commit_a_pending_render(parts, two_frames)
     restarted = restart(parts)
@@ -210,7 +212,7 @@ def test_a_pending_render_with_two_new_frames_creates_the_second_file(parts):
 
 
 def test_a_pending_render_with_one_frame_less_deletes_the_file_of_that_frame(parts):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     one_frame = PageFraming().with_crops(parts.slot_repository.load().last_scan.framing.crops[:1])
     commit_a_pending_render(parts, one_frame)
     restarted = restart(parts)

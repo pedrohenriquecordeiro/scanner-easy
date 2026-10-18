@@ -1,9 +1,12 @@
 """The quick mode through the whole application: the master in the slot, the frames, the files, the edits."""
 
+import asyncio
+import contextlib
 import dataclasses
 import functools
 import shutil
 import threading
+from collections.abc import Iterator
 from pathlib import Path
 
 import pikepdf
@@ -32,7 +35,6 @@ from tests.integration.flow_support import (
     save_settings,
     scan_once,
     wait_for_state,
-    wait_two_milliseconds,
 )
 
 TWO_PHOTOS = FakeScannerBehavior(scene=PhotoScene.PHOTOS_TWO)
@@ -49,8 +51,16 @@ def slot_folder(configuration: ApplicationConfiguration) -> Path:
     return configuration.data_directory / QUICK_SCAN_FOLDER_NAME
 
 
-def edit(client: TestClient, method: str, path: str, body: object = None):
-    return client.request(method, f"/api/scans/last{path}", json=body, headers=STATE_CHANGING_HEADERS)
+def turn_last_scan(client: TestClient):
+    return client.post("/api/scans/last/rotation", headers=STATE_CHANGING_HEADERS)
+
+
+def put_last_crops(client: TestClient, crops: list[dict]):
+    return client.put("/api/scans/last/crops", json={"crops": crops}, headers=STATE_CHANGING_HEADERS)
+
+
+def detect_last_crops(client: TestClient):
+    return client.post("/api/scans/last/crops/detect", headers=STATE_CHANGING_HEADERS)
 
 
 def worst_corner_error(crop: dict, placement_index: int, scene: PhotoScene) -> float:
@@ -157,7 +167,7 @@ def test_adjusting_the_frames_by_the_api_rewrites_the_files_under_the_same_names
         names_before = state["last_result"]["file_names"]
         smaller = [(0.30, 0.20), (0.60, 0.20), (0.60, 0.40), (0.30, 0.40)]
 
-        response = edit(client, "PUT", "/crops", {"crops": [crop_body(smaller)]})
+        response = put_last_crops(client, [crop_body(smaller)])
 
     assert response.status_code == 200
     assert response.json()["last_result"]["file_names"] == names_before[:1]
@@ -170,7 +180,7 @@ def test_removing_the_second_frame_deletes_the_second_file_and_says_so(configura
         state = scan_once(client)
         first_crop = state["last_result"]["crops"][0]
 
-        response = edit(client, "PUT", "/crops", {"crops": [first_crop]})
+        response = put_last_crops(client, [first_crop])
 
     remaining = [path.name for path in configuration.default_output_folder.iterdir()]
     assert (response.json()["deleted_file_names"], remaining) == (
@@ -185,7 +195,7 @@ def test_adding_a_second_frame_creates_the_next_numbered_file(configuration):
         state = scan_once(client)
         other = [(0.05, 0.60), (0.35, 0.60), (0.35, 0.85), (0.05, 0.85)]
 
-        response = edit(client, "PUT", "/crops", {"crops": [state["last_result"]["crops"][0], crop_body(other)]})
+        response = put_last_crops(client, [state["last_result"]["crops"][0], crop_body(other)])
 
     assert len(response.json()["last_result"]["file_names"]) == 2
     assert len(list(configuration.default_output_folder.iterdir())) == 2
@@ -195,7 +205,7 @@ def test_the_state_reports_the_new_frames_and_a_new_revision_after_an_edit(confi
     with build_client(configuration, TWO_PHOTOS) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
-        edit(client, "PUT", "/crops", {"crops": []})
+        put_last_crops(client, [])
         after = client.get("/api/state").json()
 
     assert (after["last_result"]["crops"], after["last_result_revision"]) == ([], state["last_result_revision"] + 1)
@@ -205,7 +215,7 @@ def test_setting_the_same_crops_changes_no_revision(configuration):
     with build_client(configuration, TWO_PHOTOS) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
-        edit(client, "PUT", "/crops", {"crops": state["last_result"]["crops"]})
+        put_last_crops(client, state["last_result"]["crops"])
         revision_after = client.get("/api/state").json()["last_result_revision"]
 
     assert revision_after == state["last_result_revision"]
@@ -217,7 +227,7 @@ def test_an_invalid_crop_answers_422_and_changes_nothing(configuration):
         state = scan_once(client)
         bowtie = [(0.1, 0.1), (0.8, 0.8), (0.8, 0.1), (0.1, 0.8)]
 
-        response = edit(client, "PUT", "/crops", {"crops": [crop_body(bowtie)]})
+        response = put_last_crops(client, [crop_body(bowtie)])
         after = client.get("/api/state").json()
 
     assert (response.status_code, response.json()["code"]) == (422, "invalid_crop")
@@ -229,7 +239,7 @@ def test_three_crops_are_refused(configuration):
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         crops = scan_once(client)["last_result"]["crops"]
 
-        response = edit(client, "PUT", "/crops", {"crops": [*crops, crops[0]]})
+        response = put_last_crops(client, [*crops, crops[0]])
 
     assert (response.status_code, response.json()["code"]) == (422, "invalid_crop")
 
@@ -240,7 +250,7 @@ def test_turning_the_last_scan_turns_the_files_and_the_frames_with_the_page(conf
         state = scan_once(client)
         sizes_before = [read_image_size(path) for path in last_result_paths(state)]
 
-        response = edit(client, "POST", "/rotation")
+        response = turn_last_scan(client)
 
     assert response.json()["last_result"]["rotation_degrees"] == 90
     sizes_after = [read_image_size(path) for path in last_result_paths(state)]
@@ -254,7 +264,7 @@ def test_a_turned_file_is_still_upright_in_its_own_orientation_after_four_turns(
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         state = scan_once(client)
         for _ in range(4):
-            edit(client, "POST", "/rotation")
+            turn_last_scan(client)
 
     with Image.open(last_result_paths(state)[0]) as image:
         assert has_upright_markers(image)
@@ -267,7 +277,7 @@ def test_turning_a_pdf_scan_rewrites_the_pdf_with_the_physical_size_swapped(conf
         (path,) = last_result_paths(state)
         with pikepdf.open(path) as pdf:
             before = (float(pdf.pages[0].mediabox[2]), float(pdf.pages[0].mediabox[3]))
-        edit(client, "POST", "/rotation")
+        turn_last_scan(client)
         with pikepdf.open(path) as pdf:
             after = (float(pdf.pages[0].mediabox[2]), float(pdf.pages[0].mediabox[3]))
 
@@ -279,7 +289,7 @@ def test_the_detection_finds_the_photos_of_a_scan_saved_whole(configuration):
         save_settings(client, configuration.default_output_folder)
         scan_once(client)
 
-        response = edit(client, "POST", "/crops/detect")
+        response = detect_last_crops(client)
 
     body = response.json()
     assert (body["crops_detected"], len(body["last_result"]["crops"]), len(body["last_result"]["file_names"])) == (
@@ -293,9 +303,9 @@ def test_the_detection_after_a_turn_gives_the_crops_in_the_orientation_shown(con
     with build_client(configuration, TWO_PHOTOS) as client:
         save_settings(client, configuration.default_output_folder)
         scan_once(client)
-        edit(client, "POST", "/rotation")
+        turn_last_scan(client)
 
-        body = edit(client, "POST", "/crops/detect").json()
+        body = detect_last_crops(client).json()
 
     assert body["last_result"]["rotation_degrees"] == 90
     assert len(body["last_result"]["crops"]) == 2
@@ -320,14 +330,14 @@ def test_the_quality_applies_again_when_a_frame_is_rewritten(configuration):
         size_at_95 = path.stat().st_size
         save_settings(client, configuration.default_output_folder, auto_crop=True, jpeg_quality=55)
 
-        edit(client, "POST", "/rotation")
+        turn_last_scan(client)
 
     assert path.stat().st_size < size_at_95
 
 
 def test_an_edit_during_nothing_without_a_scan_answers_no_last_scan(configuration):
     with build_client(configuration, ONE_PHOTO) as client:
-        response = edit(client, "POST", "/rotation")
+        response = turn_last_scan(client)
 
     assert (response.status_code, response.json()["code"]) == (404, "no_last_scan")
 
@@ -349,7 +359,7 @@ def test_the_last_scan_comes_back_after_a_restart_and_can_be_edited(configuratio
         restarted_configuration = copy_the_disk_to_a_new_run(configuration, tmp_path)
     with build_client(restarted_configuration, TWO_PHOTOS) as restarted:
         restored = restarted.get("/api/state").json()["last_result"]
-        response = edit(restarted, "POST", "/rotation")
+        response = turn_last_scan(restarted)
 
     assert restored["scan_identifier"] == state["last_result"]["scan_identifier"]
     assert response.status_code == 200
@@ -411,28 +421,64 @@ def test_the_edit_routes_refuse_a_request_without_the_header(configuration):
     assert [response.status_code for response in responses] == [403, 403, 403]
 
 
-def test_edits_answer_409_during_a_scan_but_the_views_keep_working(configuration):
-    slow_scanner = FakeScannerBehavior(scene=PhotoScene.PHOTOS_ONE, busy_polls_before_document=100)
-    with build_client(configuration, slow_scanner, wait_two_milliseconds) as client:
+@contextlib.contextmanager
+def scan_in_progress(configuration: ApplicationConfiguration) -> Iterator[tuple[TestClient, str]]:
+    """A client whose second scan is held in its first poll until the block ends; yields it and the last scan."""
+    gate = threading.Event()
+
+    async def wait_for_the_gate(seconds: float) -> None:
+        while not gate.is_set():
+            await asyncio.sleep(0.001)
+
+    slow_scanner = FakeScannerBehavior(scene=PhotoScene.PHOTOS_ONE, busy_polls_before_document=1)
+    with build_client(configuration, slow_scanner, wait_for_the_gate) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
+        gate.set()
         scan_once(client)
+        gate.clear()
         identifier = client.get("/api/state").json()["last_result"]["scan_identifier"]
         # The test client holds the answer of a scan until its background task ends, so the scan runs apart.
         post_the_scan = functools.partial(client.post, "/api/scans", headers=STATE_CHANGING_HEADERS)
         scanning = threading.Thread(target=post_the_scan)
         scanning.start()
         wait_for_state(client, lambda state: state["scan_phase"] != "idle")
+        try:
+            yield client, identifier
+        finally:
+            gate.set()
+            scanning.join()
 
-        responses = [
-            edit(client, "POST", "/rotation"),
-            edit(client, "PUT", "/crops", {"crops": []}),
-            edit(client, "POST", "/crops/detect"),
-        ]
+
+def test_the_rotation_answers_409_during_a_scan(configuration):
+    with scan_in_progress(configuration) as (client, _):
+        response = turn_last_scan(client)
+
+    assert (response.status_code, response.json()["code"]) == (409, "scan_already_running")
+
+
+def test_the_crops_answer_409_during_a_scan(configuration):
+    with scan_in_progress(configuration) as (client, _):
+        response = put_last_crops(client, [])
+
+    assert (response.status_code, response.json()["code"]) == (409, "scan_already_running")
+
+
+def test_the_detection_answers_409_during_a_scan(configuration):
+    with scan_in_progress(configuration) as (client, _):
+        response = detect_last_crops(client)
+
+    assert (response.status_code, response.json()["code"]) == (409, "scan_already_running")
+
+
+def test_the_thumbnail_is_still_served_during_a_scan(configuration):
+    with scan_in_progress(configuration) as (client, _):
         thumbnail = client.get("/api/scans/last/thumbnail")
-        preview = client.get(f"/api/scans/last/preview?scan_identifier={identifier}&rotation_degrees=0")
-        scanning.join()
 
-    assert [(response.status_code, response.json()["code"]) for response in responses] == [
-        (409, "scan_already_running")
-    ] * 3
-    assert (thumbnail.status_code, preview.status_code) == (200, 200)
+    assert thumbnail.status_code == 200
+
+
+def test_the_enlarged_view_is_still_served_during_a_scan(configuration):
+    with scan_in_progress(configuration) as (client, identifier):
+        preview = client.get(f"/api/scans/last/preview?scan_identifier={identifier}&rotation_degrees=0")
+
+    assert preview.status_code == 200

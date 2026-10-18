@@ -600,7 +600,7 @@ def test_set_page_crops_accepts_whole_numbers_as_coordinates(
 
     client.put(CROPS_PATH, json={"crops": [whole_page]})
 
-    assert document_service.received_arguments["set_page_crops"] == (SECOND_PAGE_IDENTIFIER, [rectangle(0, 0, 1, 1)])
+    assert document_service.received_arguments["set_page_crops"] == (SECOND_PAGE_IDENTIFIER, [rectangle((0, 0, 1, 1))])
 
 
 def test_set_page_crops_rounds_the_coordinates_to_six_digits(

@@ -95,7 +95,7 @@ def test_a_rectangle_is_built_from_its_edges() -> None:
 
 
 def test_the_corners_come_in_the_clockwise_role_order() -> None:
-    crop = rectangle(0.1, 0.2, 0.5, 0.9)
+    crop = rectangle((0.1, 0.2, 0.5, 0.9))
 
     assert crop.corners == (crop.top_left, crop.top_right, crop.bottom_right, crop.bottom_left)
 
@@ -145,7 +145,7 @@ def test_turning_the_output_leaves_the_points_where_they_are() -> None:
 
 
 def test_the_corner_of_a_half_page_goes_where_the_page_corner_goes() -> None:
-    left_half = rectangle(0.0, 0.0, 0.5, 1.0)
+    left_half = rectangle((0.0, 0.0, 0.5, 1.0))
 
     assert left_half.turned_clockwise().top_right == CropCorner(1.0, 0.0)
 
@@ -162,7 +162,7 @@ def test_seen_on_the_master_undoes_the_page_turns_but_keeps_the_roles(quarter_tu
 
 
 def test_seen_on_the_master_keeps_the_roles_of_the_displayed_crop() -> None:
-    displayed = rectangle(0.1, 0.2, 0.5, 0.9)
+    displayed = rectangle((0.1, 0.2, 0.5, 0.9))
 
     on_master = displayed.seen_on_master(1)
 
@@ -170,11 +170,11 @@ def test_seen_on_the_master_keeps_the_roles_of_the_displayed_crop() -> None:
 
 
 def test_a_rectangle_is_recognised() -> None:
-    assert rectangle(0.1, 0.2, 0.5, 0.9).is_rectangle is True
+    assert rectangle((0.1, 0.2, 0.5, 0.9)).is_rectangle is True
 
 
 def test_a_rectangle_with_turned_roles_is_still_a_rectangle() -> None:
-    assert rectangle(0.1, 0.2, 0.5, 0.9).with_output_turned_clockwise().is_rectangle is True
+    assert rectangle((0.1, 0.2, 0.5, 0.9)).with_output_turned_clockwise().is_rectangle is True
 
 
 def test_a_tilted_quadrilateral_is_not_a_rectangle() -> None:
@@ -195,7 +195,7 @@ def test_a_slightly_tilted_quadrilateral_is_not_a_rectangle() -> None:
     ],
 )
 def test_the_rotation_to_upright_follows_where_the_top_left_role_sits(top_left_role, expected_rotation) -> None:
-    crop = rectangle(0.1, 0.2, 0.5, 0.9)
+    crop = rectangle((0.1, 0.2, 0.5, 0.9))
     for _ in range(top_left_role):
         crop = crop.with_output_turned_clockwise()
 
@@ -208,15 +208,15 @@ def test_the_rotation_to_upright_of_a_tilted_quadrilateral_is_not_defined() -> N
 
 
 def test_the_whole_page_covers_the_whole_page() -> None:
-    assert rectangle(0.0, 0.0, 1.0, 1.0).covers_whole_page is True
+    assert rectangle((0.0, 0.0, 1.0, 1.0)).covers_whole_page is True
 
 
 def test_the_whole_page_with_the_roles_turned_does_not_cover_it() -> None:
-    assert rectangle(0.0, 0.0, 1.0, 1.0).with_output_turned_clockwise().covers_whole_page is False
+    assert rectangle((0.0, 0.0, 1.0, 1.0)).with_output_turned_clockwise().covers_whole_page is False
 
 
 def test_a_smaller_rectangle_does_not_cover_the_whole_page() -> None:
-    assert rectangle(0.1, 0.2, 0.5, 0.9).covers_whole_page is False
+    assert rectangle((0.1, 0.2, 0.5, 0.9)).covers_whole_page is False
 
 
 def test_a_rotated_square_does_not_cover_the_whole_page() -> None:
@@ -224,7 +224,7 @@ def test_a_rotated_square_does_not_cover_the_whole_page() -> None:
 
 
 def test_corners_one_float_step_away_from_the_page_still_cover_it() -> None:
-    assert rectangle(1e-12, 0.0, 1.0 - 1e-12, 1.0).covers_whole_page is True
+    assert rectangle((1e-12, 0.0, 1.0 - 1e-12, 1.0)).covers_whole_page is True
 
 
 def test_the_bounding_edges_hold_the_four_corners() -> None:
@@ -234,41 +234,41 @@ def test_the_bounding_edges_hold_the_four_corners() -> None:
 
 
 def test_to_pixel_region_scales_the_bounding_edges() -> None:
-    region = rectangle(0.1, 0.2, 0.5, 0.9).to_pixel_region((100, 200))
+    region = rectangle((0.1, 0.2, 0.5, 0.9)).to_pixel_region((100, 200))
 
     assert region == PixelRegion(left=10, top=40, right=50, bottom=180)
 
 
 def test_to_pixel_region_does_not_round_a_float_error_up() -> None:
-    assert rectangle(0.07, 0.0, 0.5, 1.0).to_pixel_region((100, 10)).left == 7
+    assert rectangle((0.07, 0.0, 0.5, 1.0)).to_pixel_region((100, 10)).left == 7
 
 
 def test_to_pixel_region_rounds_the_origin_down() -> None:
-    assert rectangle(0.105, 0.0, 0.5, 1.0).to_pixel_region((100, 10)).left == 10
+    assert rectangle((0.105, 0.0, 0.5, 1.0)).to_pixel_region((100, 10)).left == 10
 
 
 def test_to_pixel_region_rounds_the_far_edges_up() -> None:
-    assert rectangle(0.0, 0.0, 0.505, 1.0).to_pixel_region((100, 10)).right == 51
+    assert rectangle((0.0, 0.0, 0.505, 1.0)).to_pixel_region((100, 10)).right == 51
 
 
 def test_to_pixel_region_of_the_whole_page_is_the_whole_image() -> None:
-    assert rectangle(0.0, 0.0, 1.0, 1.0).to_pixel_region((640, 480)) == PixelRegion(0, 0, 640, 480)
+    assert rectangle((0.0, 0.0, 1.0, 1.0)).to_pixel_region((640, 480)) == PixelRegion(0, 0, 640, 480)
 
 
 def test_to_pixel_region_keeps_at_least_one_pixel_on_a_tiny_image() -> None:
-    region = rectangle(0.0, 0.0, 0.02, 0.02).to_pixel_region((10, 10))
+    region = rectangle((0.0, 0.0, 0.02, 0.02)).to_pixel_region((10, 10))
 
     assert (region.width, region.height) == (1, 1)
 
 
 def test_to_pixel_corners_scale_each_corner() -> None:
-    corners = rectangle(0.1, 0.2, 0.5, 0.9).to_pixel_corners((100, 200))
+    corners = rectangle((0.1, 0.2, 0.5, 0.9)).to_pixel_corners((100, 200))
 
     assert corners == (PixelCorner(10, 40), PixelCorner(50, 40), PixelCorner(50, 180), PixelCorner(10, 180))
 
 
 def test_the_output_size_of_a_rectangle_is_its_size_in_pixels() -> None:
-    assert rectangle(0.1, 0.2, 0.5, 0.9).output_size_in_pixels((100, 200)) == (40, 140)
+    assert rectangle((0.1, 0.2, 0.5, 0.9)).output_size_in_pixels((100, 200)) == (40, 140)
 
 
 def test_the_output_size_is_the_mean_of_the_opposite_edges() -> None:
@@ -278,13 +278,13 @@ def test_the_output_size_is_the_mean_of_the_opposite_edges() -> None:
 
 
 def test_the_output_size_of_a_turned_rectangle_swaps_width_and_height() -> None:
-    crop = rectangle(0.1, 0.2, 0.5, 0.9).with_output_turned_clockwise()
+    crop = rectangle((0.1, 0.2, 0.5, 0.9)).with_output_turned_clockwise()
 
     assert crop.output_size_in_pixels((100, 200)) == (140, 40)
 
 
 def test_the_output_size_has_at_least_one_pixel() -> None:
-    assert rectangle(0.0, 0.0, 0.02, 0.02).output_size_in_pixels((10, 10)) == (1, 1)
+    assert rectangle((0.0, 0.0, 0.02, 0.02)).output_size_in_pixels((10, 10)) == (1, 1)
 
 
 def test_the_diagonal_card_keeps_its_proportion_in_the_output() -> None:
@@ -294,7 +294,7 @@ def test_the_diagonal_card_keeps_its_proportion_in_the_output() -> None:
 
 
 def test_from_pixel_region_divides_by_the_image_size() -> None:
-    assert PageCrop.from_pixel_region(PixelRegion(10, 40, 50, 180), (100, 200)) == rectangle(0.1, 0.2, 0.5, 0.9)
+    assert PageCrop.from_pixel_region(PixelRegion(10, 40, 50, 180), (100, 200)) == rectangle((0.1, 0.2, 0.5, 0.9))
 
 
 def test_from_pixel_region_round_trips_through_to_pixel_region() -> None:

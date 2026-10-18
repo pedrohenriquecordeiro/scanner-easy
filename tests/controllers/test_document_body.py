@@ -118,7 +118,7 @@ def test_a_framed_page_reports_its_crops_with_the_four_corners() -> None:
 
 def test_a_framed_page_reports_its_rotation() -> None:
     draft = TWO_PAGE_SNAPSHOT.draft.with_page_framing(
-        page_identifier_at(2), PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.13, 0.115, 0.924, 0.925),))
+        page_identifier_at(2), PageFraming(PageRotation.CLOCKWISE_90, (rectangle((0.13, 0.115, 0.924, 0.925)),))
     )
 
     page = build_document_body(replace(TWO_PAGE_SNAPSHOT, draft=draft))["document"]["pages"][1]

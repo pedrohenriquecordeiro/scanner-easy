@@ -31,6 +31,8 @@ from tests.fakes.quick_scan_parts import (
     PHOTO_SIZE,
     SCENE_SIZE,
     TWO_PHOTOS,
+    WHOLE_IMAGE,
+    WITH_AUTO_CROP,
     QuickScanParts,
     build_job,
     build_quick_scan_parts,
@@ -43,8 +45,8 @@ JPEG_QUALITY = 90
 FIRST_FILE = "2026-10-13_00001.jpg"
 SECOND_FILE = "2026-10-13_00002.jpg"
 THIRD_FILE = "2026-10-13_00003.jpg"
-LEFT_BOX = rectangle(0.05, 0.05, 0.45, 0.45)
-RIGHT_BOX = rectangle(0.55, 0.55, 0.95, 0.95)
+LEFT_BOX = rectangle((0.05, 0.05, 0.45, 0.45))
+RIGHT_BOX = rectangle((0.55, 0.55, 0.95, 0.95))
 TILTED_BOX = quadrilateral((0.30, 0.10), (0.80, 0.22), (0.70, 0.60), (0.20, 0.48))
 
 
@@ -71,7 +73,7 @@ def file_size(parts: QuickScanParts, file_name: str) -> tuple[int, int]:
 
 
 def two_photo_scan(parts: QuickScanParts, output_format: OutputFormat = OutputFormat.JPEG) -> None:
-    parts.scan(TWO_PHOTOS, build_job(output_format, auto_crop=True))
+    parts.scan(TWO_PHOTOS, build_job(output_format, WITH_AUTO_CROP))
 
 
 def one_whole_scan(parts: QuickScanParts) -> None:
@@ -233,7 +235,7 @@ async def test_setting_the_same_crops_changes_nothing(parts, service):
 
 
 async def test_adding_a_second_frame_creates_the_next_numbered_file(parts, service):
-    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX], JPEG_QUALITY)
 
@@ -241,7 +243,7 @@ async def test_adding_a_second_frame_creates_the_next_numbered_file(parts, servi
 
 
 async def test_a_frame_added_after_the_output_folder_changed_goes_next_to_the_first_file(parts, service, tmp_path):
-    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     settings = parts.settings_repository.load()
     parts.settings_repository.save(replace(settings, output_folder=tmp_path / "other-folder"))
 
@@ -251,7 +253,7 @@ async def test_a_frame_added_after_the_output_folder_changed_goes_next_to_the_fi
 
 
 async def test_a_scan_edited_after_the_output_folder_changed_can_still_be_turned(parts, service, tmp_path):
-    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     settings = parts.settings_repository.load()
     parts.settings_repository.save(replace(settings, output_folder=tmp_path / "other-folder"))
     await service.set_crops([LEFT_BOX, RIGHT_BOX], JPEG_QUALITY)
@@ -272,7 +274,7 @@ async def test_a_slot_that_is_gone_makes_the_scan_not_editable(parts, service):
 
 
 async def test_adding_a_second_frame_lists_both_files_in_the_slot(parts, service):
-    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX], JPEG_QUALITY)
 
@@ -411,7 +413,7 @@ async def test_a_missing_file_leaves_the_slot_as_it_was(parts, service):
 
 
 async def test_detecting_two_photos_on_a_scan_saved_whole_makes_two_files(parts, service):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=False))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WHOLE_IMAGE))
 
     result = await service.detect_crops(JPEG_QUALITY)
 
@@ -419,7 +421,7 @@ async def test_detecting_two_photos_on_a_scan_saved_whole_makes_two_files(parts,
 
 
 async def test_detecting_reports_no_regions_ignored_for_two_photos(parts, service):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=False))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WHOLE_IMAGE))
 
     assert (await service.detect_crops(JPEG_QUALITY)).ignored_region_count == 0
 
@@ -436,7 +438,7 @@ async def test_detecting_nothing_changes_nothing(parts, service):
 
 
 async def test_detecting_on_a_turned_scan_shows_the_crops_in_the_orientation_of_the_page(parts, service):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=False))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WHOLE_IMAGE))
     await service.rotate_clockwise(JPEG_QUALITY)
 
     await service.detect_crops(JPEG_QUALITY)
@@ -447,7 +449,7 @@ async def test_detecting_on_a_turned_scan_shows_the_crops_in_the_orientation_of_
 
 
 async def test_detecting_the_same_crops_again_changes_nothing(parts, service):
-    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, auto_crop=True))
+    parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     revision_before = revision_of(parts)
 
     result = await service.detect_crops(JPEG_QUALITY)

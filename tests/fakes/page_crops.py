@@ -1,8 +1,9 @@
 from digitalizadora.domain.page_crop import CropCorner, PageCrop, RectangleEdges
 
 
-def rectangle(left: float, top: float, right: float, bottom: float) -> PageCrop:
-    return PageCrop.from_rectangle(RectangleEdges(left, top, right, bottom))
+def rectangle(edges: tuple[float, float, float, float]) -> PageCrop:
+    """A plain rectangle from its (left, top, right, bottom) fractions."""
+    return PageCrop.from_rectangle(RectangleEdges(*edges))
 
 
 def quadrilateral(*points: tuple[float, float]) -> PageCrop:

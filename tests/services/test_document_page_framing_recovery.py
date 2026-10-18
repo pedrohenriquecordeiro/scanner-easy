@@ -28,7 +28,7 @@ SETTINGS = ScanSettings(300, ColorMode.COLOR)
 PAGE_IDENTIFIER = page_identifier_at(1)
 PAGE_JPEG = b"first page jpeg"
 THUMBNAIL_JPEG = b"thumbnail jpeg"
-CROP = rectangle(0.125, 0.115, 0.9, 0.925)
+CROP = rectangle((0.125, 0.115, 0.9, 0.925))
 CRASH = OSError("the power went out")
 
 

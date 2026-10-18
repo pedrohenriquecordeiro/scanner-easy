@@ -51,10 +51,11 @@ ONE_PHOTO = ScannedImage(
 )
 
 
-def build_job(
-    output_format: OutputFormat = OutputFormat.JPEG, auto_crop: bool = False, jpeg_quality: int = 90
-) -> ScanJob:
-    adjustment = ImageAdjustment(auto_crop=auto_crop, jpeg_quality=jpeg_quality)
+WHOLE_IMAGE = ImageAdjustment(auto_crop=False, jpeg_quality=90)
+WITH_AUTO_CROP = ImageAdjustment(auto_crop=True, jpeg_quality=90)
+
+
+def build_job(output_format: OutputFormat = OutputFormat.JPEG, adjustment: ImageAdjustment = WHOLE_IMAGE) -> ScanJob:
     return ScanJob(ScanRequest(SETTINGS, output_format, adjustment), STARTED_AT)
 
 

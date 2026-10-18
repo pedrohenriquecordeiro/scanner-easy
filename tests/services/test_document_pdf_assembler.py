@@ -73,7 +73,7 @@ def test_a_rotated_page_has_the_turned_physical_size(tmp_path):
 
 
 def test_a_cropped_page_has_the_physical_size_of_the_region(tmp_path):
-    framing = PageFraming(crops=(rectangle(0.0, 0.0, 0.5, 1.0),))
+    framing = PageFraming(crops=(rectangle((0.0, 0.0, 0.5, 1.0)),))
 
     pdf_content = write_pdf(seed_input(tmp_path, [WIDE_PAGE], [framing]))
 
@@ -81,7 +81,7 @@ def test_a_cropped_page_has_the_physical_size_of_the_region(tmp_path):
 
 
 def test_a_cropped_and_rotated_page_has_the_size_of_the_turned_region(tmp_path):
-    framing = PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.0, 0.0, 0.5, 1.0),))
+    framing = PageFraming(PageRotation.CLOCKWISE_90, (rectangle((0.0, 0.0, 0.5, 1.0)),))
 
     pdf_content = write_pdf(seed_input(tmp_path, [WIDE_PAGE], [framing]))
 
@@ -117,7 +117,7 @@ def test_the_quality_of_the_assembly_reaches_the_renderer(tmp_path):
     assert [request.jpeg_quality for request in renderer.requests] == [61]
 
 
-TWO_SIDE_BY_SIDE_CROPS = PageFraming(crops=(rectangle(0.0, 0.0, 0.5, 1.0), rectangle(0.5, 0.0, 1.0, 1.0)))
+TWO_SIDE_BY_SIDE_CROPS = PageFraming(crops=(rectangle((0.0, 0.0, 0.5, 1.0)), rectangle((0.5, 0.0, 1.0, 1.0))))
 
 
 def test_a_page_with_two_crops_gives_two_pdf_pages(tmp_path):
@@ -127,7 +127,7 @@ def test_a_page_with_two_crops_gives_two_pdf_pages(tmp_path):
 
 
 def test_each_pdf_page_of_a_page_with_two_crops_has_the_size_of_its_region(tmp_path):
-    framing = PageFraming(crops=(rectangle(0.0, 0.0, 0.25, 1.0), rectangle(0.5, 0.0, 1.0, 1.0)))
+    framing = PageFraming(crops=(rectangle((0.0, 0.0, 0.25, 1.0)), rectangle((0.5, 0.0, 1.0, 1.0))))
 
     pdf_content = write_pdf(seed_input(tmp_path, [WIDE_PAGE], [framing]))
 

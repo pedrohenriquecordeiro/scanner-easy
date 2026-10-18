@@ -51,7 +51,7 @@ MODELS = [
     ApplicationSettings(Path("/tmp"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings),
     ImageAdjustment(),
     PixelRegion(0, 0, 1, 1),
-    rectangle(0.0, 0.0, 1.0, 1.0),
+    rectangle((0.0, 0.0, 1.0, 1.0)),
     CropCorner(0.0, 0.0),
     RectangleEdges(0.0, 0.0, 1.0, 1.0),
     PixelCorner(0.0, 0.0),
@@ -59,7 +59,7 @@ MODELS = [
     LAST_SCAN,
     QuickScanSlot(LAST_SCAN, 300, ColorMode.COLOR),
     QuickScanMasterFiles("0123456789abcdef", b"m", b"t"),
-    rectangle(0.0, 0.0, 1.0, 1.0),
+    rectangle((0.0, 0.0, 1.0, 1.0)),
     PageFraming(),
     ScanProgressSnapshot(ScanPhase.IDLE, 0, None, None),
 ]
