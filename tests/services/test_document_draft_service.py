@@ -1,0 +1,474 @@
+import dataclasses
+import threading
+from datetime import timedelta
+from pathlib import Path
+
+import pikepdf
+import pytest
+
+from digitalizadora.domain.color_mode import ColorMode
+from digitalizadora.domain.document_draft import DocumentFinalizationResult, DraftSnapshot
+from digitalizadora.domain.document_draft_reconciliation import (
+    MANIFEST_FILE_NAME,
+    page_file_name,
+    thumbnail_file_name,
+)
+from digitalizadora.domain.errors import (
+    DamagedDocumentPageError,
+    DocumentAssemblyFailedError,
+    DraftStorageUnavailableError,
+    EmptyDocumentError,
+    NoOpenDocumentError,
+    OutputFolderUnavailableError,
+)
+from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.services.document_draft_service import DocumentDraftService
+from digitalizadora.services.document_draft_store import DraftStorageState
+from digitalizadora.services.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, estimated_page_bytes
+from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, page_identifier_at
+from tests.fakes.document_service_parts import (
+    DRAFT_SESSION,
+    PLENTY_OF_FREE_SPACE_IN_BYTES,
+    DocumentServiceParts,
+    build_document_service_parts,
+)
+from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
+from tests.fakes.sample_images import build_sample_jpeg
+
+SETTINGS = ScanPreset.DOCUMENT.settings
+PHOTO_SETTINGS = ScanPreset.PHOTO.settings
+FIRST_PAGE_IDENTIFIER = page_identifier_at(1)
+SECOND_PAGE_IDENTIFIER = page_identifier_at(2)
+JPEG_START_OF_IMAGE = b"\xff\xd8"
+
+
+class StubDraftStore:
+    """Duck-typed stand-in for DocumentDraftStore: answers a fixed snapshot and counts recover()."""
+
+    def __init__(self, draft_snapshot: DraftSnapshot) -> None:
+        self._draft_snapshot = draft_snapshot
+        self.recover_calls = 0
+
+    def snapshot(self) -> DraftSnapshot:
+        return self._draft_snapshot
+
+    def recover(self) -> None:
+        self.recover_calls += 1
+
+
+@pytest.fixture
+def parts(tmp_path: Path) -> DocumentServiceParts:
+    return build_document_service_parts(tmp_path, RecordingFreeSpaceReader(PLENTY_OF_FREE_SPACE_IN_BYTES))
+
+
+@pytest.fixture
+def service(parts: DocumentServiceParts) -> DocumentDraftService:
+    return parts.document_draft_service
+
+
+def build_service_with_store(parts: DocumentServiceParts, draft_store: StubDraftStore) -> DocumentDraftService:
+    collaborators = dataclasses.replace(parts.collaborators, draft_store=draft_store)
+    return DocumentDraftService(parts.scan_service, collaborators, parts.clock)
+
+
+async def add_pages(service: DocumentDraftService, page_count: int) -> None:
+    for _ in range(page_count):
+        await service.add_page(SETTINGS)
+
+
+def test_snapshot_starts_in_the_session_without_a_draft(service):
+    assert service.snapshot() == DraftSnapshot(draft_session=DRAFT_SESSION, revision=0, draft=None)
+
+
+def test_recover_draft_asks_the_store_to_recover(parts):
+    draft_store = StubDraftStore(DraftSnapshot(draft_session=DRAFT_SESSION, revision=0, draft=None))
+
+    build_service_with_store(parts, draft_store).recover_draft()
+
+    assert draft_store.recover_calls == 1
+
+
+def test_describe_draft_storage_reports_the_space_of_the_drafts_disk(service):
+    expected_pages_remaining = (PLENTY_OF_FREE_SPACE_IN_BYTES - MINIMUM_FREE_SPACE_BYTES) // estimated_page_bytes(
+        SETTINGS
+    )
+
+    assert service.describe_draft_storage(SETTINGS) == DraftStorageState(
+        free_space_in_bytes=PLENTY_OF_FREE_SPACE_IN_BYTES,
+        estimated_pages_remaining=expected_pages_remaining,
+        available=True,
+    )
+
+
+async def test_add_page_appends_the_scanned_page_to_the_draft(service):
+    await service.add_page(SETTINGS)
+
+    assert service.snapshot().draft.page_identifiers == (FIRST_PAGE_IDENTIFIER,)
+
+
+async def test_add_page_returns_the_page_with_the_given_settings(service):
+    page = await service.add_page(PHOTO_SETTINGS)
+
+    assert (page.dots_per_inch, page.color_mode) == (600, ColorMode.COLOR)
+
+
+async def test_add_page_asks_the_printer_for_the_given_settings(service, parts):
+    await service.add_page(PHOTO_SETTINGS)
+
+    assert parts.gateway.scan_requests == [PHOTO_SETTINGS]
+
+
+async def test_add_page_keeps_the_page_as_a_jpeg(service, parts):
+    await service.add_page(SETTINGS)
+
+    page_file = parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER)
+    assert page_file.read_bytes()[: len(JPEG_START_OF_IMAGE)] == JPEG_START_OF_IMAGE
+
+
+async def test_rename_returns_the_draft_with_the_clean_name(service):
+    await add_pages(service, 1)
+
+    renamed_draft = await service.rename("  Notas fiscais 2026/10  ")
+
+    assert renamed_draft.name == "Notas fiscais 2026-10"
+
+
+async def test_reorder_returns_the_draft_in_the_new_order(service):
+    await add_pages(service, 2)
+
+    reordered_draft = await service.reorder([SECOND_PAGE_IDENTIFIER, FIRST_PAGE_IDENTIFIER])
+
+    assert reordered_draft.page_identifiers == (SECOND_PAGE_IDENTIFIER, FIRST_PAGE_IDENTIFIER)
+
+
+async def test_delete_page_returns_the_draft_without_the_page(service):
+    await add_pages(service, 2)
+
+    remaining_draft = await service.delete_page(FIRST_PAGE_IDENTIFIER)
+
+    assert remaining_draft.page_identifiers == (SECOND_PAGE_IDENTIFIER,)
+
+
+async def test_deleting_the_only_page_ends_the_draft(service):
+    await add_pages(service, 1)
+
+    assert await service.delete_page(FIRST_PAGE_IDENTIFIER) is None
+
+
+async def test_discard_last_page_returns_the_draft_without_the_last_page(service):
+    await add_pages(service, 2)
+
+    remaining_draft = await service.discard_last_page()
+
+    assert remaining_draft.page_identifiers == (FIRST_PAGE_IDENTIFIER,)
+
+
+async def test_cancel_ends_the_draft(service):
+    await add_pages(service, 1)
+
+    await service.cancel()
+
+    assert service.snapshot().draft is None
+
+
+async def test_read_thumbnail_returns_the_thumbnail_of_the_page(service, parts):
+    await add_pages(service, 1)
+
+    thumbnail_jpeg = service.read_thumbnail(FIRST_PAGE_IDENTIFIER)
+
+    assert thumbnail_jpeg == (parts.draft_folder / thumbnail_file_name(FIRST_PAGE_IDENTIFIER)).read_bytes()
+
+
+async def test_an_edit_saves_the_manifest_in_a_worker_thread(service, parts):
+    await add_pages(service, 1)
+
+    await service.rename("Contrato")
+
+    assert parts.draft_repository.manifest_thread_identifiers[-1] != threading.get_ident()
+
+
+async def test_an_edit_error_reaches_the_caller(service):
+    with pytest.raises(NoOpenDocumentError):
+        await service.rename("Contrato")
+
+
+FINALIZATION_DELAY_SECONDS = 300
+FINALIZED_AT = DRAFT_CREATED_AT + timedelta(seconds=FINALIZATION_DELAY_SECONDS)
+DOCUMENT_NAME = "Contrato do apartamento"
+DOCUMENT_FILE_NAME = "Contrato do apartamento.pdf"
+POINT_TOLERANCE = 0.01
+WIDE_SCANNED_PAGE = ScannedImage(
+    content=build_sample_jpeg(width_pixels=600, height_pixels=150), media_type="image/jpeg"
+)
+NARROW_SCANNED_PAGE = ScannedImage(
+    content=build_sample_jpeg(width_pixels=300, height_pixels=150), media_type="image/jpeg"
+)
+WIDE_PAGE_WIDTH_AT_300_IN_POINTS = 144.0
+NARROW_PAGE_WIDTH_AT_300_IN_POINTS = 72.0
+NARROW_PAGE_WIDTH_AT_600_IN_POINTS = 36.0
+DRAFT_DISK_FAILURE = DraftStorageUnavailableError("the internal disk stopped answering")
+
+
+def read_page_widths(pdf_path: Path) -> list[float]:
+    with pikepdf.open(pdf_path) as pdf:
+        return [float(pdf_page.mediabox[2]) for pdf_page in pdf.pages]
+
+
+async def finalize_later(parts: DocumentServiceParts) -> DocumentFinalizationResult:
+    parts.clock.advance(FINALIZATION_DELAY_SECONDS)
+    return await parts.document_draft_service.finalize()
+
+
+async def finalize_leaving_the_draft_marked(parts: DocumentServiceParts) -> DocumentFinalizationResult:
+    """A finalization whose PDF exists but whose cleanup failed: the draft stays in memory, marked finished."""
+    await add_pages(parts.document_draft_service, 1)
+    parts.draft_repository.deletion_failure = DRAFT_DISK_FAILURE
+    finalization = await finalize_later(parts)
+    parts.draft_repository.deletion_failure = None
+    return finalization
+
+
+async def test_finalize_writes_the_pages_in_the_order_of_the_draft(tmp_path):
+    parts = build_document_service_parts(
+        tmp_path, RecordingFreeSpaceReader(PLENTY_OF_FREE_SPACE_IN_BYTES), [WIDE_SCANNED_PAGE, NARROW_SCANNED_PAGE]
+    )
+    await add_pages(parts.document_draft_service, 2)
+
+    finalization = await finalize_later(parts)
+
+    assert read_page_widths(finalization.result.output_path) == pytest.approx(
+        [WIDE_PAGE_WIDTH_AT_300_IN_POINTS, NARROW_PAGE_WIDTH_AT_300_IN_POINTS], abs=POINT_TOLERANCE
+    )
+
+
+async def test_page_scanned_with_a_newer_preset_keeps_its_own_density(tmp_path):
+    parts = build_document_service_parts(
+        tmp_path, RecordingFreeSpaceReader(PLENTY_OF_FREE_SPACE_IN_BYTES), [NARROW_SCANNED_PAGE, NARROW_SCANNED_PAGE]
+    )
+    await parts.document_draft_service.add_page(SETTINGS)
+    await parts.document_draft_service.add_page(PHOTO_SETTINGS)
+
+    finalization = await finalize_later(parts)
+
+    assert read_page_widths(finalization.result.output_path) == pytest.approx(
+        [NARROW_PAGE_WIDTH_AT_300_IN_POINTS, NARROW_PAGE_WIDTH_AT_600_IN_POINTS], abs=POINT_TOLERANCE
+    )
+
+
+async def test_finalize_returns_the_page_count(service, parts):
+    await add_pages(service, 2)
+
+    finalization = await finalize_later(parts)
+
+    assert finalization.page_count == 2
+
+
+async def test_finalize_writes_the_pdf_dated_at_the_finalization_moment(service, parts):
+    await add_pages(service, 1)
+
+    finalization = await finalize_later(parts)
+
+    assert finalization.result.scanned_at == FINALIZED_AT
+
+
+async def test_finalize_deletes_the_draft_manifest(service, parts):
+    await add_pages(service, 1)
+
+    await finalize_later(parts)
+
+    assert not (parts.draft_folder / MANIFEST_FILE_NAME).exists()
+
+
+async def test_finalize_leaves_no_draft_in_the_snapshot(service, parts):
+    await add_pages(service, 1)
+
+    await finalize_later(parts)
+
+    assert service.snapshot().draft is None
+
+
+async def test_finalize_leaves_the_finalization_in_the_snapshot(service, parts):
+    await add_pages(service, 1)
+
+    finalization = await finalize_later(parts)
+
+    assert service.snapshot().last_finished_document == finalization
+
+
+async def test_finalize_saves_the_pdf_under_the_chosen_name(service, parts):
+    await add_pages(service, 1)
+    await service.rename(DOCUMENT_NAME)
+
+    finalization = await finalize_later(parts)
+
+    assert finalization.result.output_path == parts.output_folder / DOCUMENT_FILE_NAME
+
+
+async def test_finalize_with_the_chosen_name_taken_adds_a_number(service, parts):
+    parts.output_folder.mkdir()
+    (parts.output_folder / DOCUMENT_FILE_NAME).write_bytes(b"an older document")
+    await add_pages(service, 1)
+    await service.rename(DOCUMENT_NAME)
+
+    finalization = await finalize_later(parts)
+
+    assert finalization.result.output_path.name == "Contrato do apartamento (2).pdf"
+
+
+async def test_finalize_assembles_the_pdf_in_a_worker_thread(service, parts):
+    await add_pages(service, 1)
+
+    await finalize_later(parts)
+
+    assert parts.pdf_assembly_service.assembly_thread_identifiers[0] != threading.get_ident()
+
+
+async def test_finalize_without_a_draft_raises_no_open_document(service):
+    with pytest.raises(NoOpenDocumentError):
+        await service.finalize()
+
+
+async def test_finalize_of_a_draft_without_pages_raises_empty_document(parts):
+    draft_store = StubDraftStore(
+        DraftSnapshot(draft_session=DRAFT_SESSION, revision=1, draft=build_document_draft(page_count=0))
+    )
+
+    with pytest.raises(EmptyDocumentError):
+        await build_service_with_store(parts, draft_store).finalize()
+
+
+async def test_unusable_output_folder_keeps_the_draft(service, parts):
+    await add_pages(service, 1)
+    draft_before = service.snapshot().draft
+    parts.output_folder.write_bytes(b"a file where the folder should be")
+
+    with pytest.raises(OutputFolderUnavailableError):
+        await finalize_later(parts)
+
+    assert service.snapshot().draft == draft_before
+
+
+async def test_unusable_output_folder_leaves_no_intention_marker(service, parts):
+    await add_pages(service, 1)
+    parts.output_folder.write_bytes(b"a file where the folder should be")
+
+    with pytest.raises(OutputFolderUnavailableError):
+        await finalize_later(parts)
+
+    assert parts.read_manifest_on_disk().finalization_started_at is None
+
+
+async def test_damaged_page_raises_damaged_document_page_with_its_position(service, parts):
+    await add_pages(service, 2)
+    (parts.draft_folder / page_file_name(SECOND_PAGE_IDENTIFIER)).unlink()
+
+    with pytest.raises(DamagedDocumentPageError) as raised:
+        await finalize_later(parts)
+
+    assert (raised.value.page_identifier, raised.value.page_position) == (SECOND_PAGE_IDENTIFIER, 2)
+
+
+async def test_damaged_page_keeps_the_draft(service, parts):
+    await add_pages(service, 2)
+    draft_before = service.snapshot().draft
+    (parts.draft_folder / page_file_name(SECOND_PAGE_IDENTIFIER)).unlink()
+
+    with pytest.raises(DamagedDocumentPageError):
+        await finalize_later(parts)
+
+    assert service.snapshot().draft == draft_before
+
+
+async def test_damaged_page_leaves_no_intention_marker(service, parts):
+    await add_pages(service, 1)
+    (parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER)).write_bytes(b"short")
+
+    with pytest.raises(DamagedDocumentPageError):
+        await finalize_later(parts)
+
+    assert parts.read_manifest_on_disk().finalization_started_at is None
+
+
+async def test_intention_marker_is_on_disk_while_the_pdf_is_written(service, parts):
+    await add_pages(service, 1)
+
+    await finalize_later(parts)
+
+    assert parts.pdf_assembly_service.manifests_during_assembly[0].finalization_started_at == FINALIZED_AT
+
+
+def replace_page_with_garbage_of_the_same_size(parts: DocumentServiceParts, page_identifier: str) -> None:
+    page_file = parts.draft_folder / page_file_name(page_identifier)
+    page_file.write_bytes(b"x" * page_file.stat().st_size)
+
+
+async def test_failed_assembly_clears_the_intention_marker(service, parts):
+    await add_pages(service, 1)
+    replace_page_with_garbage_of_the_same_size(parts, FIRST_PAGE_IDENTIFIER)
+
+    with pytest.raises(DocumentAssemblyFailedError):
+        await finalize_later(parts)
+
+    assert parts.read_manifest_on_disk().finalization_started_at is None
+
+
+async def test_failed_assembly_keeps_the_draft(service, parts):
+    await add_pages(service, 1)
+    draft_before = service.snapshot().draft
+    replace_page_with_garbage_of_the_same_size(parts, FIRST_PAGE_IDENTIFIER)
+
+    with pytest.raises(DocumentAssemblyFailedError):
+        await finalize_later(parts)
+
+    assert service.snapshot().draft == draft_before
+
+
+async def test_failed_finished_mark_still_deletes_the_draft(service, parts):
+    await add_pages(service, 1)
+    parts.draft_repository.finished_mark_failure = DRAFT_DISK_FAILURE
+
+    await finalize_later(parts)
+
+    assert service.snapshot().draft is None
+
+
+async def test_failed_finished_mark_and_cleanup_keep_the_draft_marked_finished(service, parts):
+    await add_pages(service, 1)
+    parts.draft_repository.finished_mark_failure = DRAFT_DISK_FAILURE
+    parts.draft_repository.deletion_failure = DRAFT_DISK_FAILURE
+
+    finalization = await finalize_later(parts)
+
+    assert service.snapshot().draft.finished_document == finalization.result
+
+
+async def test_finalize_again_with_the_mark_and_the_pdf_writes_no_other_pdf(service, parts):
+    first_finalization = await finalize_leaving_the_draft_marked(parts)
+
+    await service.finalize()
+
+    assert list(parts.output_folder.iterdir()) == [first_finalization.result.output_path]
+
+
+async def test_finalize_again_with_the_mark_and_the_pdf_returns_the_first_finalization(service, parts):
+    first_finalization = await finalize_leaving_the_draft_marked(parts)
+
+    assert await service.finalize() == first_finalization
+
+
+async def test_finalize_again_with_the_mark_and_the_pdf_deletes_the_draft(service, parts):
+    await finalize_leaving_the_draft_marked(parts)
+
+    await service.finalize()
+
+    assert service.snapshot().draft is None
+
+
+async def test_finalize_again_with_the_mark_but_without_the_pdf_writes_a_new_pdf(service, parts):
+    first_finalization = await finalize_leaving_the_draft_marked(parts)
+    first_finalization.result.output_path.unlink()
+
+    second_finalization = await service.finalize()
+
+    assert second_finalization.result.output_path.is_file()
