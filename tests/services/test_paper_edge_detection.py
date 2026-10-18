@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from digitalizadora.services.paper_edge_detection import PaperEdges, detect_paper_edges
 from tests.fakes.book_on_glass import BookOnGlass, build_book_on_glass_preview
@@ -115,6 +115,24 @@ def test_a_page_of_text_with_margins_has_no_edges():
 
 def test_a_page_of_solid_lines_of_text_has_no_edges():
     assert detect_paper_edges(build_page_of_text(dash_period=3)) is None
+
+
+@pytest.mark.parametrize("frame_inset", [4, 6, 12, 24])
+def test_a_thin_printed_frame_around_a_white_page_is_not_a_sheet(frame_inset):
+    page = build_preview(background_level=WHITE_LEVEL)
+    ImageDraw.Draw(page).rectangle(
+        (frame_inset, frame_inset, PREVIEW_WIDTH - 1 - frame_inset, PREVIEW_HEIGHT - 1 - frame_inset), outline=60
+    )
+
+    assert detect_paper_edges(page) is None
+
+
+def test_a_sheet_with_a_printed_frame_inside_it_is_found_as_a_whole():
+    paper = FilledRectangle((40, 60, 159, 219), 250)
+    preview = build_preview(background_level=120, rectangles=[paper])
+    ImageDraw.Draw(preview).rectangle((46, 66, 153, 213), outline=60)
+
+    assert_edges_close_to(detect_paper_edges(preview), CENTRAL_PAPER_EDGES, EDGE_TOLERANCE)
 
 
 def test_the_edge_of_the_sheet_wins_over_the_text_inside_it():

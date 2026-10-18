@@ -20,6 +20,8 @@ EDGE_COMPARISON_WINDOW_PIXELS = 3
 EDGE_STEP_LEVELS = 12
 EDGE_REFINEMENT_PIXELS = 6
 EDGE_DWELL_SHARE = 0.03
+EDGE_OUTSIDE_SHARE = 0.03
+OUTSIDE_FLATNESS_LEVELS = 12
 GLASS_DEPARTURE_LEVELS = 8
 GLASS_BAND_GAP_SHARE = 0.02
 MINIMUM_GLASS_BAND_PIXELS = 3
@@ -57,9 +59,20 @@ def _step_at(profile: Sequence[float], position: int) -> float:
     return abs(inside - outside)
 
 
+def _outside_pixels(profile: Sequence[float]) -> int:
+    return max(EDGE_COMPARISON_WINDOW_PIXELS, round(EDGE_OUTSIDE_SHARE * len(profile)))
+
+
 def _search_range(profile: Sequence[float]) -> range:
-    first = max(EDGE_COMPARISON_WINDOW_PIXELS, round(SKIPPED_BORDER_SHARE * len(profile)))
+    """Past the skipped border and a stretch of glass: an edge needs a plateau of glass before it."""
+    first = round(SKIPPED_BORDER_SHARE * len(profile)) + _outside_pixels(profile)
     return range(first, round(EDGE_SEARCH_REACH_SHARE * len(profile)))
+
+
+def _comes_from_a_plateau(profile: Sequence[float], position: int) -> bool:
+    """The glass before a sheet edge is steady; a thin printed line is not, and its far side is no edge."""
+    outside_levels = profile[position - _outside_pixels(profile) : position]
+    return max(outside_levels) - min(outside_levels) <= OUTSIDE_FLATNESS_LEVELS
 
 
 def _stays_beyond_the_step(profile: Sequence[float], position: int) -> bool:
@@ -74,7 +87,11 @@ def _first_step(profile: Sequence[float]) -> float | None:
     """The first step of the profile, from its start. Not the strongest: the text of the cover would win."""
     positions = _search_range(profile)
     for position in positions:
-        if _step_at(profile, position) >= EDGE_STEP_LEVELS and _stays_beyond_the_step(profile, position):
+        if (
+            _step_at(profile, position) >= EDGE_STEP_LEVELS
+            and _comes_from_a_plateau(profile, position)
+            and _stays_beyond_the_step(profile, position)
+        ):
             refinement = range(position, min(positions.stop, position + EDGE_REFINEMENT_PIXELS))
             return max(refinement, key=lambda candidate: _step_at(profile, candidate)) / len(profile)
     return None
