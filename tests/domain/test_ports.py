@@ -33,6 +33,7 @@ EXPECTED_METHOD_NAMES_BY_PORT = {
         "write_page_files",
         "page_file_path",
         "page_file_size",
+        "read_page_file",
         "read_thumbnail",
         "delete_page_files",
         "take_inventory",

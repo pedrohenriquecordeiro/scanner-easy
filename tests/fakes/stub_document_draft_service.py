@@ -83,6 +83,10 @@ class StubDocumentDraftService:
         self._record("delete_page", page_identifier)
         return self.draft_snapshot.draft
 
+    async def rotate_page(self, page_identifier: str) -> DocumentDraft | None:
+        self._record("rotate_page", page_identifier)
+        return self.draft_snapshot.draft
+
     async def discard_last_page(self) -> DocumentDraft | None:
         self._record("discard_last_page", None)
         return self.draft_snapshot.draft

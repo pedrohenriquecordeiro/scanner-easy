@@ -39,6 +39,7 @@ from digitalizadora.services.document_draft_service import DocumentDraftCollabor
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
+from digitalizadora.services.document_page_rotator import DocumentPageRotator
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.image_pixel_limit import raise_decompression_limit_to_scanner_size
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
@@ -262,8 +263,11 @@ def _build_document_draft_service(
     finalizer = DocumentFinalizer(PdfAssemblyService(), repositories.scan_output, shared_services.storage_guard)
     # The destination is bound once here, so DocumentDraftService never depends on DocumentPageCapture.
     page_scanner = functools.partial(scan_service.scan_document_page, page_capture=page_capture)
+    page_rotator = DocumentPageRotator(draft_store, shared_services.master_jpeg_service, ThumbnailService())
     return DocumentDraftService(
-        scan_service, DocumentDraftCollaborators(draft_store, page_scanner, finalizer), shared_services.clock
+        scan_service,
+        DocumentDraftCollaborators(draft_store, page_scanner, finalizer, page_rotator),
+        shared_services.clock,
     )
 
 

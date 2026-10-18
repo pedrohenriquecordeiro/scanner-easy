@@ -22,6 +22,7 @@ from digitalizadora.domain.errors import (
     DocumentTooLargeError,
     DraftStorageUnavailableError,
     EmptyDocumentError,
+    ImageAdjustmentFailedError,
     InsufficientDraftStorageError,
     InsufficientStorageError,
     InvalidDocumentNameError,
@@ -71,6 +72,7 @@ class ExpectedFailure:
 EDIT_REQUESTS = [
     EditRequest("DELETE", "/api/document/pages/last"),
     EditRequest("DELETE", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}"),
+    EditRequest("POST", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/rotation"),
     EditRequest("PUT", "/api/document/page-order", {"page_identifiers": REVERSED_PAGE_ORDER}),
     EditRequest("PUT", "/api/document/name", {"name": "Contrato"}),
     EditRequest("POST", "/api/document/finalize"),
@@ -467,3 +469,67 @@ def test_error_statuses_cover_the_documented_codes() -> None:
         "insufficient_storage": 507,
         "insufficient_draft_storage": 507,
     }
+
+
+ROTATION_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/rotation"
+ROTATION_FAILURES = [
+    ExpectedFailure(DocumentBusyError("another change"), HTTPStatus.CONFLICT),
+    ExpectedFailure(NoOpenDocumentError("no draft"), HTTPStatus.NOT_FOUND),
+    ExpectedFailure(PageNotFoundError("not in the draft"), HTTPStatus.NOT_FOUND),
+    ExpectedFailure(DraftStorageUnavailableError("disk unreadable"), HTTPStatus.SERVICE_UNAVAILABLE),
+    ExpectedFailure(InsufficientDraftStorageError("disk full"), HTTPStatus.INSUFFICIENT_STORAGE),
+    ExpectedFailure(ImageAdjustmentFailedError("out of memory"), HTTPStatus.INTERNAL_SERVER_ERROR),
+]
+
+
+def test_rotate_page_passes_the_identifier_of_the_path(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.post(ROTATION_PATH)
+
+    assert document_service.received_arguments["rotate_page"] == SECOND_PAGE_IDENTIFIER
+
+
+def test_rotate_page_answers_the_body_after_the_edit(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.snapshot_after_edit = build_stub_snapshot(3)
+
+    response = client.post(ROTATION_PATH)
+
+    assert (response.status_code, response.json()) == (HTTPStatus.OK, build_document_body(build_stub_snapshot(3)))
+
+
+@pytest.mark.parametrize("expected_failure", ROTATION_FAILURES, ids=describe_expected_failure)
+def test_rotate_page_answers_the_documented_errors(
+    client: TestClient, document_service: StubDocumentDraftService, expected_failure: ExpectedFailure
+) -> None:
+    document_service.failure = expected_failure.error
+
+    response = client.post(ROTATION_PATH)
+
+    assert (response.status_code, response.json()) == build_expected_answer(expected_failure)
+
+
+def test_rotate_page_of_a_damaged_page_names_the_page(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.failure = DamagedDocumentPageError(SECOND_PAGE_IDENTIFIER, 2)
+
+    response = client.post(ROTATION_PATH)
+
+    assert (response.status_code, response.json()["page_identifier"]) == (HTTPStatus.CONFLICT, SECOND_PAGE_IDENTIFIER)
+
+
+def test_rotation_failing_for_lack_of_memory_says_to_choose_a_lower_resolution(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.failure = ImageAdjustmentFailedError("out of memory")
+
+    message = client.post(ROTATION_PATH).json()["message"]
+
+    assert "resolução menor" in message
+
+
+def test_rotation_is_a_post_only_route(client: TestClient) -> None:
+    assert client.get(ROTATION_PATH).status_code == HTTPStatus.METHOD_NOT_ALLOWED

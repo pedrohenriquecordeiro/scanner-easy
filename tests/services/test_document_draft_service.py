@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pikepdf
 import pytest
+from PIL import Image
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentFinalizationResult, DocumentPage, DraftSnapshot
@@ -20,6 +21,7 @@ from digitalizadora.domain.errors import (
     EmptyDocumentError,
     NoOpenDocumentError,
     OutputFolderUnavailableError,
+    PageNotFoundError,
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
@@ -45,6 +47,12 @@ PHOTO_SETTINGS = ScanPreset.PHOTO.settings
 FIRST_PAGE_IDENTIFIER = page_identifier_at(1)
 SECOND_PAGE_IDENTIFIER = page_identifier_at(2)
 JPEG_START_OF_IMAGE = b"\xff\xd8"
+UNKNOWN_PAGE_IDENTIFIER = "00000000000000ff"
+
+
+def read_page_size(page_path: Path) -> tuple[int, int]:
+    with Image.open(page_path) as image:
+        return image.size
 
 
 class StubDraftStore:
@@ -512,3 +520,55 @@ def test_describe_draft_storage_counts_the_adjustment(service):
     unadjusted_storage = service.describe_draft_storage(SETTINGS)
 
     assert adjusted_storage.estimated_pages_remaining < unadjusted_storage.estimated_pages_remaining
+
+
+TURNED_PAGE_IDENTIFIER = page_identifier_at(3)
+
+
+async def test_rotate_page_gives_the_page_a_new_identifier_at_the_same_position(service):
+    await add_pages(service, 2)
+
+    draft = await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+    assert draft.page_identifiers == (TURNED_PAGE_IDENTIFIER, SECOND_PAGE_IDENTIFIER)
+
+
+async def test_rotate_page_replaces_the_snapshot(service):
+    await add_pages(service, 2)
+
+    draft = await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+    assert service.snapshot().draft == draft
+
+
+async def test_rotate_page_swaps_the_dimensions_of_the_stored_page(service, parts):
+    await add_pages(service, 1)
+    page_size_before = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
+
+    await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+    assert read_page_size(parts.draft_folder / page_file_name(SECOND_PAGE_IDENTIFIER)) == page_size_before[::-1]
+
+
+async def test_rotate_page_of_an_unknown_page_raises_page_not_found(service):
+    await add_pages(service, 1)
+
+    with pytest.raises(PageNotFoundError):
+        await service.rotate_page(UNKNOWN_PAGE_IDENTIFIER)
+
+
+async def test_rotate_page_without_a_draft_raises_no_open_document(service):
+    with pytest.raises(NoOpenDocumentError):
+        await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+
+async def test_a_rotated_page_goes_into_the_saved_pdf_with_its_new_orientation(service, parts):
+    await add_pages(service, 1)
+    page_size = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
+    await service.rotate_page(FIRST_PAGE_IDENTIFIER)
+
+    finalization = await service.finalize()
+
+    with pikepdf.open(finalization.result.output_path) as document:
+        media_box = [float(value) for value in document.pages[0].mediabox]
+    assert (media_box[2] > media_box[3]) is (page_size[1] > page_size[0])

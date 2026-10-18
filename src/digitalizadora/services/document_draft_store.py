@@ -34,6 +34,7 @@ from digitalizadora.services.storage_guard_service import StorageGuardService
 LOGGER = logging.getLogger(__name__)
 
 INITIAL_REVISION = 0
+REPLACEMENT_SPACE_FACTOR = 2
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,15 @@ class CapturedPage:
     thumbnail_jpeg: bytes
     scanned_at: datetime
     settings: ScanSettings
+
+
+@dataclass(frozen=True)
+class StoredPage:
+    """A page of the draft with the content of its file, read to be rewritten."""
+
+    page: DocumentPage
+    position: int
+    jpeg_content: bytes
 
 
 @dataclass(frozen=True)
@@ -152,10 +162,7 @@ class DocumentDraftStore:
 
     def ensure_capacity_for_page(self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT) -> None:
         """Runs before the printer spends 15 to 75 s on the page (6.6.1, step 3)."""
-        if self._recovery_failed:
-            # current/ may hold a valid draft that only could not be read now: a new first page would set it
-            # aside, so new pages wait for the next start, which recovers again (R13).
-            raise DraftStorageUnavailableError("The draft folder could not be recovered at start-up")
+        self._ensure_recovered()
         self._draft_repository.ensure_storage_folder_ready()
         storage_folder = self._draft_repository.storage_folder()
         try:
@@ -163,6 +170,55 @@ class DocumentDraftStore:
         except (InsufficientStorageError, OutputFolderUnavailableError) as error:
             # The draft lives on the internal disk: the quick-mode messages would point at the output folder.
             raise as_draft_storage_error(error) from error
+
+    def _ensure_recovered(self) -> None:
+        if self._recovery_failed:
+            # current/ may hold a valid draft that only could not be read now: a new first page would set it
+            # aside, so new pages wait for the next start, which recovers again (R13).
+            raise DraftStorageUnavailableError("The draft folder could not be recovered at start-up")
+
+    def ensure_capacity_for_replacement(self, page_identifier: str) -> None:
+        """The new file lives beside the old one for an instant, and re-encoding may make it bigger."""
+        self._ensure_recovered()
+        draft = self._require_draft()
+        page = draft.pages[draft.position_of(page_identifier) - FIRST_PAGE_POSITION]
+        try:
+            self._storage_guard_service.ensure_space_for_file(
+                self._draft_repository.storage_folder(), REPLACEMENT_SPACE_FACTOR * page.size_in_bytes
+            )
+        except (InsufficientStorageError, OutputFolderUnavailableError) as error:
+            raise as_draft_storage_error(error) from error
+
+    def read_page_content(self, page_identifier: str) -> StoredPage:
+        draft = self._require_draft()
+        position = draft.position_of(page_identifier)
+        page = draft.pages[position - FIRST_PAGE_POSITION]
+        jpeg_content = self._draft_repository.read_page_file(page_identifier)
+        if jpeg_content is None or len(jpeg_content) != page.size_in_bytes:
+            raise DamagedDocumentPageError(page_identifier, position)
+        return StoredPage(page, position, jpeg_content)
+
+    def replace_page(self, page_identifier: str, replacement: CapturedPage) -> DocumentDraft:
+        """A new identifier at the same position (6.4): files first, manifest next, old files last.
+
+        A crash leaves either the old page or the new one in the manifest, never a size that does not match,
+        and the files left without an owner are the ones the recovery deletes.
+        """
+        draft = self._require_draft()
+        draft.position_of(page_identifier)
+        new_identifier = self._identity_source.page_identifier_factory()
+        self._draft_repository.write_page_files(
+            DocumentPageFiles(new_identifier, replacement.jpeg_content, replacement.thumbnail_jpeg)
+        )
+        new_draft = draft.with_page_replaced(page_identifier, _page_from_capture(new_identifier, replacement))
+        try:
+            self._draft_repository.save_manifest(new_draft)
+        except DigitalizadoraError:
+            self._draft_repository.delete_page_files(new_identifier)
+            raise
+        self._replace_snapshot(new_draft)
+        self._draft_repository.delete_page_files(page_identifier)
+        return new_draft
 
     def rename(self, raw_name: str) -> DocumentDraft:
         document_name = clean_document_name(raw_name)

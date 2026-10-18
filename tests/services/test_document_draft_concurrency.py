@@ -35,6 +35,7 @@ EDITS: dict[str, Callable[[DocumentDraftService], Awaitable[object]]] = {
     "rename": lambda service: service.rename("Contrato"),
     "reorder": lambda service: service.reorder([FIRST_PAGE_IDENTIFIER]),
     "delete_page": lambda service: service.delete_page(FIRST_PAGE_IDENTIFIER),
+    "rotate_page": lambda service: service.rotate_page(FIRST_PAGE_IDENTIFIER),
     "discard_last_page": lambda service: service.discard_last_page(),
     "cancel": lambda service: service.cancel(),
     "finalize": lambda service: service.finalize(),

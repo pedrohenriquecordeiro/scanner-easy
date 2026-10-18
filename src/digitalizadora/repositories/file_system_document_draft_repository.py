@@ -192,6 +192,16 @@ class FileSystemDocumentDraftRepository:
         except OSError as error:
             raise translate_draft_storage_error(error, f"Cannot examine {page_path.name}") from error
 
+    def read_page_file(self, page_identifier: str) -> bytes | None:
+        """The whole page file, or None when it does not exist."""
+        page_path = self.page_file_path(page_identifier)
+        try:
+            return page_path.read_bytes()
+        except FileNotFoundError:
+            return None
+        except OSError as error:
+            raise translate_draft_storage_error(error, f"Cannot read {page_path.name}") from error
+
     def read_thumbnail(self, page_identifier: str) -> bytes | None:
         if not is_page_identifier(page_identifier):
             return None

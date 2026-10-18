@@ -69,6 +69,7 @@ class DocumentController:
         router.add_api_route(
             "/api/document/pages/{page_identifier}/thumbnail", self.read_thumbnail, methods=["GET"]
         )
+        router.add_api_route("/api/document/pages/{page_identifier}/rotation", self.rotate_page, methods=["POST"])
         router.add_api_route("/api/document/page-order", self.reorder_pages, methods=["PUT"])
         router.add_api_route("/api/document/name", self.rename_document, methods=["PUT"])
         router.add_api_route("/api/document/finalize", self.finalize_document, methods=["POST"])
@@ -92,6 +93,9 @@ class DocumentController:
 
     async def delete_page(self, page_identifier: str) -> JSONResponse:
         return await self._respond_to_edit(self._document_draft_service.delete_page(page_identifier))
+
+    async def rotate_page(self, page_identifier: str) -> JSONResponse:
+        return await self._respond_to_edit(self._document_draft_service.rotate_page(page_identifier))
 
     def read_thumbnail(self, page_identifier: str) -> Response:
         thumbnail_jpeg = self._document_draft_service.read_thumbnail(page_identifier)

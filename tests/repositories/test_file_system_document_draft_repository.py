@@ -666,3 +666,29 @@ def test_failure_to_synchronise_after_deleting_the_manifest_still_deletes_the_dr
     build_repository(drafts_folder).delete_draft()
 
     assert list_file_names(drafts_folder) == []
+
+
+def test_read_page_file_returns_the_whole_written_page(drafts_folder):
+    repository = build_ready_repository(drafts_folder)
+    repository.write_page_files(FIRST_PAGE_FILES)
+
+    assert repository.read_page_file(FIRST_PAGE_IDENTIFIER) == b"page jpeg"
+
+
+def test_read_page_file_of_a_missing_page_is_none(drafts_folder):
+    assert build_ready_repository(drafts_folder).read_page_file(FIRST_PAGE_IDENTIFIER) is None
+
+
+def test_read_page_file_that_cannot_be_read_raises_draft_storage_unavailable(drafts_folder, draft_folder):
+    drafts_folder.mkdir(parents=True)
+    draft_folder.write_bytes(b"not a folder")
+
+    with pytest.raises(DraftStorageUnavailableError):
+        build_repository(drafts_folder).read_page_file(FIRST_PAGE_IDENTIFIER)
+
+
+def test_read_page_file_that_is_a_folder_raises_draft_storage_unavailable(drafts_folder, draft_folder):
+    (draft_folder / FIRST_PAGE_FILE_NAME).mkdir(parents=True)
+
+    with pytest.raises(DraftStorageUnavailableError):
+        build_repository(drafts_folder).read_page_file(FIRST_PAGE_IDENTIFIER)

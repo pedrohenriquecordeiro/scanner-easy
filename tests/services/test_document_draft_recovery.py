@@ -608,6 +608,16 @@ def test_failed_recovery_blocks_new_pages_with_draft_storage_unavailable(draft_s
         draft_store.ensure_capacity_for_page(SETTINGS)
 
 
+@requires_permission_bits
+def test_failed_recovery_blocks_replacements_with_draft_storage_unavailable(draft_store, drafts_folder, draft_folder):
+    write_draft_folder(drafts_folder, RECORDED_DRAFT)
+    with permission_mode(draft_folder / MANIFEST_FILE_NAME, UNREADABLE_FILE_MODE):
+        draft_store.recover()
+
+    with pytest.raises(DraftStorageUnavailableError):
+        draft_store.ensure_capacity_for_replacement(RECORDED_DRAFT.page_identifiers[0])
+
+
 def test_successful_recovery_lets_new_pages_in(draft_store, drafts_folder):
     write_draft_folder(drafts_folder, RECORDED_DRAFT)
     draft_store.recover()

@@ -214,3 +214,63 @@ def test_the_saved_adjustments_are_served_back_after_a_scan(configuration: Appli
         state_settings = client.get("/api/state").json()["settings"]
     assert state_settings == saved_settings
     assert (state_settings["rotation_degrees"], state_settings["auto_crop"]) == (270, True)
+
+
+def rotate_first_page(client: TestClient) -> dict:
+    first_page = client.get("/api/document").json()["document"]["pages"][0]
+    response = client.post(
+        f"/api/document/pages/{first_page['page_identifier']}/rotation", headers=STATE_CHANGING_HEADERS
+    )
+    assert response.status_code == 200
+    return {"previous_identifier": first_page["page_identifier"], "body": response.json()}
+
+
+def test_rotating_a_page_of_the_draft_answers_it_under_a_new_identifier(
+    configuration: ApplicationConfiguration,
+) -> None:
+    with build_client(configuration, LidBackground.WHITE) as client:
+        save_settings(client, configuration.default_output_folder)
+        client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
+        wait_for_state(client, has_document_pages(1))
+        rotation = rotate_first_page(client)
+    turned_identifier = rotation["body"]["document"]["pages"][0]["page_identifier"]
+    assert turned_identifier != rotation["previous_identifier"]
+
+
+def test_rotating_a_page_of_the_draft_swaps_its_dimensions(configuration: ApplicationConfiguration) -> None:
+    with build_client(configuration, LidBackground.WHITE) as client:
+        save_settings(client, configuration.default_output_folder)
+        client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
+        wait_for_state(client, has_document_pages(1))
+        rotate_first_page(client)
+        assert read_draft_page_size(configuration, 1, client) == GLASS_SIZE[::-1]
+
+
+def test_a_page_rotated_in_the_draft_is_saved_turned_in_the_pdf(configuration: ApplicationConfiguration) -> None:
+    with build_client(configuration, LidBackground.WHITE) as client:
+        save_settings(client, configuration.default_output_folder)
+        client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
+        wait_for_state(client, has_document_pages(1))
+        rotate_first_page(client)
+        finalization = client.post("/api/document/finalize", headers=STATE_CHANGING_HEADERS).json()
+    with pikepdf.open(Path(finalization["output_folder"]) / finalization["file_name"]) as document:
+        media_box = [float(value) for value in document.pages[0].mediabox]
+    points_per_pixel = POINTS_PER_INCH / DOTS_PER_INCH
+    assert media_box[2:] == pytest.approx([GLASS_SIZE[1] * points_per_pixel, GLASS_SIZE[0] * points_per_pixel], abs=1.0)
+
+
+def test_rotating_a_page_that_is_not_in_the_draft_answers_page_not_found(
+    configuration: ApplicationConfiguration,
+) -> None:
+    with build_client(configuration, LidBackground.WHITE) as client:
+        save_settings(client, configuration.default_output_folder)
+        client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
+        wait_for_state(client, has_document_pages(1))
+        response = client.post("/api/document/pages/00000000000000ff/rotation", headers=STATE_CHANGING_HEADERS)
+    assert (response.status_code, response.json()["code"]) == (404, "page_not_found")
+
+
+def test_rotating_without_the_request_header_is_refused(configuration: ApplicationConfiguration) -> None:
+    with build_client(configuration, LidBackground.WHITE) as client:
+        response = client.post("/api/document/pages/00000000000000ff/rotation")
+    assert (response.status_code, response.json()["code"]) == (403, "missing_request_header")
