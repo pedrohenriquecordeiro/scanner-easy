@@ -1,48 +1,18 @@
 import io
 import logging
-from collections.abc import Callable
-from typing import Any
 
-from PIL import Image, JpegImagePlugin
+from PIL import Image
 
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.pixel_region import PixelRegion
+from digitalizadora.services.jpeg_reencoding import TRANSPOSE_BY_ROTATION, read_encoding_options, replace_with
 from digitalizadora.services.paper_region_detection import PREVIEW_MAXIMUM_EDGE_PIXELS, detect_paper_region
 
 LOGGER = logging.getLogger(__name__)
-ADJUSTED_JPEG_QUALITY = 95
 CROP_MARGIN_RATIO = 0.01
 PREVIEW_COLOR_MODE = "RGB"
-NO_CHROMA_SUBSAMPLING = -1
-# Pillow turns counterclockwise, the page turns clockwise.
-TRANSPOSE_BY_ROTATION = {
-    PageRotation.CLOCKWISE_90: Image.Transpose.ROTATE_270,
-    PageRotation.HALF_TURN: Image.Transpose.ROTATE_180,
-    PageRotation.COUNTERCLOCKWISE_90: Image.Transpose.ROTATE_90,
-}
-
-
-def _replace_with(image: Image.Image, transformation: Callable[[Image.Image], Image.Image]) -> Image.Image:
-    """Holds at most two full images at a time: the source is released as soon as its successor exists."""
-    transformed = transformation(image)
-    image.close()
-    return transformed
-
-
-def _read_encoding_options(source: Image.Image) -> dict[str, Any]:
-    """What the new JPEG must keep of the scanner's. The sampling is read before the transformations, because a
-    transposed image loses its JPEG format and "keep" would then raise."""
-    options: dict[str, Any] = {"quality": ADJUSTED_JPEG_QUALITY}
-    subsampling = JpegImagePlugin.get_sampling(source)
-    if subsampling != NO_CHROMA_SUBSAMPLING:
-        options["subsampling"] = subsampling
-    if "dpi" in source.info:
-        options["dpi"] = source.info["dpi"]
-    if "icc_profile" in source.info:
-        options["icc_profile"] = source.info["icc_profile"]
-    return options
 
 
 class ImageAdjustmentService:
@@ -81,11 +51,11 @@ class ImageAdjustmentService:
     def _crop_and_rotate(self, jpeg_content: bytes, crop_region: PixelRegion | None, rotation: PageRotation) -> bytes:
         image = Image.open(io.BytesIO(jpeg_content))
         try:
-            encoding_options = _read_encoding_options(image)
+            encoding_options = read_encoding_options(image)
             if crop_region is not None:
-                image = _replace_with(image, lambda full_image: full_image.crop(crop_region.as_box()))
+                image = replace_with(image, lambda full_image: full_image.crop(crop_region.as_box()))
             if rotation is not PageRotation.NONE:
-                image = _replace_with(image, lambda uncut_image: uncut_image.transpose(TRANSPOSE_BY_ROTATION[rotation]))
+                image = replace_with(image, lambda uncut_image: uncut_image.transpose(TRANSPOSE_BY_ROTATION[rotation]))
             buffer = io.BytesIO()
             image.save(buffer, format="JPEG", **encoding_options)
         finally:
