@@ -1,0 +1,7 @@
+HTTP/1.1 201 Created
+Server: HP HTTP Server; HP DeskJet 2800 series - 6W7G2A; Serial Number: SERIALNUM01; Built:Wed Nov 13, 2024 07:11:06PM {TIP1CN2446AR}
+Location: http://localhost:57805/eSCL/ScanJobs/11111111-2222-3333-4444-000000000001
+Content-Length: 0
+Cache-Control: must-revalidate, max-age=0
+Pragma: no-cache
+
