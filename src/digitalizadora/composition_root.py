@@ -39,7 +39,10 @@ from digitalizadora.services.document_draft_service import DocumentDraftCollabor
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
+from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
+from digitalizadora.services.image_pixel_limit import raise_decompression_limit_to_scanner_size
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
 from digitalizadora.services.scan_encoder import ScanEncoder
@@ -94,9 +97,10 @@ class _ScannerAccess:
 
 @dataclass(frozen=True)
 class _SharedServices:
-    """A single clock, scan encoder and storage guard for the whole container."""
+    """A single clock, master JPEG service, scan encoder and storage guard for the whole container."""
 
     clock: Clock
+    master_jpeg_service: MasterJpegService
     scan_encoder: ScanEncoder
     storage_guard: StorageGuardService
 
@@ -130,6 +134,7 @@ def build_container(
     configuration: ApplicationConfiguration,
     overrides: ContainerOverrides | None = None,
 ) -> ApplicationContainer:
+    raise_decompression_limit_to_scanner_size()
     chosen_overrides = overrides if overrides is not None else ContainerOverrides()
     configuration.data_directory.mkdir(parents=True, exist_ok=True)
     clock = SystemClock()
@@ -139,7 +144,7 @@ def build_container(
     repositories.document_draft.claim_exclusive_access()
     _prepare_saved_output_folder(repositories.settings)
     scanner_access = _build_scanner_access(chosen_overrides)
-    shared_services = _SharedServices(clock, _build_scan_encoder(), _build_storage_guard_service(chosen_overrides))
+    shared_services = _build_shared_services(clock, chosen_overrides)
     services = _build_services(repositories, scanner_access, shared_services)
     # Before the server answers (6.6.2); recover_draft never raises, so the server always starts.
     services.document_draft.recover_draft()
@@ -210,8 +215,14 @@ def _build_gateway_factory(scanner_access: _ScannerAccess) -> Callable[[ScannerE
     return build_gateway
 
 
-def _build_scan_encoder() -> ScanEncoder:
-    return ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService())
+def _build_shared_services(clock: Clock, overrides: ContainerOverrides) -> _SharedServices:
+    master_jpeg_service = MasterJpegService(ImageAdjustmentService(), JpegResolutionService())
+    return _SharedServices(
+        clock=clock,
+        master_jpeg_service=master_jpeg_service,
+        scan_encoder=ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()),
+        storage_guard=_build_storage_guard_service(overrides),
+    )
 
 
 def _build_services(

@@ -7,18 +7,23 @@ from PIL import Image
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import ScanFailedError
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
-from digitalizadora.services.scan_encoder import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ScanEncoder
-from digitalizadora.services.thumbnail_service import ThumbnailService
+from digitalizadora.services.scan_encoder import ScanEncoder
+from digitalizadora.services.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.jpeg_segments import declare_image_size, strip_jfif_segment
 from tests.fakes.sample_images import build_sample_jpeg
+from tests.fakes.synthetic_scans import build_scan_jpeg
 
 STARTED_AT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=timezone(timedelta(hours=-3)))
 START_OF_IMAGE = b"\xff\xd8"
@@ -28,11 +33,14 @@ DECOMPRESSION_BOMB_EDGE_PIXELS = 60000
 
 
 def build_encoder() -> ScanEncoder:
-    return ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService())
+    master_jpeg_service = MasterJpegService(ImageAdjustmentService(), JpegResolutionService())
+    return ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService())
 
 
-def build_job(output_format: OutputFormat, dots_per_inch: int = 300) -> ScanJob:
-    request = ScanRequest(ScanSettings(dots_per_inch, ColorMode.COLOR), output_format)
+def build_job(
+    output_format: OutputFormat, dots_per_inch: int = 300, adjustment: ImageAdjustment = NO_ADJUSTMENT
+) -> ScanJob:
+    request = ScanRequest(ScanSettings(dots_per_inch, ColorMode.COLOR), output_format, adjustment)
     return ScanJob(request, FixedClock(STARTED_AT).now())
 
 
@@ -169,3 +177,65 @@ def test_truncated_jpeg_is_rejected_even_when_a_pdf_is_requested():
 
     with pytest.raises(ScanFailedError):
         build_encoder().encode(truncated_image, build_job(OutputFormat.PDF))
+
+
+CLOCKWISE = ImageAdjustment(rotation=PageRotation.CLOCKWISE_90)
+DARK_LID = (30, 30, 30)
+PAPER = (240, 240, 240)
+LID_SIZE = (200, 280)
+PAPER_BOX = (40, 60, 159, 219)
+
+
+def test_the_rotation_reaches_the_jpeg_output():
+    encoded = build_encoder().encode(
+        build_scanned_image(600, 300), build_job(OutputFormat.JPEG, adjustment=CLOCKWISE)
+    )
+
+    assert read_jpeg_size(encoded.content) == (300, 600)
+
+
+def test_the_rotation_reaches_the_thumbnail():
+    encoded = build_encoder().encode(
+        build_scanned_image(600, 300), build_job(OutputFormat.JPEG, adjustment=CLOCKWISE)
+    )
+
+    width, height = read_jpeg_size(encoded.thumbnail_jpeg)
+    assert height > width
+
+
+def test_the_rotation_reaches_the_pdf():
+    encoded = build_encoder().encode(
+        build_scanned_image(600, 300), build_job(OutputFormat.PDF, dots_per_inch=600, adjustment=CLOCKWISE)
+    )
+
+    assert read_pdf_page_size(encoded.content) == pytest.approx((36.0, 72.0), abs=POINT_TOLERANCE)
+
+
+CROP = ImageAdjustment(auto_crop=True)
+SHEET_ON_DARK_LID = ScannedImage(build_scan_jpeg(LID_SIZE, [(PAPER_BOX, PAPER)], background=DARK_LID), "image/jpeg")
+
+
+def test_the_crop_reaches_the_jpeg_output():
+    encoded = build_encoder().encode(SHEET_ON_DARK_LID, build_job(OutputFormat.JPEG, adjustment=CROP))
+
+    width, height = read_jpeg_size(encoded.content)
+    assert width < LID_SIZE[0] and height < LID_SIZE[1]
+
+
+def test_the_crop_reaches_the_pdf_with_the_physical_size_of_the_cropped_region():
+    cropped_jpeg = build_encoder().encode(SHEET_ON_DARK_LID, build_job(OutputFormat.JPEG, 200, CROP)).content
+    cropped_width, cropped_height = read_jpeg_size(cropped_jpeg)
+
+    encoded = build_encoder().encode(SHEET_ON_DARK_LID, build_job(OutputFormat.PDF, 200, CROP))
+
+    expected_size = (cropped_width * 72 / 200, cropped_height * 72 / 200)
+    assert read_pdf_page_size(encoded.content) == pytest.approx(expected_size, abs=POINT_TOLERANCE)
+
+
+def test_the_density_is_written_after_the_rotation():
+    encoded = build_encoder().encode(
+        build_scanned_image(600, 300), build_job(OutputFormat.JPEG, dots_per_inch=600, adjustment=CLOCKWISE)
+    )
+
+    with Image.open(io.BytesIO(encoded.content)) as image:
+        assert image.info["dpi"] == (600, 600)

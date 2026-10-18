@@ -5,6 +5,7 @@ from PIL import Image
 from digitalizadora.domain.errors import ScanFailedError
 
 THUMBNAIL_JPEG_QUALITY = 80
+THUMBNAIL_MAXIMUM_EDGE_PIXELS = 480
 DRAFT_COLOR_MODE = "RGB"
 
 

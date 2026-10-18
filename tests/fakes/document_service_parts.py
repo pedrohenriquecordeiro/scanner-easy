@@ -23,7 +23,9 @@ from digitalizadora.services.document_draft_service import DocumentDraftCollabor
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
+from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
@@ -176,8 +178,9 @@ def build_document_service_parts(
         DraftIdentitySource(DRAFT_SESSION, SequentialPageIdentifiers()),
     )
     scan_service, gateway = _build_scan_service(clock, scanned_pages)
+    master_jpeg_service = MasterJpegService(ImageAdjustmentService(), JpegResolutionService())
     page_capture = DocumentPageCapture(
-        ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService()), draft_store
+        ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()), draft_store
     )
     pdf_assembly_service = ObservingPdfAssemblyService(
         drafts_folder / CURRENT_DRAFT_FOLDER_NAME / MANIFEST_FILE_NAME

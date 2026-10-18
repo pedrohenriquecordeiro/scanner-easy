@@ -17,7 +17,9 @@ from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.file_system_document_draft_repository import FileSystemDocumentDraftRepository
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_page_capture import DocumentPageCapture
+from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.storage_guard_service import (
@@ -56,7 +58,8 @@ def free_space_reader() -> RecordingFreeSpaceReader:
 
 @pytest.fixture
 def scan_encoder() -> ScanEncoder:
-    return ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService())
+    master_jpeg_service = MasterJpegService(ImageAdjustmentService(), JpegResolutionService())
+    return ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService())
 
 
 @pytest.fixture

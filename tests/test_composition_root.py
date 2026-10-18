@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from digitalizadora.application_factory import create_application
 from digitalizadora.composition_root import (
@@ -23,6 +24,7 @@ from digitalizadora.infrastructure.bonjour_scanner_discovery import ServiceRecor
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.file_system_document_draft_repository import OWNER_LOCK_FILE_NAME
 from digitalizadora.repositories.json_scanner_endpoint_repository import JsonScannerEndpointRepository
+from digitalizadora.services.image_pixel_limit import MAXIMUM_SCANNER_IMAGE_PIXELS
 from tests.fakes.configuration_builder import TEST_PORT, build_application_configuration
 
 SCANNER_ADDRESS = "http://scanner.test/eSCL"
@@ -31,6 +33,7 @@ LOCALHOST_BASE_ADDRESS = f"http://localhost:{TEST_PORT}"
 OTHER_PORT_BASE_ADDRESS = f"http://127.0.0.1:{TEST_PORT + 1}"
 STATE_CHANGING_HEADERS = {"X-Requested-With": "digitalizadora"}
 FIXED_FREE_SPACE_IN_BYTES = 50 * 1024**3
+PILLOW_DEFAULT_PIXEL_LIMIT = 89_478_485
 EXPECTED_SCANNER_TIMEOUT = httpx.Timeout(30.0, connect=5.0, read=180.0)
 
 
@@ -311,3 +314,30 @@ def test_containers_in_different_data_directories_have_different_sessions(
         with build_client(container, LOOPBACK_BASE_ADDRESS) as client:
             draft_sessions.append(client.get("/api/document").json()["draft_session"])
     assert draft_sessions[0] != draft_sessions[1]
+
+
+def test_building_the_container_raises_the_pixel_limit_to_the_scanner_size(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", PILLOW_DEFAULT_PIXEL_LIMIT)
+
+    build_container(configuration, overrides)
+
+    assert Image.MAX_IMAGE_PIXELS == MAXIMUM_SCANNER_IMAGE_PIXELS
+
+
+def test_an_old_settings_file_with_only_a_preset_is_served_with_the_quality_of_the_preset(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    configuration.data_directory.mkdir(parents=True)
+    old_document = {
+        "output_folder": str(configuration.default_output_folder),
+        "output_format": "jpg",
+        "scan_preset": "photo",
+    }
+    (configuration.data_directory / "settings.json").write_text(json.dumps(old_document), encoding="utf-8")
+
+    with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
+        settings = client.get("/api/settings").json()
+
+    assert (settings["dots_per_inch"], settings["color_mode"], settings["scan_preset"]) == (600, "color", "photo")
