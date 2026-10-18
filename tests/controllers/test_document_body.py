@@ -10,6 +10,9 @@ from digitalizadora.domain.document_draft import (
     RecoveryOutcome,
 )
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_framing import PageFraming
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.services.document_draft_store import UNAVAILABLE_DRAFT_STORAGE_STATE, DraftStorageState
 from tests.fakes.document_drafts import build_document_draft, page_identifier_at
@@ -76,6 +79,8 @@ def test_document_describes_the_draft_and_its_pages_in_order() -> None:
                 "dots_per_inch": 300,
                 "color_mode": "color",
                 "size_in_bytes": 3,
+                "rotation_degrees": 0,
+                "crop": None,
             },
             {
                 "page_identifier": page_identifier_at(2),
@@ -83,9 +88,24 @@ def test_document_describes_the_draft_and_its_pages_in_order() -> None:
                 "dots_per_inch": 300,
                 "color_mode": "color",
                 "size_in_bytes": 3,
+                "rotation_degrees": 0,
+                "crop": None,
             },
         ],
     }
+
+
+def test_a_framed_page_reports_its_rotation_and_crop() -> None:
+    draft = TWO_PAGE_SNAPSHOT.draft.with_page_framing(
+        page_identifier_at(2), PageFraming(PageRotation.CLOCKWISE_90, PageCrop(0.13, 0.115, 0.924, 0.925))
+    )
+
+    page = build_document_body(replace(TWO_PAGE_SNAPSHOT, draft=draft))["document"]["pages"][1]
+
+    assert (page["rotation_degrees"], page["crop"]) == (
+        90,
+        {"left": 0.13, "top": 0.115, "right": 0.924, "bottom": 0.925},
+    )
 
 
 def test_document_keys_come_in_the_documented_order() -> None:

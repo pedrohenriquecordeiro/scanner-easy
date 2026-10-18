@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -6,9 +7,14 @@ from typing import Any
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentPage, is_page_identifier
-from digitalizadora.domain.errors import UnreadableDraftError
+from digitalizadora.domain.errors import InvalidCropError, UnreadableDraftError
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
+
+LOGGER = logging.getLogger(__name__)
 
 MANIFEST_FORMAT_VERSION = 1
 MANIFEST_ENCODING = "utf-8"
@@ -22,6 +28,9 @@ SCANNED_AT_KEY = "scanned_at"
 DOTS_PER_INCH_KEY = "dots_per_inch"
 COLOR_MODE_KEY = "color_mode"
 SIZE_IN_BYTES_KEY = "size_in_bytes"
+ROTATION_DEGREES_KEY = "rotation_degrees"
+CROP_KEY = "crop"
+CROP_EDGE_KEYS = ("left", "top", "right", "bottom")
 FINALIZATION_STARTED_AT_KEY = "finalization_started_at"
 FINISHED_DOCUMENT_KEY = "finished_document"
 PATH_KEY = "path"
@@ -62,7 +71,15 @@ def _encode_page(page: DocumentPage) -> dict[str, Any]:
         DOTS_PER_INCH_KEY: page.dots_per_inch,
         COLOR_MODE_KEY: page.color_mode.value,
         SIZE_IN_BYTES_KEY: page.size_in_bytes,
+        ROTATION_DEGREES_KEY: page.framing.rotation.value,
+        CROP_KEY: _encode_crop(page.framing.crop),
     }
+
+
+def _encode_crop(crop: PageCrop | None) -> dict[str, float] | None:
+    if crop is None:
+        return None
+    return dict(zip(CROP_EDGE_KEYS, (crop.left, crop.top, crop.right, crop.bottom), strict=True))
 
 
 def _encode_optional_moment(moment: datetime | None) -> str | None:
@@ -163,7 +180,45 @@ def _read_page(fields: dict[str, Any]) -> DocumentPage:
         dots_per_inch=_read_whole_number(fields, DOTS_PER_INCH_KEY, ALLOWED_DOTS_PER_INCH),
         color_mode=_read_color_mode(fields),
         size_in_bytes=_read_whole_number(fields, SIZE_IN_BYTES_KEY, ALLOWED_SIZES_IN_BYTES),
+        framing=_read_framing(fields, page_identifier),
     )
+
+
+def _read_framing(fields: dict[str, Any], page_identifier: str) -> PageFraming:
+    """Tolerant: a manifest from before the framing has neither key, and a bad value costs only that value.
+
+    An unreadable manifest sets the whole draft aside; losing one rotation or one crop is cheap to redo.
+    """
+    rotation = _read_tolerant_rotation(fields, page_identifier)
+    crop = _read_tolerant_crop(fields, page_identifier)
+    return UNFRAMED if rotation is PageRotation.NONE and crop is None else PageFraming(rotation, crop)
+
+
+def _read_tolerant_rotation(fields: dict[str, Any], page_identifier: str) -> PageRotation:
+    if ROTATION_DEGREES_KEY not in fields:
+        return PageRotation.NONE
+    value = fields[ROTATION_DEGREES_KEY]
+    try:
+        if not _is_whole_number(value):
+            raise ValueError(value)
+        return PageRotation(value)
+    except ValueError:
+        LOGGER.warning("Page %s has an invalid rotation %r in the manifest; read as none", page_identifier, value)
+        return PageRotation.NONE
+
+
+def _read_tolerant_crop(fields: dict[str, Any], page_identifier: str) -> PageCrop | None:
+    value = fields.get(CROP_KEY)
+    if value is None:
+        return None
+    try:
+        if not isinstance(value, dict):
+            raise InvalidCropError("The crop is not an object")
+        crop = PageCrop(*(value[edge_key] for edge_key in CROP_EDGE_KEYS))
+    except (InvalidCropError, KeyError):
+        LOGGER.warning("Page %s has an invalid crop %r in the manifest; read as no crop", page_identifier, value)
+        return None
+    return None if crop.covers_whole_page else crop
 
 
 def _read_color_mode(fields: dict[str, Any]) -> ColorMode:

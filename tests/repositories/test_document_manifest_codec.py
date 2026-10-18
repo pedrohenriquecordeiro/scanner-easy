@@ -1,5 +1,7 @@
 import json
+import logging
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -10,6 +12,9 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentPage
 from digitalizadora.domain.errors import UnreadableDraftError
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.repositories.document_manifest_codec import (
     MANIFEST_FORMAT_VERSION,
@@ -18,6 +23,7 @@ from digitalizadora.repositories.document_manifest_codec import (
 )
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft
 
+FRAMED = PageFraming(PageRotation.CLOCKWISE_90, PageCrop(0.125, 0.115, 0.924, 0.925))
 FINALIZATION_STARTED_AT = DRAFT_CREATED_AT + timedelta(minutes=4)
 FINALIZED_AT = DRAFT_CREATED_AT + timedelta(minutes=5)
 FINISHED_DOCUMENT = ScanResult(
@@ -44,7 +50,9 @@ EXPECTED_MANIFEST_TEXT = """{
       "scanned_at": "2026-10-17T10:00:00-03:00",
       "dots_per_inch": 300,
       "color_mode": "color",
-      "size_in_bytes": 806123
+      "size_in_bytes": 806123,
+      "rotation_degrees": 0,
+      "crop": null
     }
   ],
   "finalization_started_at": null,
@@ -137,6 +145,14 @@ ROUND_TRIP_DRAFTS = [
     pytest.param(build_document_draft(0), id="no-pages"),
     pytest.param(
         DocumentDraft(
+            name="Moldura",
+            created_at=DRAFT_CREATED_AT,
+            pages=(replace(SAMPLE_PAGE, framing=FRAMED),),
+        ),
+        id="rotated-and-cropped-page",
+    ),
+    pytest.param(
+        DocumentDraft(
             name="Foto",
             created_at=DRAFT_CREATED_AT,
             pages=(DocumentPage("0123456789abcdef", FINALIZED_AT, 200, ColorMode.GRAYSCALE, 1),),
@@ -165,6 +181,75 @@ def test_unknown_keys_are_ignored():
     document["pages"][0]["rotation_in_degrees"] = 90
 
     assert decode_manifest(encode_document(document)) == NAMED_DRAFT
+
+
+def test_the_rotation_and_the_crop_are_encoded_on_the_page():
+    document = json.loads(encode_manifest(replace(NAMED_DRAFT, pages=(replace(SAMPLE_PAGE, framing=FRAMED),))))
+
+    assert (document["pages"][0]["rotation_degrees"], document["pages"][0]["crop"]) == (
+        90,
+        {"left": 0.125, "top": 0.115, "right": 0.924, "bottom": 0.925},
+    )
+
+
+def test_a_manifest_from_before_the_framing_reads_pages_without_rotation_or_crop():
+    document = json.loads(encode_manifest(NAMED_DRAFT))
+    del document["pages"][0]["rotation_degrees"]
+    del document["pages"][0]["crop"]
+
+    assert decode_manifest(encode_document(document)).pages[0].framing == UNFRAMED
+
+
+@pytest.mark.parametrize("rotation", [45, "90", 90.0, True, None, [90]])
+def test_an_invalid_rotation_is_read_as_no_rotation(rotation):
+    draft = decode_changed_manifest(set_page_value("rotation_degrees", rotation))
+
+    assert draft.pages[0].framing.rotation is PageRotation.NONE
+
+
+INVALID_CROPS = [
+    pytest.param({"left": 0.5, "top": 0, "right": 0.4, "bottom": 1}, id="edges-reversed"),
+    pytest.param({"left": -0.1, "top": 0, "right": 1, "bottom": 1}, id="outside-the-page"),
+    pytest.param({"left": 0, "top": 0, "right": 1}, id="edge-missing"),
+    pytest.param({"left": "0", "top": 0, "right": 1, "bottom": 1}, id="edge-as-text"),
+    pytest.param([0, 0, 1, 1], id="not-an-object"),
+    pytest.param("whole", id="text"),
+]
+
+
+@pytest.mark.parametrize("crop", INVALID_CROPS)
+def test_an_invalid_crop_is_read_as_no_crop(crop):
+    draft = decode_changed_manifest(set_page_value("crop", crop))
+
+    assert draft.pages[0].framing.crop is None
+
+
+def test_an_invalid_crop_does_not_make_the_manifest_unreadable():
+    draft = decode_changed_manifest(set_page_value("crop", "whole"))
+
+    assert draft.name == NAMED_DRAFT.name
+
+
+def test_an_invalid_rotation_keeps_the_crop_of_the_page():
+    document = manifest_with_both_markers()
+    document["pages"][0].update({"rotation_degrees": 45, "crop": {"left": 0, "top": 0, "right": 0.5, "bottom": 0.5}})
+
+    framing = decode_manifest(encode_document(document)).pages[0].framing
+
+    assert framing == PageFraming(PageRotation.NONE, PageCrop(0.0, 0.0, 0.5, 0.5))
+
+
+def test_a_crop_of_the_whole_page_is_read_as_no_crop():
+    whole_page = {"left": 0, "top": 0, "right": 1, "bottom": 1}
+
+    assert decode_changed_manifest(set_page_value("crop", whole_page)).pages[0].framing.crop is None
+
+
+def test_an_invalid_framing_value_is_reported_in_the_log(caplog):
+    with caplog.at_level(logging.WARNING):
+        decode_changed_manifest(set_page_value("rotation_degrees", 45))
+
+    assert "invalid rotation" in caplog.text
 
 
 @pytest.mark.parametrize("dots_per_inch", [1, 65535])

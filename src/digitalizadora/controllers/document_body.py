@@ -9,6 +9,7 @@ from digitalizadora.domain.document_draft import (
     DraftRecoveryReport,
     DraftSnapshot,
 )
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.services.document_draft_store import DraftStorageState
 
 EMPTY_PAGE_COUNT = 0
@@ -72,7 +73,15 @@ def _describe_page(page: DocumentPage) -> dict[str, Any]:
         "dots_per_inch": page.dots_per_inch,
         "color_mode": page.color_mode.value,
         "size_in_bytes": page.size_in_bytes,
+        "rotation_degrees": page.framing.rotation.value,
+        "crop": _describe_crop(page.framing.crop),
     }
+
+
+def _describe_crop(crop: PageCrop | None) -> dict[str, float] | None:
+    if crop is None:
+        return None
+    return {"left": crop.left, "top": crop.top, "right": crop.right, "bottom": crop.bottom}
 
 
 def _describe_recovery(recovery_report: DraftRecoveryReport | None) -> dict[str, Any] | None:
