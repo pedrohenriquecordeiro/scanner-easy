@@ -55,10 +55,21 @@ Ajustes (salvos na hora):
 
 - **Modo:** Rápido ou Documento.
 - **Formato:** PDF ou JPG (só no modo Rápido; o modo Documento sempre grava PDF).
-- **Qualidade:** Texto (300 dpi, cor), Texto econômico (200 dpi, cinza) ou Foto (600 dpi, cor).
+- **Resolução** (75 a 1200 dpi) e **Cor** (colorido ou tons de cinza).
+- **Cortar automaticamente e remover o fundo:** acha até 2 fotos (ou uma folha menor que o vidro), inclusive tortas, e dá uma moldura a cada uma. Veja [Molduras de corte](#molduras-de-corte-até-2-fotos-e-qualidade-do-jpeg).
+- **Qualidade do JPEG** (50 a 100, padrão 90): vale quando a imagem é cortada ou girada.
 - **Pasta de saída:** digite o caminho completo (por exemplo `/Volumes/MeuDisco/Scans`) e clique em **Salvar**. O padrão é `~/Pictures/Digitalizadora`. A página mostra o espaço livre e quantas páginas ainda cabem; se a pasta sumir (por exemplo, um disco externo desconectado), mostra "Pasta de saída indisponível" no lugar do espaço livre.
 
 Os arquivos se chamam `AAAA-MM-DD_NNNNN.pdf` ou `.jpg`, com um contador de 5 dígitos por dia, e nunca sobrescrevem outro arquivo.
+
+## Molduras de corte, até 2 fotos e qualidade do JPEG
+
+Uma **moldura** é um quadrilátero com quatro cantos livres: serve para uma foto reta e para uma foto torta, deitada em qualquer ângulo no vidro. O corte **endireita** a região da moldura (e o "lado de cima" da moldura é o lado de cima da foto recortada). Cada digitalização aceita **até 2 molduras**, para digitalizar duas fotos de uma vez.
+
+- **Modo Rápido.** Com **Cortar automaticamente** ligado, cada foto achada vira um arquivo (numeração seguida, mesmo formato). O painel **Última digitalização** mostra a miniatura com as molduras (a 1 em azul e linha contínua, a 2 em laranja e tracejada, com o número ao lado), a lista de arquivos, **Girar ↻** e **Ampliar**. O original do scanner fica guardado em `~/Library/Application Support/Digitalizadora/quick-scan/` até a próxima digitalização; por isso cada ajuste regrava os arquivos a partir dele, sem perder qualidade. Se uma moldura é removida, o arquivo dela só é apagado se continua como o app o gravou (a tela diz o que foi apagado, criado ou mantido). Sem o original guardado, os dois botões ficam desabilitados e o painel explica.
+- **Modo Documento.** Cada página guarda as suas molduras (miniaturas com as mesmas cores e números e, com duas, o texto "2 molduras"). Uma página com 2 molduras vira **2 páginas no PDF**, na ordem de leitura (da esquerda para a direita, depois de cima para baixo).
+- **Ampliar** (os dois modos, o mesmo editor). Arraste um **canto** (só ele se move), um **lado** (anda na perpendicular dele), o **interior** (move a moldura toda) ou a **alça redonda de cima** (gira a moldura). Botões: **Adicionar moldura** (no máximo 2), **Remover moldura**, **Girar moldura ↻** (muda o lado de cima da foto recortada), **Detectar automaticamente**, **Sem corte**, **Girar ↻** (gira a página), **Cancelar** (Esc) e **Aplicar**. Com o teclado: Tab percorre as alças da moldura selecionada, depois **Selecionar moldura N**; as setas movem a alça (Shift anda 10 vezes mais; nas laterais só valem as setas que apontam na perpendicular; na alça de girar, esquerda e direita giram 0,5°, com Shift 5°). Um movimento que deixaria a moldura torta demais (côncava, achatada ou com lado menor que 2%) é ignorado, e a tela diz.
+- **Qualidade do JPEG.** O scanner entrega JPEG de qualidade 50; cada regravação por corte, endireitamento ou giro usa o valor da configuração (padrão 90). Uma imagem sem corte e sem giro mantém os bytes do scanner. Um valor menor dá arquivos menores.
 
 ## Documento de várias páginas
 
@@ -134,6 +145,8 @@ make run-simulated
 ```
 
 O primeiro liga a impressora falsa em `http://127.0.0.1:8080/eSCL`; o segundo abre o app apontando para ela. O `make run-simulated` usa uma pasta pessoal separada, `~/Digitalizadora-simulador`: os ajustes, o endereço da impressora, o registro e os arquivos de teste (em `~/Digitalizadora-simulador/Pictures/Digitalizadora`) ficam lá, e o uso real não é afetado. Para usar outra pasta: `make run-simulated SIMULATED_HOME="$HOME/outra-pasta"`. Essa pasta pode ser apagada quando você quiser.
+
+Para testar as molduras com fotos (formas sintéticas, nunca pessoas), ligue o simulador com uma cena: `DIGITALIZADORA_SIMULATOR_SCENE=photos_two make simulator` (duas fotos giradas sobre a tampa branca; `photos_one` põe uma só; o padrão, `sheet`, é uma folha). Cada foto tem um quadradinho magenta no canto de cima à esquerda e um verde no de cima à direita, para conferir que o recorte sai em pé.
 
 ## Variáveis de ambiente
 

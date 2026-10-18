@@ -131,6 +131,28 @@ Antes de começar: simulador e `make run-simulated` parados; impressora ligada e
 | C33 | Apertar Espaço e, enquanto o status mostra "Digitalizando a página 1…", apertar Espaço mais três vezes; depois cancelar o documento | Só uma página entra; se aparecer faixa, é "Já existe uma digitalização em andamento." |  |
 | C34 | (Opcional, com um disco externo de verdade) Pasta de saída no disco externo; uma página; ejetar o disco pelo Finder; clicar em **Finalizar PDF** e confirmar em **Finalizar**; reconectar o disco e finalizar de novo | Com o disco ejetado: faixa "Não consigo gravar na pasta de saída. Se for um disco externo, confira se está conectado." e a página continua na grade. Com o disco de volta: o PDF é gravado no disco externo e o documento termina |  |
 
+## Parte D: molduras livres, até 2 fotos, modo Rápido com Ampliar e qualidade do JPEG (simulador, sem impressora)
+
+Antes de começar: `DIGITALIZADORA_SIMULATOR_SCENE=photos_two make simulator` num Terminal e `make run-simulated` em outro; abrir `http://127.0.0.1:8765`. A cena tem duas fotos sintéticas giradas (uma a uns 30°, de cabeça para baixo na tampa; a outra quase reta), cada uma com um quadradinho magenta (canto de cima à esquerda) e um verde (canto de cima à direita).
+
+| # | O que fazer | Resultado esperado | Resultado |
+|---|---|---|---|
+| D1 | Olhar a caixa de ajustes | Nenhum parágrafo sobre "fotos e folhas menores que o vidro"; o campo **Qualidade do JPEG** (controle deslizante, número ao lado, valor 90) tem a dica "Vale quando a imagem é cortada ou girada." |  |
+| D2 | Modo **Rápido**, resolução 150 dpi, marcar **Cortar automaticamente e remover o fundo**, apertar Espaço | O painel **Última digitalização** mostra a miniatura com duas molduras (1 azul contínua, 2 laranja tracejada, com os números), dois arquivos na lista (numeração seguida) e os botões **Girar ↻** e **Ampliar** |  |
+| D3 | Abrir os dois arquivos | Cada foto sai em pé e endireitada, com o quadradinho magenta em cima à esquerda e o verde em cima à direita |  |
+| D4 | **Ampliar**: arrastar um canto da moldura 1; depois um lado; depois o interior; depois a alça redonda de cima | Só o canto se move; o lado anda na perpendicular; o interior move a moldura toda; a alça gira a moldura. A moldura nunca sai da página. **Aplicar** fica habilitado só quando algo mudou |  |
+| D5 | Tentar arrastar um canto até ultrapassar o canto vizinho | A moldura fica no último lugar bom e, ao soltar, a tela diz "Esse movimento deixaria a moldura torta demais. Ela ficou como estava." |  |
+| D6 | Com o teclado: abrir **Ampliar** com Enter, Tab até o canto inferior direito, setas e Shift+setas, Esc | O foco começa em **Mover a moldura**; a ordem do Tab é cantos, lados, mover, girar, selecionar a outra moldura, botões; cada seta anda 0,5% (Shift 5%) e a tela diz a posição; Esc fecha sem aplicar e devolve o foco a **Ampliar** |  |
+| D7 | Tocar (tela de toque ou emulação) e arrastar um canto | O canto acompanha o dedo |  |
+| D8 | **Aplicar** | O diálogo fecha; o painel diz "Moldura aplicada: 2 arquivos."; só o arquivo da moldura mudada foi regravado |  |
+| D9 | **Ampliar**, selecionar a moldura 2 (clicando dentro dela), **Remover moldura**, **Aplicar** | O painel diz "O arquivo AAAA-MM-DD_NNNNN.pdf foi apagado porque a moldura 2 foi removida."; só sobra um arquivo |  |
+| D10 | **Ampliar**, **Adicionar moldura**, **Aplicar** | Um arquivo novo aparece (o próximo número livre) e o painel diz "Novo arquivo: …"; com 2 molduras, **Adicionar moldura** fica desabilitado |  |
+| D11 | **Girar ↻** no painel, quatro vezes | Cada giro regrava os arquivos e a miniatura gira; depois de quatro, tudo volta à posição original |  |
+| D12 | Mexer o controle de **Qualidade do JPEG** para 60 (com as setas) e girar o painel quatro vezes | O número acompanha o controle; os arquivos regravados ficam bem menores (cerca de metade) |  |
+| D13 | Desmarcar **Cortar automaticamente**, digitalizar, **Ampliar** (o foco começa em **Adicionar moldura**), adicionar, arrastar um canto, **Aplicar** | O primeiro arquivo é a imagem inteira, sem molduras; depois de aplicar, o arquivo mostra só a região |  |
+| D14 | Modo **Documento**, resolução 150 dpi, com o corte ligado, uma página, **Salvar** com Enter | A miniatura tem as duas molduras e o texto "2 molduras"; o rótulo diz "…com 2 molduras de corte (2 páginas no PDF)"; o PDF tem 2 páginas, uma por foto |  |
+| D15 | Celular (390 px de largura) e tema escuro | O painel e o diálogo cabem sem rolagem horizontal; as cores e os números das molduras continuam legíveis |  |
+
 Resumo (preencha no fim):
 
 - Páginas por hora no uso real: ____________

@@ -1,6 +1,6 @@
 # Molduras livres, até 2 fotos por digitalização e o modo Rápido com moldura: design
 
-**Data:** 2026-10-18 · **Status:** servidor implementado (T51 a T60, seção 13); interface (T61 a T66) e aceitação (T67, T68) ainda por fazer. Decisões tomadas e medidas feitas (seções 2 e 3), contratos fechados (seções 4 a 8), tarefas T51 a T68 na seção 11 · **Substitui** do [Moldura de corte por página](2026-10-18-moldura-de-corte-por-pagina.md): D1 (a moldura é um retângulo, uma por página), D4 e D9 (o modo Rápido corta de forma destrutiva e só com o detector estrito), D8 (girar o arquivo salvo no próprio arquivo), D12 (oito alças de retângulo), a seção 6.1 (giro de um retângulo), 6.3 (os dois detectores e onde cada um roda) e 6.9 (módulo de geometria). **Complementa** [Documento de várias páginas](2026-10-17-documento-de-varias-paginas.md) e [Ajustes: girar, resoluções, corte](2026-10-17-ajustes-rotacao-resolucoes-corte.md) (a decisão A2, "recodificar a 95", é substituída pela qualidade configurável, D23) · **Baseline:** 3263 testes passando (17 pulados), `ruff` limpo, 28 commits locais (nada enviado ao GitHub).
+**Data:** 2026-10-18 · **Status:** servidor implementado (T51 a T60, seção 13) e interface implementada (T61 a T65, seção 14; aceitação no simulador, T67, na 14.4); falta só a limpeza do servidor da 14.5 e a aceitação na impressora real (T68). Decisões tomadas e medidas feitas (seções 2 e 3), contratos fechados (seções 4 a 8), tarefas T51 a T68 na seção 11 · **Substitui** do [Moldura de corte por página](2026-10-18-moldura-de-corte-por-pagina.md): D1 (a moldura é um retângulo, uma por página), D4 e D9 (o modo Rápido corta de forma destrutiva e só com o detector estrito), D8 (girar o arquivo salvo no próprio arquivo), D12 (oito alças de retângulo), a seção 6.1 (giro de um retângulo), 6.3 (os dois detectores e onde cada um roda) e 6.9 (módulo de geometria). **Complementa** [Documento de várias páginas](2026-10-17-documento-de-varias-paginas.md) e [Ajustes: girar, resoluções, corte](2026-10-17-ajustes-rotacao-resolucoes-corte.md) (a decisão A2, "recodificar a 95", é substituída pela qualidade configurável, D23) · **Baseline:** 3263 testes passando (17 pulados), `ruff` limpo, 28 commits locais (nada enviado ao GitHub).
 
 ## 1. O que você pediu (md.md, linhas 39 a 56) e o que as medições mudaram
 
@@ -1096,3 +1096,51 @@ DIGITALIZADORA_CARD_IMAGE=<caminho do cartão a uns 30°> \
 ### 13.6 Pontos que seguem abertos para a interface
 
 A rota provisória e o `crop` do corpo saem na T64; `file_name` e `size_in_bytes` de `last_result` saem na T65; a leitura do arquivo `page-crop-rotation-vectors.json` pelos testes do Node vira a de `page-crop-vectors.json` na T61.
+
+## 14. Notas da implementação da interface (T61 a T65) e aceitação no simulador (T67)
+
+A interface está feita e testada. Baseline anterior: 3736 testes; agora **4039 passam** (17 pulados) e `ruff` está limpo. Os testes novos da interface rodam no Node (cada teste abaixo de 100 ms; o processo do Node de cada módulo é o único custo, como antes). Nada foi enviado ao GitHub, a impressora real não foi usada e a porta 8765 não foi tocada.
+
+### 14.1 O que saiu como o desenho dizia
+
+Moldura como quadrilátero (`page-frame-geometry.js` reescrito, os vetores de `page-crop-vectors.json` lidos pelo Node: giro da página, giro só da saída, quatro giros voltam ao início e todos os casos de validade com os mesmos nomes de problema do Python); sobreposição em SVG com o escurecimento `evenodd`, um polígono por moldura (1 azul contínua, 2 laranja tracejada), selo com o número, "2 molduras" em texto no tile; o editor com quatro cantos livres, quatro lados (andam na perpendicular), mover, alça de girar a moldura, **Adicionar**, **Remover**, **Girar moldura ↻**, **Detectar automaticamente**, **Sem corte**, **Girar ↻**, **Cancelar** e **Aplicar**; o teclado (Tab, setas, Shift) e os anúncios; o painel do modo Rápido com miniatura, molduras, lista de arquivos, **Girar ↻** e **Ampliar** (o mesmo editor, sem cópia); o campo de **Qualidade do JPEG** e a dica removida.
+
+### 14.2 Desvios e escolhas pequenas (todos dentro dos contratos)
+
+- **O editor recebe o dono em cada abertura, não um `editor_services` fixo (D25).** `PageFrameEditor.open({owner, target_identifier, action_origin})`; o dono é o `DocumentPanel` ou o `LastScanPanel` e dá `find_target`, `attempt_edit`, `report_failure`, `can_edit`, `announce` e `restore_focus`. As respostas entram por `handle_target_change(owner)`, que ignora quem não é o dono da sessão. O alvo leva também `progress_text` ("Regravando…" no modo Rápido, nada no Documento) e `describe_application(frame_count)` (o painel do modo Rápido já escreveu o que fez nos arquivos e devolve `null`).
+- **`move_corner`, `move_edge` e `rotate_frame` devolvem `null` quando o resultado é inválido**, em vez de "a moldura de antes". Assim o arraste fica no último lugar bom em vez de saltar para o início, e só ao soltar a tela diz "Esse movimento deixaria a moldura torta demais. Ela ficou como estava." As setas usam o mesmo `null`.
+- **`describe_frame(frame, {label, surface})`** leva o tamanho da imagem ampliada: o ângulo "inclinada N° para a esquerda/direita" só é certo em pixels. Um quadrilátero cujo lado de cima aponta mais para um lado do que para cima diz também "Lado de cima da foto à direita/à esquerda/embaixo".
+- **As duas molduras ficam em ordem de leitura no rascunho do editor**, como o servidor as guarda: a ordem muda ao soltar o arraste ou depois de uma seta, e a moldura selecionada continua a mesma (a numeração 1 e 2 acompanha).
+- **"Mover a moldura" e "Selecionar moldura N" são botões do tamanho do palco recortados pelo polígono da moldura (`clip-path`)**: o ponteiro só os alcança dentro dela, e as duas molduras podem se sobrepor sem problema. A ordem do Tab é cantos, lados, mover, girar, selecionar, botões (com duas molduras **Adicionar moldura** está desabilitado e o Tab o pula).
+- **Arquivos novos:** `frame-overlay.js` (as molduras sobre uma imagem, usado pelo tile, pelo painel e pelo editor), `frame-dialog-policy.js` (textos e regras do editor), `last-scan-policy.js` (endereços e textos do último arquivo) e `last-scan-panel.js` (`LastScanPanel`, o painel do modo Rápido). O `ScanPage` só os liga. O texto da dica de limites (duas fotos muito juntas) fica no diálogo, em letra pequena e no `aria-describedby`.
+- **Uma digitalização espera qualquer ajuste em curso** (`can_start_capture`), no modo Documento e no Rápido, para a resposta nunca ser `last_scan_busy` (409) por culpa da tela. O seletor de modo também fica desabilitado durante um ajuste do último arquivo.
+- **Estado antigo nunca desfaz um ajuste.** Cada ajuste que termina sobe um contador (`edit_serial`); um `GET /api/state` pedido antes do fim do ajuste, ou que chega durante um, é ignorado. A miniatura recarrega logo depois de um ajuste feito aqui (versão `revisão-serial`) e o estado novo é pedido na hora.
+- **A caixa de qualidade grava ao soltar** (`change`) e mostra o número enquanto mexe (`input`); uma recusa do servidor devolve o controle ao valor salvo. Os outros ajustes levam a qualidade salva no corpo, como já levavam o resto das configurações.
+- **O texto de abertura e a alça de girar são calculados de novo quando a imagem carrega**, porque só então se conhece o tamanho em pixels (o ângulo "inclinada N°" e a distância da alça dependem dele); um texto que o usuário já provocou não é trocado. Um segundo dedo em outra alça não toma o arraste do primeiro.
+- **O selo do número fica logo dentro do primeiro canto** (4 px para dentro), para não ficar debaixo da alça do canto.
+- **Não foi feita a limpeza do servidor da T64 e da T65** (o `crop` provisório do corpo do documento, o apelido `PUT …/crop` e `file_name`/`size_in_bytes` de `last_result`): a tela não os usa mais, e tirá-los mexe em testes de integração do servidor, fora de `web/static` e `tests/web`. Ver 14.5.
+
+### 14.3 Textos que ficaram errados e foram trocados
+
+Saiu a dica da caixa de corte (e o `aria-describedby`). A dica do painel virou "Ajustes regravam os arquivos salvos."; "Arquivo" virou "Arquivos" (um nome por linha); o status do painel passou a se chamar `last-scan-status` e diz "Regravando…", "Moldura aplicada: 2 arquivos.", "Corte removido: 1 arquivo.", "Molduras detectadas: 2 arquivos.", "Novo arquivo: …", "O arquivo … foi apagado porque a moldura 2 foi removida." e "Mantive … porque ele foi alterado depois de gravado." A linha de status da página diz "Pronto! 2 arquivos salvos: A e B". `README.md` e `docs/acceptance-checklist.md` (parte D) ganharam as partes novas.
+
+### 14.4 Aceitação no simulador (T67), com o Chrome sem janela
+
+Aplicativo numa porta livre (18952) com `HOME` temporário, simulador em outra (18951) com `DIGITALIZADORA_SIMULATOR_SCENE=photos_two`; o Chrome sem janela do `~/.cache/puppeteer` dirigido pelo cliente CDP de antes (os scripts ficam no scratchpad, fora do repositório). Tudo passou, sem erro no console e sem exceção:
+
+- **Modo Rápido, 150 dpi, corte ligado:** painel com 2 molduras (a 2 tracejada, o polígono casa com o contorno desenhado a ±0,01 e o quadro da miniatura tem a proporção da imagem), dois arquivos; o arquivo 1 saiu endireitado, com o quadradinho magenta em cima à esquerda e o verde em cima à direita.
+- **Ampliar:** as alças ficam sobre os cantos (±0,01 do que o servidor guarda); arrastar um canto com o mouse muda o polígono; **Aplicar** regravou só o arquivo da moldura mudada (64924 para 56384 bytes) e o painel disse "Moldura aplicada: 2 arquivos."; toque (eventos de toque do CDP) moveu um canto; o lado, o interior e a alça redonda de girar também arrastam; **Girar moldura ↻**, **Detectar automaticamente** ("Achei 2 molduras e salvei.") e **Cancelar** respondem; teclado: Enter abre com o foco em **Mover a moldura**, Tab segue a ordem do desenho, setas e Shift+setas movem um canto e a tela diz a posição, Esc fecha e devolve o foco a **Ampliar**.
+- **Remover e Adicionar:** clicar dentro da moldura 2 a seleciona; remover e aplicar apagou o arquivo 2 e o painel disse por quê; adicionar e aplicar criou de novo o arquivo 2 ("Novo arquivo: …"); com duas molduras **Adicionar** fica desabilitado.
+- **Girar ↻** no painel: rotação 90, miniatura rotacionada, arquivos regravados; quatro giros voltam a 0. **Qualidade 60** (30 vezes seta para a esquerda no controle, salva em `/api/settings`): os arquivos regravados caíram de 64924 e 54668 bytes para 31187 e 28508.
+- **Corte desligado:** a digitalização é a imagem inteira, sem molduras; **Ampliar** abre com o foco em **Adicionar moldura**; uma moldura desenhada à mão e aplicada vira 1 moldura.
+- **Modo Documento, corte ligado:** o tile mostra as 2 molduras, "2 molduras" e o rótulo "…com 2 molduras de corte (2 páginas no PDF)"; **Salvar** (Enter, confirmar) gravou um PDF de **2 páginas**; o painel do modo Rápido some.
+- **Celular (390 px, tema escuro):** sem rolagem horizontal; o diálogo rola por dentro.
+
+Não foi repetido aqui o que o servidor já mediu (13.4): 600 e 1200 dpi, memória, kill -9 com `render_pending`.
+
+### 14.5 Pontos que seguem abertos
+
+- **Limpeza do servidor (T64 e T65):** tirar o `crop` do corpo do documento, o apelido `PUT …/crop` e `POST …/crop/detect`, e `file_name`/`size_in_bytes` de `last_result` (e os testes de integração que ainda os usam, `tests/integration/test_frame_and_rotation_flow.py` entre eles).
+- **Aceitação na impressora real (T68)**, com as duas fotos e depois o livro.
+- **Ergonomia no toque:** a alça de girar a moldura fica a uns 6% da altura da moldura, fora do lado de cima; em moldura pequena ela e a alça do lado de cima ficam perto (cada uma tem 44 px de área de toque). Na aceitação em toque de verdade vale conferir.
+- **Duas molduras que se sobrepõem** têm o botão de selecionar da outra por baixo do da selecionada: clicar na parte comum move a selecionada, e a outra se seleciona pela parte só dela ou pelo teclado.
