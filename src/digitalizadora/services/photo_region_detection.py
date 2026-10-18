@@ -293,13 +293,14 @@ def _candidates_of(mask: Image.Image) -> list[_Candidate]:
 def _touched_side_count(corners: Corners, preview: Image.Image) -> int:
     width, height = preview.size
     border_width = _border_width(preview)
-    xs, ys = [corner[0] for corner in corners], [corner[1] for corner in corners]
+    horizontal_positions = [corner[0] for corner in corners]
+    vertical_positions = [corner[1] for corner in corners]
     return sum(
         (
-            min(xs) <= border_width,
-            min(ys) <= border_width,
-            max(xs) >= width - border_width,
-            max(ys) >= height - border_width,
+            min(horizontal_positions) <= border_width,
+            min(vertical_positions) <= border_width,
+            max(horizontal_positions) >= width - border_width,
+            max(vertical_positions) >= height - border_width,
         )
     )
 

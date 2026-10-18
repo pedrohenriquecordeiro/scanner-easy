@@ -8,7 +8,14 @@ from PIL import Image, ImageDraw
 from digitalizadora.domain.pixel_region import PixelRegion
 from digitalizadora.services.photo_region_detection import PhotoRegion, detect_photo_regions
 from tests.fakes.book_on_glass import BookOnGlass, build_book_on_glass_jpeg
-from tests.fakes.photo_scenes import PlacedPhoto, build_lid, build_photo_scene, paste_flat_sheet, photo_corners
+from tests.fakes.photo_scenes import (
+    PlacedPhoto,
+    build_flat_lid,
+    build_lid,
+    build_photo_scene,
+    paste_flat_sheet,
+    photo_corners,
+)
 from tests.fakes.synthetic_previews import (
     PAPER_LEVEL,
     PREVIEW_SIZE,
@@ -35,8 +42,14 @@ def detect_paper_region(preview) -> PixelRegion | None:
         return None
     assert len(detection.regions) == 1
     corners = detection.regions[0].corners
-    xs, ys = [corner[0] for corner in corners], [corner[1] for corner in corners]
-    return PixelRegion(round(min(xs)), round(min(ys)), round(max(xs)), round(max(ys)))
+    horizontal_positions = [corner[0] for corner in corners]
+    vertical_positions = [corner[1] for corner in corners]
+    return PixelRegion(
+        round(min(horizontal_positions)),
+        round(min(vertical_positions)),
+        round(max(horizontal_positions)),
+        round(max(vertical_positions)),
+    )
 
 
 def assert_region_close_to(region: PixelRegion | None, expected: PixelRegion) -> None:
@@ -313,7 +326,7 @@ def test_an_empty_white_lid_has_no_region():
 
 
 def test_a_page_with_a_thin_printed_frame_has_no_region():
-    lid = build_lid(SCENE_SIZE, color=(250, 250, 250), shading=False)
+    lid = build_flat_lid(SCENE_SIZE, color=(250, 250, 250))
     ImageDraw.Draw(lid).rectangle((0, 0, SCENE_SIZE[0] - 1, SCENE_SIZE[1] - 1), outline=(230, 230, 230))
 
     assert detect_in([], lid).regions == ()
@@ -342,7 +355,7 @@ def test_a_photo_flush_with_the_edge_of_the_glass_is_found():
 
 def test_a_white_sheet_on_a_dark_lid_at_seven_degrees_is_found():
     sheet = PlacedPhoto(center=(145.0, 200.0), size=(160, 220), angle_degrees=7.0)
-    lid = build_lid(SCENE_SIZE, color=(30, 30, 30), shading=False)
+    lid = build_flat_lid(SCENE_SIZE, color=(30, 30, 30))
     paste_flat_sheet(lid, sheet, (250, 250, 245))
 
     detection = detect_in([], lid)
@@ -352,7 +365,7 @@ def test_a_white_sheet_on_a_dark_lid_at_seven_degrees_is_found():
 
 def test_a_photo_almost_the_colour_of_the_lid_is_not_a_region():
     photo = PlacedPhoto(center=(145.0, 200.0), size=(160, 220), angle_degrees=0.0)
-    lid = build_lid(SCENE_SIZE, color=(30, 30, 30), shading=False)
+    lid = build_flat_lid(SCENE_SIZE, color=(30, 30, 30))
     paste_flat_sheet(lid, photo, (45, 45, 45))
 
     assert detect_in([], lid).regions == ()

@@ -122,10 +122,10 @@ def photo_corners(placement: PhotoPlacement, size_in_pixels: tuple[int, int]) ->
     )
     return tuple(
         (
-            center_x + dx * math.cos(angle) - dy * math.sin(angle),
-            center_y + dx * math.sin(angle) + dy * math.cos(angle),
+            center_x + offset_x * math.cos(angle) - offset_y * math.sin(angle),
+            center_y + offset_x * math.sin(angle) + offset_y * math.cos(angle),
         )
-        for dx, dy in offsets
+        for offset_x, offset_y in offsets
     )
 
 

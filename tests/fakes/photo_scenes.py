@@ -41,7 +41,8 @@ def rotated_rectangle_corners(center: Point, size: tuple[int, int], angle_degree
     cosine, sine = math.cos(angle), math.sin(angle)
     offsets = ((-width / 2, -height / 2), (width / 2, -height / 2), (width / 2, height / 2), (-width / 2, height / 2))
     return tuple(
-        (center[0] + dx * cosine - dy * sine, center[1] + dx * sine + dy * cosine) for dx, dy in offsets
+        (center[0] + offset_x * cosine - offset_y * sine, center[1] + offset_x * sine + offset_y * cosine)
+        for offset_x, offset_y in offsets
     )
 
 
@@ -63,11 +64,13 @@ def build_photo_image(size: tuple[int, int], seed: int) -> Image.Image:
     return photo
 
 
-def build_lid(size: tuple[int, int], color: tuple[int, int, int] = LID_COLOR, shading: bool = True) -> Image.Image:
-    """The lid: flat, or with the light vertical shading a closed white lid gives."""
-    lid = Image.new("RGB", size, color)
-    if not shading:
-        return lid
+def build_flat_lid(size: tuple[int, int], color: tuple[int, int, int] = LID_COLOR) -> Image.Image:
+    return Image.new("RGB", size, color)
+
+
+def build_lid(size: tuple[int, int], color: tuple[int, int, int] = LID_COLOR) -> Image.Image:
+    """The lid with the light vertical shading a closed white lid gives."""
+    lid = build_flat_lid(size, color)
     shade = Image.linear_gradient("L").resize(size).point(lambda level: LID_SHADING_LEVELS * level // 255)
     return ImageChops.subtract(lid, Image.merge("RGB", (shade, shade, shade)))
 

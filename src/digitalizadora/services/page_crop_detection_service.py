@@ -81,13 +81,14 @@ def _crop_around(region: PixelRegion, full_size: tuple[int, int]) -> PageCrop | 
 
 
 def _bounding_region(region: PhotoRegion, preview_size: tuple[int, int]) -> PixelRegion:
-    xs, ys = [corner[0] for corner in region.corners], [corner[1] for corner in region.corners]
+    horizontal_positions = [corner[0] for corner in region.corners]
+    vertical_positions = [corner[1] for corner in region.corners]
     width, height = preview_size
     return PixelRegion(
-        left=max(0, math.floor(min(xs))),
-        top=max(0, math.floor(min(ys))),
-        right=min(width, math.ceil(max(xs))),
-        bottom=min(height, math.ceil(max(ys))),
+        left=max(0, math.floor(min(horizontal_positions))),
+        top=max(0, math.floor(min(vertical_positions))),
+        right=min(width, math.ceil(max(horizontal_positions))),
+        bottom=min(height, math.ceil(max(vertical_positions))),
     )
 
 
