@@ -1,6 +1,8 @@
 # Checklist de aceitação do Digitalizadora
 
-Preencha a coluna **Resultado** com OK, FALHOU (e o que viu) ou N/A. Faça as partes nesta ordem: A (simulador, sem impressora), B (impressora real) e C (documento de várias páginas: C.1 no simulador e C.2 na impressora real). As partes A e B usam o modo Rápido, o padrão. O Gate 0 já foi concluído em 2026-10-17 ([resultado](gate-0-resultado-2026-10-17.md)); este checklist não repete nenhum passo dele.
+Checklist manual, para rodar antes de aceitar uma versão ou depois de mudanças grandes. Veja também [desenvolvimento.md](desenvolvimento.md).
+
+Preencha a coluna **Resultado** com OK, FALHOU (e o que viu) ou N/A. Faça as partes nesta ordem: A (simulador, sem impressora), B (impressora real), C (documento de várias páginas: C.1 no simulador e C.2 na impressora real) e D (molduras, no simulador). As partes A e B usam o modo Rápido, o padrão. O Gate 0 já foi concluído em 2026-10-17 ([resultado](historico/gate-0-resultado-2026-10-17.md)); este checklist não repete nenhum passo dele.
 
 Anote ao começar:
 
@@ -13,7 +15,7 @@ Deixe a impressora de verdade **desligada** durante toda a parte A: com ela liga
 
 | # | O que fazer | Resultado esperado | Resultado |
 |---|---|---|---|
-| A0 | Num terminal, apagar os ajustes e os arquivos de execuções anteriores do simulador (inclusive da verificação manual da Tarefa 12): `rm -rf ~/Digitalizadora-simulador ~/Digitalizadora-teste` | O comando termina sem mensagem; as duas pastas deixam de existir (`ls ~/Digitalizadora-simulador ~/Digitalizadora-teste` responde "No such file or directory") |  |
+| A0 | Num terminal, apagar os ajustes e os arquivos de execuções anteriores do simulador: `rm -rf ~/Digitalizadora-simulador ~/Digitalizadora-teste` | O comando termina sem mensagem; as duas pastas deixam de existir (`ls ~/Digitalizadora-simulador ~/Digitalizadora-teste` responde "No such file or directory") |  |
 | A1 | Terminal 1: `make simulator` | Aparece "Impressora de mentira ligada em http://127.0.0.1:8080/eSCL" |  |
 | A2 | Terminal 2: `DIGITALIZADORA_OUTPUT_FOLDER="$HOME/Digitalizadora-teste" make run-simulated` | Aparece o endereço `http://127.0.0.1:8765` e o aviso para manter a janela aberta |  |
 | A3 | Abrir `http://127.0.0.1:8765` no navegador | Página em português; selo "Impressora pronta (USB)" em até 15 s (o simulador entra como endereço manual em 127.0.0.1, e um endereço de loopback conta como rota USB pela G0C-16); seletor Modo em "Rápido" e seletor Qualidade em "Texto (300 dpi, cor)"; botão Digitalizar com o foco; linha "Espaço livre: ... cabem ~N páginas" |  |
