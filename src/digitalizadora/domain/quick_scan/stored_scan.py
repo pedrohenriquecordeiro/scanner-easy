@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from digitalizadora.domain.last_scan import LastScan
+from digitalizadora.domain.quick_scan.last_scan import LastScan
 
 
 @dataclass(frozen=True)

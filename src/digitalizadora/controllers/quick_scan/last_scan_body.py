@@ -1,7 +1,7 @@
 from typing import Any
 
 from digitalizadora.controllers.documents.document_body import describe_crop
-from digitalizadora.domain.last_scan import LastScan
+from digitalizadora.domain.quick_scan.last_scan import LastScan
 
 
 def describe_last_scan(last_scan: LastScan) -> dict[str, Any]:

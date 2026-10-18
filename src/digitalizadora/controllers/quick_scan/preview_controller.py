@@ -5,9 +5,9 @@ from fastapi import APIRouter, Response
 
 from digitalizadora.controllers.documents.document_controller import parse_page_rotation
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
-from digitalizadora.controllers.last_scan_controller import respond_to_last_scan_error
+from digitalizadora.controllers.quick_scan.last_scan_controller import respond_to_last_scan_error
 from digitalizadora.domain.errors import DigitalizadoraError
-from digitalizadora.services.last_scan_view_service import LastScanViewService
+from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 
 JPEG_MEDIA_TYPE = "image/jpeg"
 NO_STORE_HEADERS = {"Cache-Control": "no-store"}

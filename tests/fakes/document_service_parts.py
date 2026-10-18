@@ -31,8 +31,8 @@ from digitalizadora.services.page_crop_detection_service import PageCropDetectio
 from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
+from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_encoder import ScanEncoder
-from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_service import ScanService
 from digitalizadora.services.storage_guard_service import StorageGuardService
 from digitalizadora.services.thumbnail_service import ThumbnailService

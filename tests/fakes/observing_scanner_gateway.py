@@ -1,10 +1,10 @@
 import asyncio
 
-from digitalizadora.domain.scan_progress import ScanPhase
+from digitalizadora.domain.quick_scan.scan_progress import ScanPhase
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.domain.scanned_image import ScannedImage
 from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
-from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
+from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from tests.fakes.scripted_scanner_gateway import ScriptedScannerGateway
 
 

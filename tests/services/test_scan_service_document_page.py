@@ -12,13 +12,13 @@ from digitalizadora.domain.errors import (
     ScannerUnreachableError,
 )
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
+from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_service import ScanService
 from tests.fakes.document_drafts import build_document_page, page_identifier_at
 from tests.fakes.fixed_clock import FixedClock

@@ -2,10 +2,10 @@ from dataclasses import replace
 
 from digitalizadora.domain.errors import LastScanBusyError, ScanAlreadyRunningError
 from digitalizadora.domain.ports import Clock
+from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
+from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_job import ScanJob
-from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.stored_scan import StoredScan
 
 INITIAL_SNAPSHOT = ScanProgressSnapshot(phase=ScanPhase.IDLE, scans_completed=0, last_scan=None, last_error_code=None)
 

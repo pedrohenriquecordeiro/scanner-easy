@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from digitalizadora.domain.last_scan import LastScan
+from digitalizadora.domain.quick_scan.last_scan import LastScan
 
 
 class ScanPhase(str, Enum):

@@ -5,14 +5,14 @@ from contextlib import contextmanager
 
 from digitalizadora.domain.documents.document_draft import DocumentPage
 from digitalizadora.domain.errors import DigitalizadoraError
-from digitalizadora.domain.last_scan import LastScan
 from digitalizadora.domain.ports import ScannerGatewayProvider
+from digitalizadora.domain.quick_scan.last_scan import LastScan
+from digitalizadora.domain.quick_scan.scan_progress import ScanPhase
+from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_job import ScanJob
-from digitalizadora.domain.scan_progress import ScanPhase
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.stored_scan import StoredScan
+from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_destination import ScanDestination
-from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 
 logger = logging.getLogger(__name__)
 

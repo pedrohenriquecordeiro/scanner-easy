@@ -10,7 +10,7 @@ from digitalizadora.services.application_state_service import (
     ApplicationStateService,
     StorageState,
 )
-from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
+from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.storage_guard_service import (
     StorageGuardService,
     read_free_space_in_bytes,

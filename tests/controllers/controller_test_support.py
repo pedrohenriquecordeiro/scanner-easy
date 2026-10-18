@@ -4,7 +4,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 from digitalizadora.domain.errors import ScanAlreadyRunningError
-from digitalizadora.domain.last_scan import LastScan
+from digitalizadora.domain.quick_scan.last_scan import LastScan
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.services.printer_connection_service import PrinterConnectionState
 from tests.fakes.stored_scans import STORED_SCAN_SCANNED_AT, build_last_scan

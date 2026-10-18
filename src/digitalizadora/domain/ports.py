@@ -8,7 +8,7 @@ from digitalizadora.domain.documents.document_draft import DocumentDraft, Docume
 from digitalizadora.domain.documents.document_draft_reconciliation import DraftFileInventory
 from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.encoded_scan import EncodedScan
-from digitalizadora.domain.last_scan import QuickScanMasterFiles, QuickScanSlot, SavedScanFile
+from digitalizadora.domain.quick_scan.last_scan import QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.domain.scanned_image import ScannedImage

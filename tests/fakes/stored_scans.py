@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from digitalizadora.domain.last_scan import LastScan, SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
-from digitalizadora.domain.stored_scan import StoredScan
+from digitalizadora.domain.quick_scan.last_scan import LastScan, SavedScanFile
+from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 
 STORED_SCAN_SCANNED_AT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=timezone(timedelta(hours=-3)))
 STORED_SCAN_OUTPUT_FOLDER = Path("/Volumes/Scans")

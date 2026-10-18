@@ -6,10 +6,10 @@ from typing import Any
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InvalidCropError, UnreadableQuickScanError
-from digitalizadora.domain.last_scan import LastScan, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_framing import MAXIMUM_CROPS_PER_PAGE, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanSlot, SavedScanFile
 from digitalizadora.repositories.crop_codec import decode_crop, encode_crop
 
 MANIFEST_FORMAT_VERSION = 1

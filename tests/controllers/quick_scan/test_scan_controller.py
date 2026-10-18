@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
-from digitalizadora.controllers.scan_controller import ScanController
+from digitalizadora.controllers.quick_scan.scan_controller import ScanController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import ScanAlreadyRunningError, ScannerUnreachableError
 from digitalizadora.domain.image_adjustment import ImageAdjustment

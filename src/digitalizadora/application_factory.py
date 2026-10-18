@@ -17,12 +17,12 @@ from digitalizadora.controllers.error_message_catalog import (
     ErrorMessageCatalog,
     build_error_body,
 )
-from digitalizadora.controllers.last_scan_controller import LastScanController
 from digitalizadora.controllers.local_request_guard import LocalRequestGuard
-from digitalizadora.controllers.preview_controller import PreviewController
 from digitalizadora.controllers.printer_controller import PrinterController
+from digitalizadora.controllers.quick_scan.last_scan_controller import LastScanController
+from digitalizadora.controllers.quick_scan.preview_controller import PreviewController
+from digitalizadora.controllers.quick_scan.scan_controller import ScanController
 from digitalizadora.controllers.revalidated_static_files import REVALIDATE_ALWAYS_HEADERS, RevalidatedStaticFiles
-from digitalizadora.controllers.scan_controller import ScanController
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.controllers.state_controller import StateController
 from digitalizadora.domain.errors import (

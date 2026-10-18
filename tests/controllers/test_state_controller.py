@@ -10,10 +10,10 @@ from digitalizadora.controllers.state_controller import StateController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.image_adjustment import ImageAdjustment
-from digitalizadora.domain.last_scan import SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.quick_scan.last_scan import SavedScanFile
+from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.services.application_state_service import ApplicationState, StorageState
 from tests.controllers.controller_test_support import SCANNED_AT, build_test_client
 from tests.fakes.stored_scans import build_last_scan

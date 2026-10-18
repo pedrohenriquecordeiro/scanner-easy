@@ -4,9 +4,9 @@ from fastapi import APIRouter
 
 from digitalizadora.controllers.documents.document_body import build_document_summary_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
-from digitalizadora.controllers.last_scan_body import describe_last_scan
+from digitalizadora.controllers.quick_scan.last_scan_body import describe_last_scan
 from digitalizadora.controllers.settings_body import build_settings_body
-from digitalizadora.domain.last_scan import LastScan
+from digitalizadora.domain.quick_scan.last_scan import LastScan
 from digitalizadora.services.application_state_service import (
     ApplicationState,
     ApplicationStateService,

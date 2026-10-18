@@ -6,9 +6,9 @@ from digitalizadora.domain.documents.document_name_policy import FIRST_ATTEMPT_N
 from digitalizadora.domain.documents.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import OutputFolderUnavailableError
-from digitalizadora.domain.last_scan import SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import ApplicationSettingsRepository
+from digitalizadora.domain.quick_scan.last_scan import SavedScanFile
 from digitalizadora.domain.scan_file_naming_policy import SINGLE_FILE_COUNT, ScanFileNamingPolicy
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter

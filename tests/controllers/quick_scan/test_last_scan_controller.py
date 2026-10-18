@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
-from digitalizadora.controllers.last_scan_controller import LAST_SCAN_ERROR_STATUSES, LastScanController
+from digitalizadora.controllers.quick_scan.last_scan_controller import LAST_SCAN_ERROR_STATUSES, LastScanController
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     DraftStorageUnavailableError,
@@ -20,8 +20,8 @@ from digitalizadora.domain.errors import (
     SavedScanUnreadableError,
     ScanAlreadyRunningError,
 )
-from digitalizadora.domain.last_scan import SavedScanFile
-from digitalizadora.services.last_scan_edit_service import LastScanEditResult
+from digitalizadora.domain.quick_scan.last_scan import SavedScanFile
+from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditResult
 from tests.controllers.controller_test_support import build_test_client
 from tests.fakes.page_crops import quadrilateral, rectangle
 from tests.fakes.stored_scans import STORED_SCAN_SCANNED_AT, build_last_scan

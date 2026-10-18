@@ -24,15 +24,17 @@ from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.repositories.file_system_quick_scan_slot_repository import FileSystemQuickScanSlotRepository
 from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
+    FileSystemQuickScanSlotRepository,
+)
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.page_crop_detection_service import DetectedCrops, PageCropDetectionService
 from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
-from digitalizadora.services.quick_scan_output_renderer import QuickScanOutputRenderer
+from digitalizadora.services.quick_scan.quick_scan_output_renderer import QuickScanOutputRenderer
+from digitalizadora.services.quick_scan.scan_output_service import ScanOutputParts, ScanOutputService
 from digitalizadora.services.scan_encoder import ScanEncoder
-from digitalizadora.services.scan_output_service import ScanOutputParts, ScanOutputService
 from digitalizadora.services.storage_guard_service import (
     MINIMUM_FREE_SPACE_BYTES,
     SAFETY_MARGIN_PAGES,

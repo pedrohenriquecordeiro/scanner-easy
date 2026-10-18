@@ -8,14 +8,15 @@ from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.image_adjustment import ImageAdjustment
-from digitalizadora.domain.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_crop import CropCorner, RectangleEdges
 from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.pixel_region import PixelCorner, PixelRegion
+from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
+from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
+from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -24,7 +25,6 @@ from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
 from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
 from digitalizadora.domain.scanner_route import ScannerRoute
 from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
-from digitalizadora.domain.stored_scan import StoredScan
 from tests.fakes.page_crops import rectangle
 
 MOMENT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=timezone(timedelta(hours=-3)))

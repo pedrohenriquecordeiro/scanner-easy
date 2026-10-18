@@ -14,7 +14,7 @@ from digitalizadora.domain.errors import (
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.domain.stored_scan import StoredScan
+from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from tests.fakes.quick_scan_parts import ONE_PHOTO, SCENE_SIZE, QuickScanParts, build_job, build_quick_scan_parts
 
 

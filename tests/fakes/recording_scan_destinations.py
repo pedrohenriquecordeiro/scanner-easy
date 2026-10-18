@@ -2,13 +2,13 @@ import threading
 from dataclasses import replace
 
 from digitalizadora.domain.documents.document_draft import DocumentPage
-from digitalizadora.domain.last_scan import SavedScanFile
+from digitalizadora.domain.quick_scan.last_scan import SavedScanFile
+from digitalizadora.domain.quick_scan.scan_progress import ScanPhase
+from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_job import ScanJob
-from digitalizadora.domain.scan_progress import ScanPhase
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.domain.stored_scan import StoredScan
-from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
+from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from tests.fakes.stored_scans import STORED_SCAN_OUTPUT_PATH, build_last_scan
 
 
