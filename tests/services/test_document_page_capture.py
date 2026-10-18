@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -6,9 +7,12 @@ import pytest
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentPage
 from digitalizadora.domain.encoded_scan import EncodedScan
-from digitalizadora.domain.errors import InsufficientDraftStorageError, ScanFailedError
+from digitalizadora.domain.errors import ImageAdjustmentFailedError, InsufficientDraftStorageError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_framing import UNFRAMED
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
@@ -35,6 +39,7 @@ from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.sequential_page_identifiers import SequentialPageIdentifiers
+from tests.fakes.synthetic_scans import build_scan_jpeg, read_jpeg_size
 
 DRAFT_SESSION = "5c0f9a2e7b1d4c38"
 STARTED_AT = datetime(2026, 10, 17, 10, 0, 41, tzinfo=timezone(timedelta(hours=-3)))
@@ -79,7 +84,7 @@ def draft_store(drafts_folder: Path, free_space_reader: RecordingFreeSpaceReader
 
 @pytest.fixture
 def page_capture(scan_encoder: ScanEncoder, draft_store: DocumentDraftStore) -> DocumentPageCapture:
-    return DocumentPageCapture(scan_encoder, draft_store)
+    return DocumentPageCapture(scan_encoder, draft_store, PageCropDetectionService())
 
 
 def test_ensure_capacity_checks_the_drafts_disk_with_the_request_settings(page_capture):
@@ -89,15 +94,14 @@ def test_ensure_capacity_checks_the_drafts_disk_with_the_request_settings(page_c
         page_capture.ensure_capacity(photo_request)
 
 
-def test_ensure_capacity_counts_the_adjustment_of_the_request(page_capture):
+def test_ensure_capacity_does_not_count_the_adjustment_of_the_request(page_capture):
     adjusted_request = ScanRequest(
         settings=ScanPreset.DOCUMENT.settings,
         output_format=OutputFormat.JPEG,
         adjustment=ImageAdjustment(auto_crop=True),
     )
 
-    with pytest.raises(InsufficientDraftStorageError):
-        page_capture.ensure_capacity(adjusted_request)
+    assert page_capture.ensure_capacity(adjusted_request) is None
 
 
 def test_ensure_capacity_accepts_a_page_that_fits_on_the_drafts_disk(page_capture, free_space_reader, drafts_folder):
@@ -147,3 +151,127 @@ def test_store_of_an_image_that_is_not_jpeg_adds_no_page(page_capture, draft_sto
         page_capture.store(ScannedImage(content=b"%PDF-1.4", media_type="application/pdf"), PAGE_JOB)
 
     assert draft_store.snapshot().draft is None
+
+
+LID_SIZE = (200, 280)
+DARK_LID = (30, 30, 30)
+PAPER = (240, 240, 240)
+PAPER_BOX = (40, 60, 159, 219)
+SHEET_ON_DARK_LID = ScannedImage(build_scan_jpeg(LID_SIZE, [(PAPER_BOX, PAPER)], background=DARK_LID), "image/jpeg")
+CROPPING_JOB = ScanJob(
+    request=ScanRequest(
+        ScanPreset.DOCUMENT_ECONOMY.settings, OutputFormat.JPEG, ImageAdjustment(auto_crop=True)
+    ),
+    started_at=STARTED_AT,
+)
+
+
+def test_a_page_without_the_automatic_crop_has_no_frame(page_capture):
+    page = page_capture.store(SHEET_ON_DARK_LID, PAGE_JOB)
+
+    assert page.framing == UNFRAMED
+
+
+def test_a_page_with_the_automatic_crop_gets_the_frame_of_the_sheet(page_capture):
+    page = page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    assert page.framing.crop is not None
+    assert (page.framing.crop.left, page.framing.crop.right) == pytest.approx((0.18, 0.82), abs=0.05)
+
+
+def test_a_page_with_the_automatic_crop_has_no_rotation(page_capture):
+    page = page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    assert page.framing.rotation is PageRotation.NONE
+
+
+def test_the_stored_page_keeps_the_scanner_image_when_a_frame_is_found(page_capture, drafts_folder):
+    page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    page_file = drafts_folder / "current" / f"page-{FIRST_PAGE_IDENTIFIER}.jpg"
+    assert read_jpeg_size(page_file.read_bytes()) == LID_SIZE
+
+
+def test_the_stored_page_is_the_unadjusted_master_whatever_the_request_asks(
+    page_capture, scan_encoder, drafts_folder
+):
+    page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    unadjusted_master = scan_encoder.encode(SHEET_ON_DARK_LID, PAGE_JOB).content
+    page_file = drafts_folder / "current" / f"page-{FIRST_PAGE_IDENTIFIER}.jpg"
+    assert page_file.read_bytes() == unadjusted_master
+
+
+def test_the_size_of_the_manifest_is_the_size_of_the_stored_page(page_capture, drafts_folder):
+    page = page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    page_file = drafts_folder / "current" / f"page-{FIRST_PAGE_IDENTIFIER}.jpg"
+    assert page.size_in_bytes == page_file.stat().st_size
+
+
+def test_a_white_page_with_the_automatic_crop_has_no_frame(page_capture):
+    page = page_capture.store(SCANNED_IMAGE, CROPPING_JOB)
+
+    assert page.framing == UNFRAMED
+
+
+class FailingCropDetectionService(PageCropDetectionService):
+    def __init__(self, failure: Exception) -> None:
+        self._failure = failure
+
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+        raise self._failure
+
+
+def test_a_detection_that_fails_still_adds_the_page(scan_encoder, draft_store):
+    page_capture = DocumentPageCapture(scan_encoder, draft_store, FailingCropDetectionService(ScanFailedError("x")))
+
+    page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    assert draft_store.snapshot().draft.page_count == 1
+
+
+def test_a_detection_that_fails_leaves_the_page_without_a_frame(scan_encoder, draft_store):
+    page_capture = DocumentPageCapture(
+        scan_encoder, draft_store, FailingCropDetectionService(ImageAdjustmentFailedError("memory"))
+    )
+
+    page = page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    assert page.framing == UNFRAMED
+
+
+def test_a_detection_that_fails_is_reported_in_the_log(scan_encoder, draft_store, caplog):
+    page_capture = DocumentPageCapture(scan_encoder, draft_store, FailingCropDetectionService(ScanFailedError("x")))
+
+    with caplog.at_level(logging.WARNING):
+        page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    assert "automatic crop of the page failed" in caplog.text
+
+
+class CountingCropDetectionService(PageCropDetectionService):
+    def __init__(self) -> None:
+        self.detection_count = 0
+
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+        self.detection_count += 1
+        return None
+
+
+def test_the_detection_is_not_run_without_the_automatic_crop(scan_encoder, draft_store):
+    counting_service = CountingCropDetectionService()
+    page_capture = DocumentPageCapture(scan_encoder, draft_store, counting_service)
+
+    page_capture.store(SHEET_ON_DARK_LID, PAGE_JOB)
+
+    assert counting_service.detection_count == 0
+
+
+def test_the_detection_runs_once_on_the_stored_master_with_the_automatic_crop(scan_encoder, draft_store):
+    counting_service = CountingCropDetectionService()
+    page_capture = DocumentPageCapture(scan_encoder, draft_store, counting_service)
+
+    page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
+
+    assert counting_service.detection_count == 1

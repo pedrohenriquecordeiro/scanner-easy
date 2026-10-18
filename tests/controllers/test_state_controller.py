@@ -211,12 +211,9 @@ def test_state_contains_the_document_summary(client: TestClient) -> None:
     }
 
 
-def test_state_estimates_the_draft_storage_with_the_saved_quality_and_adjustment(
+def test_state_estimates_the_draft_storage_with_the_saved_quality(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
     client.get("/api/state")
 
-    assert document_service.received_arguments["describe_draft_storage"] == (
-        ScanPreset.DOCUMENT_ECONOMY.settings,
-        ADJUSTMENT,
-    )
+    assert document_service.received_arguments["describe_draft_storage"] == ScanPreset.DOCUMENT_ECONOMY.settings

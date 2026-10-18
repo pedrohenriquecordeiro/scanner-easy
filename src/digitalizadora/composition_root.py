@@ -39,6 +39,7 @@ from digitalizadora.services.document_draft_service import DocumentDraftCollabor
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
+from digitalizadora.services.document_page_crop_detector import DocumentPageCropDetector
 from digitalizadora.services.document_page_renderer import DocumentPageRenderer
 from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
@@ -268,7 +269,7 @@ def _build_document_draft_service(
         shared_services.storage_guard,
         DraftIdentitySource(draft_session=generate_draft_session(), page_identifier_factory=generate_page_identifier),
     )
-    page_capture = DocumentPageCapture(shared_services.scan_encoder, draft_store)
+    page_capture = DocumentPageCapture(shared_services.scan_encoder, draft_store, shared_services.crop_detection)
     pdf_assembler = DocumentPdfAssembler(DocumentPageRenderer(), PdfAssemblyService())
     finalizer = DocumentFinalizer(pdf_assembler, repositories.scan_output, shared_services.storage_guard)
     # The destination is bound once here, so DocumentDraftService never depends on DocumentPageCapture.
@@ -276,7 +277,11 @@ def _build_document_draft_service(
     return DocumentDraftService(
         scan_service,
         DocumentDraftCollaborators(
-            draft_store, page_scanner, finalizer, DocumentPageViewService(draft_store, shared_services.image_view)
+            draft_store,
+            page_scanner,
+            finalizer,
+            DocumentPageCropDetector(draft_store, shared_services.crop_detection),
+            DocumentPageViewService(draft_store, shared_services.image_view),
         ),
         shared_services.clock,
     )

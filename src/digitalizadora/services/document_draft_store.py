@@ -26,8 +26,8 @@ from digitalizadora.domain.errors import (
     UnreadableDraftError,
     as_draft_storage_error,
 )
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.ports import DocumentDraftRepository
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import StorageGuardService
@@ -45,6 +45,7 @@ class CapturedPage:
     thumbnail_jpeg: bytes
     scanned_at: datetime
     settings: ScanSettings
+    framing: PageFraming = UNFRAMED
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,7 @@ def _page_from_capture(page_identifier: str, captured_page: CapturedPage) -> Doc
         dots_per_inch=captured_page.settings.dots_per_inch,
         color_mode=captured_page.settings.color_mode,
         size_in_bytes=len(captured_page.jpeg_content),
+        framing=captured_page.framing,
     )
 
 
@@ -145,28 +147,26 @@ class DocumentDraftStore:
             last_finished_document=last_finished_document,
         )
 
-    def describe_storage(
-        self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT
-    ) -> DraftStorageState:
+    def describe_storage(self, settings: ScanSettings) -> DraftStorageState:
         storage_folder = self._draft_repository.storage_folder()
         try:
             return DraftStorageState(
                 free_space_in_bytes=self._storage_guard_service.free_space_in_bytes(storage_folder),
                 estimated_pages_remaining=self._storage_guard_service.estimate_pages_remaining(
-                    storage_folder, settings, adjustment
+                    storage_folder, settings
                 ),
                 available=True,
             )
         except OutputFolderUnavailableError:
             return UNAVAILABLE_DRAFT_STORAGE_STATE
 
-    def ensure_capacity_for_page(self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT) -> None:
+    def ensure_capacity_for_page(self, settings: ScanSettings) -> None:
         """Runs before the printer spends 15 to 75 s on the page (6.6.1, step 3)."""
         self._ensure_recovered()
         self._draft_repository.ensure_storage_folder_ready()
         storage_folder = self._draft_repository.storage_folder()
         try:
-            self._storage_guard_service.ensure_space_for_scan(storage_folder, settings, adjustment)
+            self._storage_guard_service.ensure_space_for_scan(storage_folder, settings)
         except (InsufficientStorageError, OutputFolderUnavailableError) as error:
             # The draft lives on the internal disk: the quick-mode messages would point at the output folder.
             raise as_draft_storage_error(error) from error

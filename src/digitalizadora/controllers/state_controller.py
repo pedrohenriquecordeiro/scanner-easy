@@ -48,9 +48,7 @@ class StateController:
 
     def _describe_document(self, state: ApplicationState) -> dict[str, Any]:
         """R8 and R20: the page compares draft_session and revision and re-reads GET /api/document."""
-        draft_storage = self._document_draft_service.describe_draft_storage(
-            state.settings.scan_settings, state.settings.adjustment
-        )
+        draft_storage = self._document_draft_service.describe_draft_storage(state.settings.scan_settings)
         return build_document_summary_body(self._document_draft_service.snapshot(), draft_storage)
 
     @staticmethod

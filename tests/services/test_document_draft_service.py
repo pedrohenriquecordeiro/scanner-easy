@@ -552,12 +552,12 @@ async def test_add_page_without_adjustment_asks_for_no_adjustment(parts):
     assert page_scanner.requests[0].adjustment == NO_ADJUSTMENT
 
 
-def test_describe_draft_storage_counts_the_adjustment(service):
-    adjusted_storage = service.describe_draft_storage(SETTINGS, ImageAdjustment(auto_crop=True))
+def test_describe_draft_storage_estimates_the_pages_by_the_quality_alone(service, parts):
+    storage = service.describe_draft_storage(SETTINGS)
 
-    unadjusted_storage = service.describe_draft_storage(SETTINGS)
-
-    assert adjusted_storage.estimated_pages_remaining < unadjusted_storage.estimated_pages_remaining
+    assert storage.estimated_pages_remaining == (
+        (PLENTY_OF_FREE_SPACE_IN_BYTES - MINIMUM_FREE_SPACE_BYTES) // estimated_page_bytes(SETTINGS)
+    )
 
 
 async def test_rotate_page_keeps_the_identifier_and_the_position(service):
@@ -718,3 +718,24 @@ async def test_a_cropped_page_goes_into_the_saved_pdf_with_the_size_of_its_frame
 
     media_box = read_pdf_media_box(finalization.result.output_path)
     assert media_box[2] / media_box[3] == pytest.approx(page_width / 2 / page_height, rel=0.1)
+
+
+async def test_detect_page_crop_on_a_white_page_finds_nothing_and_changes_nothing(service):
+    await add_pages(service, 1)
+    revision_before = service.snapshot().revision
+
+    result = await service.detect_page_crop(FIRST_PAGE_IDENTIFIER)
+
+    assert (result.crop_detected, service.snapshot().revision) == (False, revision_before)
+
+
+async def test_detect_page_crop_of_an_unknown_page_raises_page_not_found(service):
+    await add_pages(service, 1)
+
+    with pytest.raises(PageNotFoundError):
+        await service.detect_page_crop(UNKNOWN_PAGE_IDENTIFIER)
+
+
+async def test_detect_page_crop_without_a_draft_raises_no_open_document(service):
+    with pytest.raises(NoOpenDocumentError):
+        await service.detect_page_crop(FIRST_PAGE_IDENTIFIER)

@@ -25,6 +25,7 @@ from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftStorageState
 from digitalizadora.services.document_finalizer import DocumentFinalizer
+from digitalizadora.services.document_page_crop_detector import CropDetectionResult, DocumentPageCropDetector
 from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentAssemblyInput
 from digitalizadora.services.scan_service import ScanService
@@ -37,6 +38,7 @@ class DocumentDraftCollaborators:
     draft_store: DocumentDraftStore
     page_scanner: Callable[[ScanRequest], Awaitable[DocumentPage]]
     finalizer: DocumentFinalizer
+    page_cropper: DocumentPageCropDetector
     page_views: DocumentPageViewService
 
 
@@ -52,6 +54,7 @@ class DocumentDraftService:
         self._draft_store = collaborators.draft_store
         self._page_scanner = collaborators.page_scanner
         self._finalizer = collaborators.finalizer
+        self._page_cropper = collaborators.page_cropper
         self._page_views = collaborators.page_views
         self._clock = clock
         self._lock = asyncio.Lock()
@@ -65,10 +68,8 @@ class DocumentDraftService:
     def snapshot(self) -> DraftSnapshot:
         return self._draft_store.snapshot()
 
-    def describe_draft_storage(
-        self, settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT
-    ) -> DraftStorageState:
-        return self._draft_store.describe_storage(settings, adjustment)
+    def describe_draft_storage(self, settings: ScanSettings) -> DraftStorageState:
+        return self._draft_store.describe_storage(settings)
 
     def read_thumbnail(self, page_identifier: str, rotation: PageRotation) -> bytes | None:
         # No lock: a thumbnail file never changes after it is written.
@@ -106,6 +107,9 @@ class DocumentDraftService:
 
     async def set_page_crop(self, page_identifier: str, crop: PageCrop | None) -> DocumentDraft:
         return await self._run_edit(functools.partial(self._draft_store.set_page_crop, page_identifier, crop))
+
+    async def detect_page_crop(self, page_identifier: str) -> CropDetectionResult:
+        return await self._run_edit(functools.partial(self._page_cropper.detect_for_page, page_identifier))
 
     async def discard_last_page(self) -> DocumentDraft | None:
         return await self._run_edit(self._draft_store.discard_last_page)

@@ -153,14 +153,17 @@ def test_quick_scan_without_the_crop_against_the_dark_lid_keeps_the_whole_glass(
         assert read_scanned_file_size(client) == GLASS_SIZE
 
 
-def test_document_page_against_the_dark_lid_is_cropped(configuration: ApplicationConfiguration) -> None:
+def test_document_page_against_the_dark_lid_gets_a_frame_and_keeps_the_scanner_image(
+    configuration: ApplicationConfiguration,
+) -> None:
     with build_client(configuration, LidBackground.DARK) as client:
         save_settings(client, configuration.default_output_folder, auto_crop=True)
         client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
         wait_for_state(client, has_document_pages(1))
-        width, height = read_draft_page_size(configuration, 1, client)
-    assert abs(width - SHEET_SIZE_ON_DARK_LID[0]) <= SIZE_TOLERANCE_PIXELS
-    assert abs(height - SHEET_SIZE_ON_DARK_LID[1]) <= SIZE_TOLERANCE_PIXELS
+        crop = client.get("/api/document").json()["document"]["pages"][0]["crop"]
+        page_size = read_draft_page_size(configuration, 1, client)
+    assert page_size == GLASS_SIZE
+    assert crop is not None
 
 
 def test_document_with_a_resumed_page_and_a_rotated_page_is_saved_as_one_pdf(

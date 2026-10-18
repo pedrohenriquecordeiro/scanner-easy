@@ -1,3 +1,4 @@
+import dataclasses
 import errno
 from collections.abc import Callable
 from datetime import timedelta
@@ -22,9 +23,9 @@ from digitalizadora.domain.errors import (
     OutputFolderUnavailableError,
     PageNotFoundError,
 )
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_crop import WHOLE_PAGE, PageCrop
+from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_result import ScanResult
@@ -127,6 +128,26 @@ def draft_store(
     draft_repository: FileSystemDocumentDraftRepository, free_space_reader: RecordingFreeSpaceReader
 ) -> DocumentDraftStore:
     return build_store(draft_repository, free_space_reader)
+
+
+def test_a_captured_page_with_a_frame_joins_the_draft_framed(draft_store):
+    framing = PageFraming(PageRotation.NONE, SAMPLE_CROP)
+
+    page = draft_store.append_page(dataclasses.replace(build_captured_page(FIRST_PAGE_JPEG), framing=framing))
+
+    assert page.framing == framing
+
+
+def test_the_frame_of_a_captured_page_is_saved_in_the_manifest(draft_store, drafts_folder):
+    framing = PageFraming(PageRotation.NONE, SAMPLE_CROP)
+
+    draft_store.append_page(dataclasses.replace(build_captured_page(FIRST_PAGE_JPEG), framing=framing))
+
+    assert reopen_manifest(drafts_folder).pages[0].framing == framing
+
+
+def test_a_captured_page_has_no_frame_by_default(draft_store):
+    assert draft_store.append_page(build_captured_page(FIRST_PAGE_JPEG)).framing == UNFRAMED
 
 
 def test_new_store_has_no_draft_at_revision_zero_in_its_session(draft_store):
@@ -819,23 +840,15 @@ def test_next_accepted_change_forgets_the_last_finished_document(draft_store):
     assert draft_store.snapshot().last_finished_document is None
 
 
-ADJUSTED = ImageAdjustment(auto_crop=True)
+def test_capacity_check_accepts_exactly_enough_space(draft_store):
+    assert draft_store.ensure_capacity_for_page(SETTINGS) is None
 
 
-def test_capacity_check_counts_the_adjustment_of_the_page(draft_store):
-    with pytest.raises(InsufficientDraftStorageError):
-        draft_store.ensure_capacity_for_page(SETTINGS, ADJUSTED)
-
-
-def test_capacity_check_without_adjustment_accepts_exactly_enough_space(draft_store):
-    assert draft_store.ensure_capacity_for_page(SETTINGS, NO_ADJUSTMENT) is None
-
-
-def test_describe_storage_estimates_fewer_pages_when_the_pages_are_adjusted(draft_repository):
+def test_describe_storage_estimates_the_pages_by_the_quality_alone(draft_repository):
     free_space = MINIMUM_FREE_SPACE_BYTES + 10 * estimated_page_bytes(SETTINGS)
     draft_store = build_store(draft_repository, RecordingFreeSpaceReader(free_space))
 
-    assert draft_store.describe_storage(SETTINGS, ADJUSTED).estimated_pages_remaining == 5
+    assert draft_store.describe_storage(SETTINGS).estimated_pages_remaining == 10
 
 
 def test_read_page_content_returns_the_page_its_position_and_its_file(draft_store):

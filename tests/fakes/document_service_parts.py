@@ -23,6 +23,7 @@ from digitalizadora.services.document_draft_service import DocumentDraftCollabor
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
+from digitalizadora.services.document_page_crop_detector import DocumentPageCropDetector
 from digitalizadora.services.document_page_renderer import DocumentPageRenderer
 from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
@@ -187,9 +188,12 @@ def build_document_service_parts(
         DraftIdentitySource(DRAFT_SESSION, SequentialPageIdentifiers()),
     )
     scan_service, gateway = _build_scan_service(clock, scanned_pages)
-    master_jpeg_service = MasterJpegService(ImageAdjustmentService(PageCropDetectionService()), JpegResolutionService())
+    crop_detection_service = PageCropDetectionService()
+    master_jpeg_service = MasterJpegService(ImageAdjustmentService(crop_detection_service), JpegResolutionService())
     page_capture = DocumentPageCapture(
-        ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()), draft_store
+        ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()),
+        draft_store,
+        crop_detection_service,
     )
     pdf_assembly_service = ObservingPdfAssemblyService(
         drafts_folder / CURRENT_DRAFT_FOLDER_NAME / MANIFEST_FILE_NAME
@@ -198,6 +202,7 @@ def build_document_service_parts(
         draft_store=draft_store,
         page_scanner=functools.partial(scan_service.scan_document_page, page_capture=page_capture),
         finalizer=_build_finalizer(output_folder, pdf_assembly_service, finalizer_free_space_reader),
+        page_cropper=DocumentPageCropDetector(draft_store, crop_detection_service),
         page_views=DocumentPageViewService(draft_store, PageImageViewService()),
     )
     return DocumentServiceParts(
