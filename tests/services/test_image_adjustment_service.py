@@ -1,4 +1,5 @@
 import io
+import logging
 
 import pytest
 from PIL import Image, JpegImagePlugin
@@ -105,6 +106,20 @@ def test_the_crop_keeps_the_sheet_content(service, sheet_on_dark_lid):
 
 def test_the_crop_of_a_page_without_a_sheet_returns_the_same_bytes(service, marked_page):
     assert service.adjust(marked_page, CROP) is marked_page
+
+
+def test_a_crop_that_finds_no_sheet_says_so_in_the_log(service, marked_page, caplog):
+    with caplog.at_level(logging.INFO):
+        service.adjust(marked_page, CROP)
+
+    assert [record.levelno for record in caplog.records] == [logging.INFO]
+
+
+def test_a_crop_that_finds_a_sheet_logs_nothing(service, sheet_on_dark_lid, caplog):
+    with caplog.at_level(logging.INFO):
+        service.adjust(sheet_on_dark_lid, CROP)
+
+    assert caplog.records == []
 
 
 def test_a_page_without_a_sheet_is_still_rotated_when_the_crop_finds_nothing(service, marked_page):

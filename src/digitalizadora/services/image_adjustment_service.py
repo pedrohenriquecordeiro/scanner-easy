@@ -1,4 +1,5 @@
 import io
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -10,6 +11,7 @@ from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.pixel_region import PixelRegion
 from digitalizadora.services.paper_region_detection import PREVIEW_MAXIMUM_EDGE_PIXELS, detect_paper_region
 
+LOGGER = logging.getLogger(__name__)
 ADJUSTED_JPEG_QUALITY = 95
 CROP_MARGIN_RATIO = 0.01
 PREVIEW_COLOR_MODE = "L"
@@ -69,6 +71,7 @@ class ImageAdjustmentService:
             preview = source.convert(PREVIEW_COLOR_MODE)
         paper_region = detect_paper_region(preview)
         if paper_region is None:
+            LOGGER.info("The automatic crop found no reliable sheet; the whole image is kept")
             return None
         margin = round(CROP_MARGIN_RATIO * max(full_size))
         crop_region = paper_region.scaled(preview.size, full_size).grown_within(margin, full_size)
