@@ -20,14 +20,6 @@ class ScanPreset(str, Enum):
     def settings(self) -> ScanSettings:
         return SETTINGS_BY_PRESET[self]
 
-    @classmethod
-    def matching(cls, scan_settings: ScanSettings) -> "ScanPreset | None":
-        """The preset whose settings are exactly these, or None for a custom combination."""
-        for preset, preset_settings in SETTINGS_BY_PRESET.items():
-            if preset_settings == scan_settings:
-                return preset
-        return None
-
 
 SETTINGS_BY_PRESET: Mapping[ScanPreset, ScanSettings] = MappingProxyType(
     {

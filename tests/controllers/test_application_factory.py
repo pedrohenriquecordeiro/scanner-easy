@@ -67,9 +67,7 @@ SETTINGS_BODY = {
     "output_format": "jpg",
     "dots_per_inch": 600,
     "color_mode": "color",
-    "scan_preset": "photo",
     "capture_mode": "single",
-    "rotation_degrees": 0,
     "auto_crop": False,
 }
 CONNECTED_STATE = PrinterConnectionState(

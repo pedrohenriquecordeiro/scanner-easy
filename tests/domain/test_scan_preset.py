@@ -2,7 +2,6 @@ import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.scan_preset import ScanPreset
-from digitalizadora.domain.scan_settings import ScanSettings
 
 
 @pytest.mark.parametrize(
@@ -22,16 +21,3 @@ def test_preset_settings_table(
 
 def test_preset_is_created_from_its_stored_text() -> None:
     assert ScanPreset("document_economy") is ScanPreset.DOCUMENT_ECONOMY
-
-
-@pytest.mark.parametrize("preset", list(ScanPreset))
-def test_matching_finds_the_preset_of_its_own_settings(preset: ScanPreset) -> None:
-    assert ScanPreset.matching(preset.settings) is preset
-
-
-def test_matching_is_none_for_a_resolution_no_preset_uses() -> None:
-    assert ScanPreset.matching(ScanSettings(400, ColorMode.COLOR)) is None
-
-
-def test_matching_is_none_for_a_known_resolution_with_another_colour_mode() -> None:
-    assert ScanPreset.matching(ScanSettings(300, ColorMode.GRAYSCALE)) is None

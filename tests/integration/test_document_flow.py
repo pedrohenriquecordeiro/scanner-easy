@@ -82,7 +82,12 @@ def wait_for_state(client: TestClient, condition: Callable[[dict], bool]) -> dic
 
 
 def save_economy_settings(client: TestClient, output_folder: Path) -> None:
-    settings = {"output_folder": str(output_folder), "output_format": "pdf", "scan_preset": "document_economy"}
+    settings = {
+        "output_folder": str(output_folder),
+        "output_format": "pdf",
+        "dots_per_inch": 200,
+        "color_mode": "grayscale",
+    }
     response = client.put("/api/settings", json=settings, headers=STATE_CHANGING_HEADERS)
     assert response.status_code == 200
 

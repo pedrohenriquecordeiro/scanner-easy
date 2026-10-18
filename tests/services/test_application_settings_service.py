@@ -9,7 +9,6 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InvalidSettingsError, OutputFolderUnavailableError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_quality import SUPPORTED_DOTS_PER_INCH
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -43,18 +42,14 @@ class RecordingFolderPreparer:
 def build_update(
     output_folder: str = "/Volumes/External/scans",
     output_format: str = "jpg",
-    scan_preset: str = "photo",
 ) -> SettingsUpdate:
-    return SettingsUpdate(
-        output_folder=output_folder, output_format=output_format, scan_preset=scan_preset
-    )
+    return SettingsUpdate(output_folder=output_folder, output_format=output_format)
 
 
 def build_capture_mode_update(capture_mode: str | None) -> SettingsUpdate:
     return SettingsUpdate(
         output_folder="/Volumes/External/scans",
         output_format="jpg",
-        scan_preset="photo",
         capture_mode=capture_mode,
     )
 
@@ -87,7 +82,7 @@ def test_update_returns_the_new_settings(settings_service: ApplicationSettingsSe
     assert saved == ApplicationSettings(
         output_folder=Path("/Volumes/External/scans"),
         output_format=OutputFormat.JPEG,
-        scan_settings=ScanPreset.PHOTO.settings,
+        scan_settings=INITIAL_SETTINGS.scan_settings,
     )
 
 
@@ -172,30 +167,23 @@ def test_update_rejects_an_unknown_output_format(
         settings_service.update(build_update(output_format="tiff"))
 
 
-def test_update_rejects_an_unknown_scan_preset(
-    settings_service: ApplicationSettingsService,
-) -> None:
-    with pytest.raises(InvalidSettingsError):
-        settings_service.update(build_update(scan_preset="poster"))
-
-
 @pytest.mark.parametrize("output_format", list(OutputFormat))
-@pytest.mark.parametrize("scan_preset", list(ScanPreset))
-def test_update_accepts_every_known_format_and_preset(
-    settings_service: ApplicationSettingsService,
-    output_format: OutputFormat,
-    scan_preset: ScanPreset,
+def test_update_accepts_every_known_format(
+    settings_service: ApplicationSettingsService, output_format: OutputFormat
 ) -> None:
-    saved = settings_service.update(
-        build_update(output_format=output_format.value, scan_preset=scan_preset.value)
-    )
+    saved = settings_service.update(build_update(output_format=output_format.value))
 
-    assert (saved.output_format, saved.scan_settings) == (output_format, scan_preset.settings)
+    assert saved.output_format == output_format
+
+
+def test_update_without_a_quality_keeps_the_saved_quality(settings_service: ApplicationSettingsService) -> None:
+    saved = settings_service.update(build_update())
+
+    assert saved.scan_settings == INITIAL_SETTINGS.scan_settings
 
 
 INVALID_UPDATES = [
     build_update(output_format="tiff"),
-    build_update(scan_preset="poster"),
     build_update(output_folder="relative/scans"),
     build_update(output_folder=FOLDER_WITH_NULL_CHARACTER),
     build_update(output_folder=FOLDER_OF_UNKNOWN_USER),
@@ -310,12 +298,10 @@ def test_update_rejects_an_unknown_capture_mode(
 def build_quality_update(
     dots_per_inch: int | None = None,
     color_mode: str | None = None,
-    scan_preset: str | None = None,
 ) -> SettingsUpdate:
     return SettingsUpdate(
         output_folder="/Volumes/External/scans",
         output_format="jpg",
-        scan_preset=scan_preset,
         dots_per_inch=dots_per_inch,
         color_mode=color_mode,
     )
@@ -325,12 +311,6 @@ def build_quality_update(
 def custom_quality_service(folder_preparer: RecordingFolderPreparer) -> ApplicationSettingsService:
     custom_settings = dataclasses.replace(INITIAL_SETTINGS, scan_settings=ScanSettings(1200, ColorMode.GRAYSCALE))
     return ApplicationSettingsService(InMemoryApplicationSettingsRepository(custom_settings), folder_preparer)
-
-
-def test_a_preset_alone_sets_both_quality_values(settings_service: ApplicationSettingsService) -> None:
-    saved = settings_service.update(build_quality_update(scan_preset="document_economy"))
-
-    assert saved.scan_settings == ScanSettings(200, ColorMode.GRAYSCALE)
 
 
 def test_a_resolution_alone_keeps_the_saved_colour_mode(
@@ -347,22 +327,6 @@ def test_a_colour_mode_alone_keeps_the_saved_resolution(
     saved = custom_quality_service.update(build_quality_update(color_mode="color"))
 
     assert saved.scan_settings == ScanSettings(1200, ColorMode.COLOR)
-
-
-def test_the_pair_wins_over_the_old_preset_the_page_sent_back(
-    settings_service: ApplicationSettingsService,
-) -> None:
-    saved = settings_service.update(build_quality_update(400, "grayscale", scan_preset="document"))
-
-    assert saved.scan_settings == ScanSettings(400, ColorMode.GRAYSCALE)
-
-
-def test_a_resolution_wins_over_the_preset_and_keeps_the_saved_colour_not_the_preset_colour(
-    custom_quality_service: ApplicationSettingsService,
-) -> None:
-    saved = custom_quality_service.update(build_quality_update(dots_per_inch=100, scan_preset="document"))
-
-    assert saved.scan_settings == ScanSettings(100, ColorMode.GRAYSCALE)
 
 
 def test_no_quality_field_keeps_the_saved_quality(custom_quality_service: ApplicationSettingsService) -> None:
@@ -398,18 +362,10 @@ def test_the_one_bit_mode_is_not_offered(settings_service: ApplicationSettingsSe
         settings_service.update(build_quality_update(color_mode="BlackAndWhite1"))
 
 
-def test_an_unknown_preset_is_refused_even_with_a_valid_resolution(
-    settings_service: ApplicationSettingsService,
-) -> None:
-    with pytest.raises(InvalidSettingsError):
-        settings_service.update(build_quality_update(dots_per_inch=300, scan_preset="poster"))
-
-
-def build_adjustment_update(rotation_degrees: int | None = None, auto_crop: bool | None = None) -> SettingsUpdate:
+def build_adjustment_update(auto_crop: bool | None = None) -> SettingsUpdate:
     return SettingsUpdate(
         output_folder="/Volumes/External/scans",
         output_format="jpg",
-        rotation_degrees=rotation_degrees,
         auto_crop=auto_crop,
     )
 
@@ -417,7 +373,7 @@ def build_adjustment_update(rotation_degrees: int | None = None, auto_crop: bool
 @pytest.fixture
 def adjusted_service(folder_preparer: RecordingFolderPreparer) -> ApplicationSettingsService:
     adjusted_settings = dataclasses.replace(
-        INITIAL_SETTINGS, adjustment=ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
+        INITIAL_SETTINGS, adjustment=ImageAdjustment(auto_crop=True)
     )
     return ApplicationSettingsService(InMemoryApplicationSettingsRepository(adjusted_settings), folder_preparer)
 
@@ -427,39 +383,18 @@ def test_update_without_adjustment_fields_keeps_the_saved_adjustment(
 ) -> None:
     saved = adjusted_service.update(build_adjustment_update())
 
-    assert saved.adjustment == ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
+    assert saved.adjustment == ImageAdjustment(auto_crop=True)
 
 
-def test_a_rotation_is_saved_and_the_crop_is_kept(adjusted_service: ApplicationSettingsService) -> None:
-    saved = adjusted_service.update(build_adjustment_update(rotation_degrees=90))
-
-    assert saved.adjustment == ImageAdjustment(rotation=PageRotation.CLOCKWISE_90, auto_crop=True)
-
-
-def test_a_crop_choice_is_saved_and_the_rotation_is_kept(adjusted_service: ApplicationSettingsService) -> None:
+def test_a_crop_choice_is_saved(adjusted_service: ApplicationSettingsService) -> None:
     saved = adjusted_service.update(build_adjustment_update(auto_crop=False))
 
-    assert saved.adjustment == ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=False)
-
-
-def test_a_rotation_of_zero_degrees_turns_the_rotation_off(adjusted_service: ApplicationSettingsService) -> None:
-    saved = adjusted_service.update(build_adjustment_update(rotation_degrees=0))
-
-    assert saved.adjustment.rotation is PageRotation.NONE
-
-
-@pytest.mark.parametrize("rotation_degrees", [45, 360, -90, 91])
-def test_a_rotation_outside_the_four_quarters_is_refused(
-    settings_service: ApplicationSettingsService, rotation_degrees: int
-) -> None:
-    with pytest.raises(InvalidSettingsError):
-        settings_service.update(build_adjustment_update(rotation_degrees=rotation_degrees))
+    assert saved.adjustment == ImageAdjustment(auto_crop=False)
 
 
 INVALID_QUALITY_AND_ADJUSTMENT_UPDATES = [
     build_quality_update(dots_per_inch=301),
     build_quality_update(color_mode="sepia"),
-    build_adjustment_update(rotation_degrees=45),
 ]
 
 

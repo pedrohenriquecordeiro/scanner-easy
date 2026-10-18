@@ -499,7 +499,7 @@ class RecordingPageScanner:
 async def test_add_page_passes_the_adjustment_to_the_page_scanner(parts):
     page_scanner = RecordingPageScanner()
     collaborators = dataclasses.replace(parts.collaborators, page_scanner=page_scanner)
-    adjustment = ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
+    adjustment = ImageAdjustment(auto_crop=True)
 
     await DocumentDraftService(parts.scan_service, collaborators, parts.clock).add_page(SETTINGS, adjustment)
 

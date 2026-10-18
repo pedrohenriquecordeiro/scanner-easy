@@ -9,9 +9,7 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InvalidSettingsError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.ports import ApplicationSettingsRepository
-from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_quality import is_supported_dots_per_inch
 from digitalizadora.domain.scan_settings import ScanSettings
 
@@ -20,18 +18,13 @@ NULL_CHARACTER = "\0"
 
 @dataclass(frozen=True)
 class SettingsUpdate:
-    """The two first fields are required; None in any other field keeps the saved value.
-
-    A client that predates the custom quality sends only the scan preset, which then sets both quality values.
-    """
+    """The two first fields are required; None in any other field keeps the saved value."""
 
     output_folder: str
     output_format: str
-    scan_preset: str | None = None
     capture_mode: str | None = None
     dots_per_inch: int | None = None
     color_mode: str | None = None
-    rotation_degrees: int | None = None
     auto_crop: bool | None = None
 
 
@@ -89,11 +82,8 @@ class ApplicationSettingsService:
 
     @staticmethod
     def _resolve_scan_settings(update: SettingsUpdate, saved: ApplicationSettings) -> ScanSettings:
-        scan_preset = None
-        if update.scan_preset is not None:
-            scan_preset = parse_enum_member(ScanPreset, update.scan_preset, "scan preset")
         if update.dots_per_inch is None and update.color_mode is None:
-            return saved.scan_settings if scan_preset is None else scan_preset.settings
+            return saved.scan_settings
         return ScanSettings(
             dots_per_inch=_resolve_dots_per_inch(update.dots_per_inch, saved.scan_settings),
             color_mode=_resolve_color_mode(update.color_mode, saved.scan_settings),
@@ -108,7 +98,6 @@ class ApplicationSettingsService:
     @staticmethod
     def _resolve_adjustment(update: SettingsUpdate, saved: ApplicationSettings) -> ImageAdjustment:
         return ImageAdjustment(
-            rotation=_resolve_rotation(update.rotation_degrees, saved.adjustment),
             auto_crop=saved.adjustment.auto_crop if update.auto_crop is None else update.auto_crop,
         )
 
@@ -126,11 +115,3 @@ def _resolve_color_mode(requested_color_mode: str | None, saved_settings: ScanSe
         return saved_settings.color_mode
     return parse_enum_member(ColorMode, requested_color_mode, "colour mode")
 
-
-def _resolve_rotation(requested_degrees: int | None, saved_adjustment: ImageAdjustment) -> PageRotation:
-    if requested_degrees is None:
-        return saved_adjustment.rotation
-    try:
-        return PageRotation(requested_degrees)
-    except ValueError as error:
-        raise InvalidSettingsError(f"Unsupported rotation: {requested_degrees!r}") from error

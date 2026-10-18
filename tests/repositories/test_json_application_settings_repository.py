@@ -10,7 +10,6 @@ from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
@@ -55,7 +54,6 @@ def test_save_writes_the_documented_json_shape(tmp_path):
         "dots_per_inch": 600,
         "color_mode": "color",
         "capture_mode": "single",
-        "rotation_degrees": 0,
         "auto_crop": False,
     }
 
@@ -222,7 +220,7 @@ ADJUSTED_SETTINGS = ApplicationSettings(
     OutputFormat.PDF,
     ScanSettings(1200, ColorMode.GRAYSCALE),
     CaptureMode.DOCUMENT,
-    ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True),
+    ImageAdjustment(auto_crop=True),
 )
 NEW_FORMAT_DOCUMENT = {
     "output_folder": "/Volumes/Archive",
@@ -230,7 +228,6 @@ NEW_FORMAT_DOCUMENT = {
     "dots_per_inch": 400,
     "color_mode": "grayscale",
     "capture_mode": "document",
-    "rotation_degrees": 270,
     "auto_crop": True,
 }
 SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT = ApplicationSettings(
@@ -238,7 +235,7 @@ SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT = ApplicationSettings(
     OutputFormat.JPEG,
     ScanSettings(400, ColorMode.GRAYSCALE),
     CaptureMode.DOCUMENT,
-    ImageAdjustment(rotation=PageRotation.COUNTERCLOCKWISE_90, auto_crop=True),
+    ImageAdjustment(auto_crop=True),
 )
 
 
@@ -327,7 +324,6 @@ NEW_FORMAT_DOCUMENT_WITH_INVALID_PAIR = {
     "dots_per_inch": 301,
     "color_mode": "color",
     "capture_mode": "document",
-    "rotation_degrees": 90,
     "auto_crop": True,
 }
 
@@ -341,7 +337,7 @@ def test_an_invalid_quality_pair_without_a_preset_keeps_the_other_fields(tmp_pat
         output_format=OutputFormat.JPEG,
         scan_settings=ScanPreset.DOCUMENT.settings,
         capture_mode=CaptureMode.DOCUMENT,
-        adjustment=ImageAdjustment(PageRotation.CLOCKWISE_90, auto_crop=True),
+        adjustment=ImageAdjustment(auto_crop=True),
     )
 
 
@@ -362,14 +358,32 @@ def test_an_invalid_quality_pair_with_an_unknown_preset_keeps_the_other_fields(t
     assert build_repository(storage_file).load().output_folder == Path("/Volumes/Archive")
 
 
-@pytest.mark.parametrize("invalid_rotation", [45, "90", None, True, False, 90.0, 360, -90, [90]])
-def test_an_invalid_rotation_is_read_as_no_rotation_keeping_the_other_fields(tmp_path, invalid_rotation):
+@pytest.mark.parametrize("old_rotation", [0, 90, 270, 45, "90", None, True])
+def test_an_old_rotation_key_is_ignored_keeping_the_other_fields(tmp_path, old_rotation):
     storage_file = tmp_path / "settings.json"
-    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": invalid_rotation})
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": old_rotation})
 
-    assert build_repository(storage_file).load() == dataclasses.replace(
-        SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT, adjustment=ImageAdjustment(auto_crop=True)
-    )
+    assert build_repository(storage_file).load() == SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT
+
+
+def test_an_old_rotation_key_is_ignored_without_a_warning(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": 45})
+
+    with caplog.at_level(logging.WARNING):
+        build_repository(storage_file).load()
+
+    assert caplog.records == []
+
+
+def test_saving_an_old_document_drops_its_rotation_key(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": 90})
+    repository = build_repository(storage_file)
+
+    repository.save(repository.load())
+
+    assert "rotation_degrees" not in json.loads(storage_file.read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("invalid_auto_crop", [1, 0, "true", None, [True]])
@@ -378,16 +392,15 @@ def test_an_invalid_auto_crop_is_read_as_off_keeping_the_other_fields(tmp_path, 
     write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "auto_crop": invalid_auto_crop})
 
     assert build_repository(storage_file).load() == dataclasses.replace(
-        SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT, adjustment=ImageAdjustment(rotation=PageRotation.COUNTERCLOCKWISE_90)
+        SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT, adjustment=ImageAdjustment(auto_crop=False)
     )
 
 
 @pytest.mark.parametrize(
     ("document_update", "expected_warning_count"),
     [
-        ({"rotation_degrees": 45}, 1),
         ({"auto_crop": "yes"}, 1),
-        ({"rotation_degrees": 45, "auto_crop": "yes", "capture_mode": "batch"}, 3),
+        ({"auto_crop": "yes", "capture_mode": "batch"}, 2),
     ],
 )
 def test_each_invalid_tolerant_value_is_reported_once(tmp_path, caplog, document_update, expected_warning_count):
@@ -402,13 +415,13 @@ def test_each_invalid_tolerant_value_is_reported_once(tmp_path, caplog, document
     assert len(caplog.records) == expected_warning_count
 
 
-def test_a_changed_invalid_rotation_is_reported_again(tmp_path, caplog):
+def test_a_changed_invalid_auto_crop_is_reported_again(tmp_path, caplog):
     storage_file = tmp_path / "settings.json"
     repository = build_repository(storage_file)
-    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": 45})
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "auto_crop": "yes"})
     repository.load()
     caplog.clear()
-    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "rotation_degrees": 46})
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "auto_crop": "maybe"})
 
     with caplog.at_level(logging.WARNING):
         repository.load()
@@ -416,7 +429,7 @@ def test_a_changed_invalid_rotation_is_reported_again(tmp_path, caplog):
     assert len(caplog.records) == 1
 
 
-def test_a_missing_rotation_and_auto_crop_are_not_reported_as_problems(tmp_path, caplog):
+def test_a_missing_auto_crop_is_not_reported_as_a_problem(tmp_path, caplog):
     storage_file = tmp_path / "settings.json"
     write_document(storage_file, VALID_DOCUMENT)
 

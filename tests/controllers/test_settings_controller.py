@@ -8,11 +8,12 @@ from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
+from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import OutputFolderUnavailableError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
@@ -27,7 +28,8 @@ INITIAL_SETTINGS = ApplicationSettings(
 VALID_BODY = {
     "output_folder": "/Volumes/External/scans",
     "output_format": "jpg",
-    "scan_preset": "photo",
+    "dots_per_inch": 600,
+    "color_mode": "color",
 }
 INVALID_SETTINGS_BODY = {
     "code": "invalid_settings",
@@ -65,9 +67,7 @@ def test_get_settings_returns_the_saved_settings(client: TestClient) -> None:
             "output_format": "pdf",
             "dots_per_inch": 300,
             "color_mode": "color",
-            "scan_preset": "document",
             "capture_mode": "document",
-            "rotation_degrees": 0,
             "auto_crop": False,
         },
     )
@@ -80,10 +80,7 @@ def test_put_settings_returns_the_new_settings(client: TestClient) -> None:
         HTTPStatus.OK,
         {
             **VALID_BODY,
-            "dots_per_inch": 600,
-            "color_mode": "color",
             "capture_mode": "document",
-            "rotation_degrees": 0,
             "auto_crop": False,
         },
     )
@@ -97,7 +94,7 @@ def test_put_settings_saves_the_new_settings(
     assert settings_repository.load() == ApplicationSettings(
         output_folder=Path("/Volumes/External/scans"),
         output_format=OutputFormat.JPEG,
-        scan_settings=ScanPreset.PHOTO.settings,
+        scan_settings=ScanSettings(600, ColorMode.COLOR),
         capture_mode=CaptureMode.DOCUMENT,
     )
 
@@ -146,7 +143,7 @@ def test_a_rejected_put_leaves_the_saved_settings_untouched(
     client: TestClient,
     settings_repository: InMemoryApplicationSettingsRepository,
 ) -> None:
-    client.put("/api/settings", json={**VALID_BODY, "scan_preset": "poster"})
+    client.put("/api/settings", json={**VALID_BODY, "dots_per_inch": 301})
 
     assert settings_repository.load() == INITIAL_SETTINGS
 
@@ -196,7 +193,7 @@ def test_put_settings_with_an_unknown_capture_mode_prepares_no_folder(
     assert folder_preparer.prepared_folders == []
 
 
-def test_put_settings_without_a_preset_or_quality_keeps_the_saved_quality(client: TestClient) -> None:
+def test_put_settings_without_a_quality_keeps_the_saved_quality(client: TestClient) -> None:
     body_without_quality = {"output_folder": "/Volumes/External/scans", "output_format": "jpg"}
 
     response = client.put("/api/settings", json=body_without_quality)
@@ -210,32 +207,60 @@ def test_put_settings_with_a_resolution_and_a_colour_mode_saves_them(client: Tes
     assert (response.json()["dots_per_inch"], response.json()["color_mode"]) == (1200, "grayscale")
 
 
-def test_put_settings_reports_no_preset_for_a_custom_combination(client: TestClient) -> None:
-    response = client.put("/api/settings", json={**VALID_BODY, "dots_per_inch": 400, "color_mode": "color"})
+def test_put_settings_does_not_report_a_preset(client: TestClient) -> None:
+    response = client.put("/api/settings", json=VALID_BODY)
 
-    assert response.json()["scan_preset"] is None
-
-
-def test_put_settings_reports_the_preset_a_combination_matches(client: TestClient) -> None:
-    response = client.put("/api/settings", json={**VALID_BODY, "dots_per_inch": 200, "color_mode": "grayscale"})
-
-    assert response.json()["scan_preset"] == "document_economy"
+    assert "scan_preset" not in response.json()
 
 
-def test_the_page_may_send_a_preset_with_null_quality_fields(client: TestClient) -> None:
+def test_put_settings_does_not_report_a_rotation(client: TestClient) -> None:
+    response = client.put("/api/settings", json=VALID_BODY)
+
+    assert "rotation_degrees" not in response.json()
+
+
+def test_an_old_client_that_sends_a_preset_and_a_rotation_is_accepted(client: TestClient) -> None:
     response = client.put(
-        "/api/settings", json={**VALID_BODY, "scan_preset": "photo", "dots_per_inch": None, "color_mode": None}
+        "/api/settings", json={**VALID_BODY, "scan_preset": "document_economy", "rotation_degrees": 180}
     )
 
-    assert (response.json()["dots_per_inch"], response.json()["scan_preset"]) == (600, "photo")
+    assert response.status_code == HTTPStatus.OK
 
 
-def test_put_settings_saves_the_rotation_and_the_crop(
+def test_the_preset_and_the_rotation_of_an_old_client_are_ignored(
     client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
 ) -> None:
-    client.put("/api/settings", json={**VALID_BODY, "rotation_degrees": 180, "auto_crop": True})
+    client.put("/api/settings", json={**VALID_BODY, "scan_preset": "document_economy", "rotation_degrees": 180})
 
-    assert settings_repository.load().adjustment == ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
+    assert settings_repository.load().scan_settings == ScanSettings(600, ColorMode.COLOR)
+
+
+def test_an_old_preset_alone_leaves_the_saved_quality_as_it_is(
+    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
+) -> None:
+    body_with_a_preset_only = {
+        "output_folder": "/Volumes/External/scans",
+        "output_format": "jpg",
+        "scan_preset": "photo",
+    }
+
+    client.put("/api/settings", json=body_with_a_preset_only)
+
+    assert settings_repository.load().scan_settings == INITIAL_SETTINGS.scan_settings
+
+
+def test_an_unknown_old_preset_is_ignored_too(client: TestClient) -> None:
+    response = client.put("/api/settings", json={**VALID_BODY, "scan_preset": "poster"})
+
+    assert response.status_code == HTTPStatus.OK
+
+
+def test_put_settings_saves_the_crop(
+    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
+) -> None:
+    client.put("/api/settings", json={**VALID_BODY, "auto_crop": True})
+
+    assert settings_repository.load().adjustment == ImageAdjustment(auto_crop=True)
 
 
 def test_the_body_of_a_get_is_a_valid_body_for_a_put(client: TestClient) -> None:
@@ -248,9 +273,9 @@ def test_the_body_of_a_get_is_a_valid_body_for_a_put(client: TestClient) -> None
 
 @pytest.mark.parametrize(
     "invalid_fields",
-    [{"dots_per_inch": 301}, {"color_mode": "sepia"}, {"rotation_degrees": 45}],
+    [{"dots_per_inch": 301}, {"color_mode": "sepia"}],
 )
-def test_put_settings_with_an_invalid_quality_or_rotation_answers_422(
+def test_put_settings_with_an_invalid_quality_answers_422(
     client: TestClient, invalid_fields: dict[str, object]
 ) -> None:
     response = client.put("/api/settings", json={**VALID_BODY, **invalid_fields})
@@ -260,7 +285,7 @@ def test_put_settings_with_an_invalid_quality_or_rotation_answers_422(
 
 @pytest.mark.parametrize(
     "mistyped_fields",
-    [{"dots_per_inch": "300"}, {"dots_per_inch": 300.5}, {"rotation_degrees": "90"}, {"auto_crop": "true"}],
+    [{"dots_per_inch": "300"}, {"dots_per_inch": 300.5}, {"auto_crop": "true"}],
 )
 def test_put_settings_with_a_mistyped_field_answers_the_standard_422(
     client: TestClient, mistyped_fields: dict[str, object]

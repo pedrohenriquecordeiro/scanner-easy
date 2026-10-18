@@ -121,22 +121,6 @@ def test_quick_scan_without_adjustment_has_the_size_of_the_glass(configuration: 
         assert read_scanned_file_size(client) == GLASS_SIZE
 
 
-def test_quick_scan_with_a_quarter_turn_swaps_the_dimensions(configuration: ApplicationConfiguration) -> None:
-    with build_client(configuration, LidBackground.WHITE) as client:
-        save_settings(client, configuration.default_output_folder, rotation_degrees=90)
-        client.post("/api/scans", headers=STATE_CHANGING_HEADERS)
-        wait_for_state(client, has_finished_a_scan)
-        assert read_scanned_file_size(client) == GLASS_SIZE[::-1]
-
-
-def test_quick_scan_with_a_half_turn_keeps_the_dimensions(configuration: ApplicationConfiguration) -> None:
-    with build_client(configuration, LidBackground.WHITE) as client:
-        save_settings(client, configuration.default_output_folder, rotation_degrees=180)
-        client.post("/api/scans", headers=STATE_CHANGING_HEADERS)
-        wait_for_state(client, has_finished_a_scan)
-        assert read_scanned_file_size(client) == GLASS_SIZE
-
-
 def test_quick_scan_with_the_crop_on_a_white_page_keeps_the_whole_glass(
     configuration: ApplicationConfiguration,
 ) -> None:
@@ -179,14 +163,6 @@ def test_document_page_against_the_dark_lid_is_cropped(configuration: Applicatio
     assert abs(height - SHEET_SIZE_ON_DARK_LID[1]) <= SIZE_TOLERANCE_PIXELS
 
 
-def test_document_page_with_a_quarter_turn_swaps_the_dimensions(configuration: ApplicationConfiguration) -> None:
-    with build_client(configuration, LidBackground.WHITE) as client:
-        save_settings(client, configuration.default_output_folder, rotation_degrees=90)
-        client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
-        wait_for_state(client, has_document_pages(1))
-        assert read_draft_page_size(configuration, 1, client) == GLASS_SIZE[::-1]
-
-
 def test_document_with_a_resumed_page_and_a_rotated_page_is_saved_as_one_pdf(
     configuration: ApplicationConfiguration,
 ) -> None:
@@ -195,9 +171,10 @@ def test_document_with_a_resumed_page_and_a_rotated_page_is_saved_as_one_pdf(
         configuration.data_directory / DRAFTS_FOLDER_NAME, [build_sample_jpeg(*resumed_page_size, POINTS_PER_INCH)]
     )
     with build_client(configuration, LidBackground.WHITE) as client:
-        save_settings(client, configuration.default_output_folder, rotation_degrees=90)
+        save_settings(client, configuration.default_output_folder)
         client.post("/api/document/pages", headers=STATE_CHANGING_HEADERS)
         wait_for_state(client, has_document_pages(2))
+        rotate_page(client, 2)
         finalization = client.post("/api/document/finalize", headers=STATE_CHANGING_HEADERS).json()
     with pikepdf.open(Path(finalization["output_folder"]) / finalization["file_name"]) as document:
         page_sizes = [(float(page.mediabox[2]), float(page.mediabox[3])) for page in document.pages]
@@ -209,20 +186,22 @@ def test_document_with_a_resumed_page_and_a_rotated_page_is_saved_as_one_pdf(
 def test_the_saved_adjustments_are_served_back_after_a_scan(configuration: ApplicationConfiguration) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         saved_settings = save_settings(
-            client, configuration.default_output_folder, rotation_degrees=270, auto_crop=True, color_mode="grayscale"
+            client, configuration.default_output_folder, auto_crop=True, color_mode="grayscale"
         )
         state_settings = client.get("/api/state").json()["settings"]
     assert state_settings == saved_settings
-    assert (state_settings["rotation_degrees"], state_settings["auto_crop"]) == (270, True)
+    assert (state_settings["color_mode"], state_settings["auto_crop"]) == ("grayscale", True)
+
+
+def rotate_page(client: TestClient, page_position: int) -> dict:
+    page = client.get("/api/document").json()["document"]["pages"][page_position - 1]
+    response = client.post(f"/api/document/pages/{page['page_identifier']}/rotation", headers=STATE_CHANGING_HEADERS)
+    assert response.status_code == 200
+    return {"previous_identifier": page["page_identifier"], "body": response.json()}
 
 
 def rotate_first_page(client: TestClient) -> dict:
-    first_page = client.get("/api/document").json()["document"]["pages"][0]
-    response = client.post(
-        f"/api/document/pages/{first_page['page_identifier']}/rotation", headers=STATE_CHANGING_HEADERS
-    )
-    assert response.status_code == 200
-    return {"previous_identifier": first_page["page_identifier"], "body": response.json()}
+    return rotate_page(client, 1)
 
 
 def test_rotating_a_page_of_the_draft_keeps_its_identifier(

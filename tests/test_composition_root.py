@@ -109,9 +109,7 @@ def test_state_endpoint_reports_default_settings(
         "output_format": "pdf",
         "dots_per_inch": 300,
         "color_mode": "color",
-        "scan_preset": "document",
         "capture_mode": "single",
-        "rotation_degrees": 0,
         "auto_crop": False,
     }
     assert (response.status_code, response.json()["settings"]) == (200, expected_settings)
@@ -340,4 +338,4 @@ def test_an_old_settings_file_with_only_a_preset_is_served_with_the_quality_of_t
     with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
         settings = client.get("/api/settings").json()
 
-    assert (settings["dots_per_inch"], settings["color_mode"], settings["scan_preset"]) == (600, "color", "photo")
+    assert (settings["dots_per_inch"], settings["color_mode"]) == (600, "color")

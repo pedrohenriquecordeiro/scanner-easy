@@ -7,7 +7,6 @@ import pytest
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import (
     ADJUSTED_PAGE_SIZE_FACTOR,
@@ -227,15 +226,8 @@ def test_unavailable_folder_propagates_from_the_space_check_for_a_file():
         StorageGuardService(reader).ensure_space_for_file(OUTPUT_FOLDER, DOCUMENT_SIZE_IN_BYTES)
 
 
-ROTATED_HALF_TURN = ImageAdjustment(rotation=PageRotation.HALF_TURN)
 CROPPED = ImageAdjustment(auto_crop=True)
 COLOR_AT_1200 = ScanSettings(1200, ColorMode.COLOR)
-
-
-def test_an_active_rotation_doubles_the_estimated_page_size():
-    assert estimated_page_bytes(COLOR_AT_300, ROTATED_HALF_TURN) == ADJUSTED_PAGE_SIZE_FACTOR * estimated_page_bytes(
-        COLOR_AT_300
-    )
 
 
 def test_an_active_crop_doubles_the_estimated_page_size():
@@ -269,4 +261,4 @@ def test_the_space_check_without_adjustment_still_accepts_what_it_accepted_befor
 def test_fewer_pages_remain_when_an_adjustment_is_active():
     guard = build_guard(MINIMUM_FREE_SPACE_BYTES + 100 * estimated_page_bytes(COLOR_AT_300))
 
-    assert guard.estimate_pages_remaining(OUTPUT_FOLDER, COLOR_AT_300, ROTATED_HALF_TURN) == 50
+    assert guard.estimate_pages_remaining(OUTPUT_FOLDER, COLOR_AT_300, CROPPED) == 50

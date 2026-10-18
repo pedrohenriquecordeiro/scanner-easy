@@ -35,7 +35,6 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
@@ -45,7 +44,7 @@ from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.stub_document_draft_service import StubDocumentDraftService, build_stub_snapshot
 
 CATALOG = ErrorMessageCatalog()
-ADJUSTMENT = ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
+ADJUSTMENT = ImageAdjustment(auto_crop=True)
 SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.PDF,

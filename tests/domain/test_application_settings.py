@@ -5,7 +5,6 @@ from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_settings import ScanSettings
 
@@ -57,7 +56,7 @@ def test_adjustment_defaults_to_no_adjustment() -> None:
 
 
 def test_to_scan_request_carries_the_adjustment() -> None:
-    adjustment = ImageAdjustment(rotation=PageRotation.HALF_TURN, auto_crop=True)
+    adjustment = ImageAdjustment(auto_crop=True)
     application_settings = ApplicationSettings(
         SCANS_FOLDER, OutputFormat.PDF, ScanPreset.DOCUMENT.settings, adjustment=adjustment
     )

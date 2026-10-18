@@ -17,11 +17,9 @@ class SettingsRequestBody(BaseModel):
     output_folder: str
     output_format: str
     # Every field but the first two: missing or null keeps the saved value, so an older client keeps working.
-    scan_preset: str | None = None
     capture_mode: str | None = None
     dots_per_inch: StrictInt | None = None
     color_mode: str | None = None
-    rotation_degrees: StrictInt | None = None
     auto_crop: StrictBool | None = None
 
 
@@ -47,11 +45,9 @@ class SettingsController:
         update = SettingsUpdate(
             output_folder=body.output_folder,
             output_format=body.output_format,
-            scan_preset=body.scan_preset,
             capture_mode=body.capture_mode,
             dots_per_inch=body.dots_per_inch,
             color_mode=body.color_mode,
-            rotation_degrees=body.rotation_degrees,
             auto_crop=body.auto_crop,
         )
         try:

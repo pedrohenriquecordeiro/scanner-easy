@@ -8,7 +8,6 @@ from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_quality import is_supported_dots_per_inch
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -19,13 +18,11 @@ CAPTURE_MODE_KEY = "capture_mode"
 DOTS_PER_INCH_KEY = "dots_per_inch"
 COLOR_MODE_KEY = "color_mode"
 SCAN_PRESET_KEY = "scan_preset"
-ROTATION_DEGREES_KEY = "rotation_degrees"
 AUTO_CROP_KEY = "auto_crop"
 SCAN_QUALITY_KEY = "scan_quality"
 KNOWN_CAPTURE_MODE_VALUES = frozenset(capture_mode.value for capture_mode in CaptureMode)
 KNOWN_COLOR_MODE_VALUES = frozenset(color_mode.value for color_mode in ColorMode)
 KNOWN_SCAN_PRESET_VALUES = frozenset(scan_preset.value for scan_preset in ScanPreset)
-KNOWN_ROTATION_VALUES = frozenset(rotation.value for rotation in PageRotation)
 DEFAULT_ADJUSTMENT = ImageAdjustment()
 
 
@@ -56,15 +53,6 @@ def _read_capture_mode(document: dict[str, object]) -> tuple[CaptureMode, Reject
     if isinstance(raw_capture_mode, str) and raw_capture_mode in KNOWN_CAPTURE_MODE_VALUES:
         return CaptureMode(raw_capture_mode), None
     return CaptureMode.SINGLE, RejectedValue(CAPTURE_MODE_KEY, repr(raw_capture_mode), "the single capture mode")
-
-
-def _read_rotation(document: dict[str, object]) -> tuple[PageRotation, RejectedValue | None]:
-    if ROTATION_DEGREES_KEY not in document:
-        return PageRotation.NONE, None
-    raw_rotation = document[ROTATION_DEGREES_KEY]
-    if _is_plain_integer(raw_rotation) and raw_rotation in KNOWN_ROTATION_VALUES:
-        return PageRotation(raw_rotation), None
-    return PageRotation.NONE, RejectedValue(ROTATION_DEGREES_KEY, repr(raw_rotation), "no rotation")
 
 
 def _read_auto_crop(document: dict[str, object]) -> tuple[bool, RejectedValue | None]:
@@ -120,11 +108,10 @@ def read_application_settings(document: object) -> SettingsReading:
     output_format = OutputFormat(document["output_format"])
     scan_settings, rejected_quality = _read_scan_settings(document)
     capture_mode, rejected_capture_mode = _read_capture_mode(document)
-    rotation, rejected_rotation = _read_rotation(document)
     auto_crop, rejected_auto_crop = _read_auto_crop(document)
     rejected_values = tuple(
         rejected
-        for rejected in (rejected_quality, rejected_capture_mode, rejected_rotation, rejected_auto_crop)
+        for rejected in (rejected_quality, rejected_capture_mode, rejected_auto_crop)
         if rejected is not None
     )
     settings = ApplicationSettings(
@@ -132,7 +119,7 @@ def read_application_settings(document: object) -> SettingsReading:
         output_format=output_format,
         scan_settings=scan_settings,
         capture_mode=capture_mode,
-        adjustment=ImageAdjustment(rotation=rotation, auto_crop=auto_crop),
+        adjustment=ImageAdjustment(auto_crop=auto_crop),
     )
     return SettingsReading(settings, rejected_values)
 
@@ -170,7 +157,6 @@ class JsonApplicationSettingsRepository:
             DOTS_PER_INCH_KEY: settings.scan_settings.dots_per_inch,
             COLOR_MODE_KEY: settings.scan_settings.color_mode.value,
             CAPTURE_MODE_KEY: settings.capture_mode.value,
-            ROTATION_DEGREES_KEY: settings.adjustment.rotation.value,
             AUTO_CROP_KEY: settings.adjustment.auto_crop,
         }
         self._storage_file.parent.mkdir(parents=True, exist_ok=True)

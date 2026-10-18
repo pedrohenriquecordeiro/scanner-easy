@@ -11,7 +11,6 @@ from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import ScanAlreadyRunningError, ScannerUnreachableError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import (
@@ -25,7 +24,7 @@ SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.JPEG,
     scan_settings=ScanPreset.PHOTO.settings,
-    adjustment=ImageAdjustment(rotation=PageRotation.CLOCKWISE_90),
+    adjustment=ImageAdjustment(auto_crop=True),
 )
 CATALOG = ErrorMessageCatalog()
 

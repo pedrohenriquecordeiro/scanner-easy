@@ -123,7 +123,8 @@ def build_settings(output_folder: Path, output_format: str) -> dict[str, str]:
     return {
         "output_folder": str(output_folder),
         "output_format": output_format,
-        "scan_preset": "document_economy",
+        "dots_per_inch": 200,
+        "color_mode": "grayscale",
     }
 
 

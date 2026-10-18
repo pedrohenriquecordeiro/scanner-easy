@@ -9,7 +9,6 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import ScanFailedError
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -179,36 +178,10 @@ def test_truncated_jpeg_is_rejected_even_when_a_pdf_is_requested():
         build_encoder().encode(truncated_image, build_job(OutputFormat.PDF))
 
 
-CLOCKWISE = ImageAdjustment(rotation=PageRotation.CLOCKWISE_90)
 DARK_LID = (30, 30, 30)
 PAPER = (240, 240, 240)
 LID_SIZE = (200, 280)
 PAPER_BOX = (40, 60, 159, 219)
-
-
-def test_the_rotation_reaches_the_jpeg_output():
-    encoded = build_encoder().encode(
-        build_scanned_image(600, 300), build_job(OutputFormat.JPEG, adjustment=CLOCKWISE)
-    )
-
-    assert read_jpeg_size(encoded.content) == (300, 600)
-
-
-def test_the_rotation_reaches_the_thumbnail():
-    encoded = build_encoder().encode(
-        build_scanned_image(600, 300), build_job(OutputFormat.JPEG, adjustment=CLOCKWISE)
-    )
-
-    width, height = read_jpeg_size(encoded.thumbnail_jpeg)
-    assert height > width
-
-
-def test_the_rotation_reaches_the_pdf():
-    encoded = build_encoder().encode(
-        build_scanned_image(600, 300), build_job(OutputFormat.PDF, dots_per_inch=600, adjustment=CLOCKWISE)
-    )
-
-    assert read_pdf_page_size(encoded.content) == pytest.approx((36.0, 72.0), abs=POINT_TOLERANCE)
 
 
 CROP = ImageAdjustment(auto_crop=True)
@@ -232,10 +205,10 @@ def test_the_crop_reaches_the_pdf_with_the_physical_size_of_the_cropped_region()
     assert read_pdf_page_size(encoded.content) == pytest.approx(expected_size, abs=POINT_TOLERANCE)
 
 
-def test_the_density_is_written_after_the_rotation():
-    encoded = build_encoder().encode(
-        build_scanned_image(600, 300), build_job(OutputFormat.JPEG, dots_per_inch=600, adjustment=CLOCKWISE)
-    )
+def test_the_density_is_written_after_the_crop():
+    job = build_job(OutputFormat.JPEG, dots_per_inch=600, adjustment=CROP)
+
+    encoded = build_encoder().encode(SHEET_ON_DARK_LID, job)
 
     with Image.open(io.BytesIO(encoded.content)) as image:
         assert image.info["dpi"] == (600, 600)
