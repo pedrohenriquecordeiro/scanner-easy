@@ -1,8 +1,11 @@
 import fcntl
+import functools
 import logging
 import os
 import secrets
+from collections.abc import Callable
 from pathlib import Path
+from typing import BinaryIO
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,34 +36,49 @@ def flush_to_disk(descriptor: int) -> None:
         os.fsync(descriptor)
 
 
+def write_bytes(content: bytes, stream: BinaryIO) -> None:
+    stream.write(content)
+
+
 class AtomicFileWriter:
     def write_new_file(self, destination: Path, content: bytes) -> None:
+        self.write_new_file_from(destination, functools.partial(write_bytes, content))
+
+    def write_new_file_from(self, destination: Path, write_content: Callable[[BinaryIO], None]) -> int:
+        """Streams the content into a hidden temporary file and publishes it without overwriting.
+
+        Returns the written size. An exception of the callback removes the temporary file and reaches
+        the caller unchanged.
+        """
         if destination.exists():
             raise FileExistsError(f"Refusing to overwrite {destination}")
         temporary = temporary_path_for(destination)
         try:
-            self._write_temporary_file(temporary, content)
+            written_size = self._write_temporary_file(temporary, write_content)
             self._publish_without_overwriting(temporary, destination)
         finally:
             remove_temporary_file(temporary)
         self._synchronise_directory(destination.parent)
+        return written_size
 
     def replace_file(self, destination: Path, content: bytes) -> None:
         temporary = temporary_path_for(destination)
         try:
-            self._write_temporary_file(temporary, content)
+            self._write_temporary_file(temporary, functools.partial(write_bytes, content))
             os.replace(temporary, destination)
         finally:
             remove_temporary_file(temporary)
         self._synchronise_directory(destination.parent)
 
-    def _write_temporary_file(self, temporary: Path, content: bytes) -> None:
+    def _write_temporary_file(self, temporary: Path, write_content: Callable[[BinaryIO], None]) -> int:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         descriptor = os.open(temporary, flags, TEMPORARY_FILE_PERMISSIONS)
         with os.fdopen(descriptor, "wb") as stream:
-            stream.write(content)
+            write_content(stream)
+            written_size = stream.tell()
             stream.flush()
             flush_to_disk(stream.fileno())
+        return written_size
 
     def _publish_without_overwriting(self, temporary: Path, destination: Path) -> None:
         try:

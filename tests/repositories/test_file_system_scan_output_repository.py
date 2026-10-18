@@ -1,16 +1,20 @@
 import errno
 import os
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
 
 from digitalizadora.domain.application_settings import ApplicationSettings
+from digitalizadora.domain.document_pdf_to_save import DocumentPdfToSave
 from digitalizadora.domain.encoded_scan import EncodedScan
-from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
+from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError, ScanFailedError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.file_system_scan_output_repository import (
     MAXIMUM_NAME_ATTEMPTS,
@@ -281,3 +285,224 @@ def test_ensure_output_folder_ready_raises_unavailable_below_a_file(tmp_path):
 
     with pytest.raises(OutputFolderUnavailableError):
         build_real_repository(blocking_file / "nested").ensure_output_folder_ready()
+
+
+FINALIZED_AT = datetime(2026, 10, 17, 10, 5, 0, tzinfo=TIME_ZONE)
+DOCUMENT_NAME = "Contrato do apartamento"
+ASSEMBLED_PDF = b"%PDF-1.7 assembled document"
+
+
+def write_assembled_pdf(stream: BinaryIO) -> None:
+    stream.write(ASSEMBLED_PDF)
+
+
+class CountingPdfAssembly:
+    """Stands in for the streamed assembly: writes the same PDF and counts how often it ran."""
+
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    def __call__(self, stream: BinaryIO) -> None:
+        self.call_count += 1
+        write_assembled_pdf(stream)
+
+
+def build_document_pdf(
+    document_name: str, write_content: Callable[[BinaryIO], None] = write_assembled_pdf
+) -> DocumentPdfToSave:
+    return DocumentPdfToSave(write_content=write_content, created_at=FINALIZED_AT, document_name=document_name)
+
+
+def fail_with_error_number(error_number: int) -> Callable[[BinaryIO], None]:
+    def failing_assembly(stream: BinaryIO) -> None:
+        raise OSError(error_number, os.strerror(error_number))
+
+    return failing_assembly
+
+
+def skip_on_a_case_sensitive_volume(folder: Path) -> None:
+    probe = folder / "letter-case-probe"
+    probe.write_bytes(b"")
+    is_case_sensitive = not (folder / "LETTER-CASE-PROBE").exists()
+    probe.unlink()
+    if is_case_sensitive:
+        pytest.skip("the volume is case-sensitive; the default APFS volume of macOS is not")
+
+
+class StreamWriterThatSucceedsOnAttempt:
+    def __init__(self, successful_attempt: int) -> None:
+        self._successful_attempt = successful_attempt
+        self.attempted_destinations: list[Path] = []
+
+    def write_new_file_from(self, destination: Path, write_content: Callable[[BinaryIO], None]) -> int:
+        self.attempted_destinations.append(destination)
+        if len(self.attempted_destinations) < self._successful_attempt:
+            raise FileExistsError(destination)
+        return len(ASSEMBLED_PDF)
+
+
+class StreamWriterThatLosesTheFirstName:
+    """Another 'process' takes the first chosen name while the PDF is being assembled."""
+
+    def __init__(self, real_writer: AtomicFileWriter) -> None:
+        self._real_writer = real_writer
+        self._race_already_happened = False
+
+    def write_new_file_from(self, destination: Path, write_content: Callable[[BinaryIO], None]) -> int:
+        if self._race_already_happened:
+            return self._real_writer.write_new_file_from(destination, write_content)
+        self._race_already_happened = True
+
+        def assemble_and_lose_the_name(stream: BinaryIO) -> None:
+            write_content(stream)
+            destination.write_bytes(b"written by another process")
+
+        return self._real_writer.write_new_file_from(destination, assemble_and_lose_the_name)
+
+
+def test_chosen_name_becomes_the_pdf_file_name(tmp_path):
+    result = build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert result.output_path == tmp_path / "Contrato do apartamento.pdf"
+
+
+def test_saved_document_holds_what_the_assembly_wrote(tmp_path):
+    result = build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert result.output_path.read_bytes() == ASSEMBLED_PDF
+
+
+def test_saved_document_result_has_the_path_the_moment_and_the_written_size(tmp_path):
+    result = build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert result == ScanResult(
+        output_path=tmp_path / "Contrato do apartamento.pdf",
+        output_format=OutputFormat.PDF,
+        scanned_at=FINALIZED_AT,
+        size_in_bytes=len(ASSEMBLED_PDF),
+    )
+
+
+def test_taken_chosen_name_moves_to_the_second_attempt(tmp_path):
+    (tmp_path / "Contrato do apartamento.pdf").write_bytes(b"older document")
+
+    result = build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert result.output_path.name == "Contrato do apartamento (2).pdf"
+
+
+def test_two_taken_names_move_to_the_third_attempt(tmp_path):
+    (tmp_path / "Contrato do apartamento.pdf").write_bytes(b"older document")
+    (tmp_path / "Contrato do apartamento (2).pdf").write_bytes(b"older document")
+
+    result = build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert result.output_path.name == "Contrato do apartamento (3).pdf"
+
+
+def test_saving_a_document_never_overwrites_an_existing_file(tmp_path):
+    (tmp_path / "Contrato do apartamento.pdf").write_bytes(b"older document")
+
+    build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert (tmp_path / "Contrato do apartamento.pdf").read_bytes() == b"older document"
+
+
+def test_name_that_differs_only_in_letter_case_counts_as_taken(tmp_path):
+    skip_on_a_case_sensitive_volume(tmp_path)
+    (tmp_path / "Contrato do apartamento.pdf").write_bytes(b"older document")
+
+    result = build_real_repository(tmp_path).save_document(build_document_pdf("contrato do apartamento"))
+
+    assert result.output_path.name == "contrato do apartamento (2).pdf"
+
+
+def test_taken_name_is_skipped_without_assembling_the_pdf(tmp_path):
+    (tmp_path / "Contrato do apartamento.pdf").write_bytes(b"older document")
+    assembly = CountingPdfAssembly()
+
+    build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME, assembly))
+
+    assert assembly.call_count == 1
+
+
+def test_name_taken_during_the_assembly_assembles_again_under_the_next_name(tmp_path):
+    assembly = CountingPdfAssembly()
+    repository = build_repository(tmp_path, StreamWriterThatLosesTheFirstName(AtomicFileWriter()))
+
+    result = repository.save_document(build_document_pdf(DOCUMENT_NAME, assembly))
+
+    assert (result.output_path.name, assembly.call_count) == ("Contrato do apartamento (2).pdf", 2)
+
+
+def test_empty_name_follows_the_sequence_of_the_finalization_day(tmp_path):
+    (tmp_path / "2026-10-17_00007.pdf").write_bytes(b"x")
+    (tmp_path / "2026-10-16_00009.pdf").write_bytes(b"x")
+
+    result = build_real_repository(tmp_path).save_document(build_document_pdf(""))
+
+    assert result.output_path.name == "2026-10-17_00008.pdf"
+
+
+def test_last_allowed_name_attempt_still_saves_the_document(tmp_path):
+    file_writer = StreamWriterThatSucceedsOnAttempt(MAXIMUM_NAME_ATTEMPTS)
+
+    result = build_repository(tmp_path, file_writer).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert result.output_path.name == "Contrato do apartamento (1000).pdf"
+
+
+def test_one_name_attempt_beyond_the_limit_raises_output_folder_unavailable(tmp_path):
+    file_writer = StreamWriterThatSucceedsOnAttempt(MAXIMUM_NAME_ATTEMPTS + 1)
+
+    with pytest.raises(OutputFolderUnavailableError):
+        build_repository(tmp_path, file_writer).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert len(file_writer.attempted_destinations) == MAXIMUM_NAME_ATTEMPTS
+
+
+@pytest.mark.parametrize("error_number", [errno.ENOSPC, errno.EDQUOT])
+def test_full_disk_while_streaming_the_document_raises_insufficient_storage(tmp_path, error_number):
+    document_pdf = build_document_pdf(DOCUMENT_NAME, fail_with_error_number(error_number))
+
+    with pytest.raises(InsufficientStorageError):
+        build_real_repository(tmp_path).save_document(document_pdf)
+
+
+def test_input_output_error_while_streaming_the_document_raises_output_folder_unavailable(tmp_path):
+    document_pdf = build_document_pdf(DOCUMENT_NAME, fail_with_error_number(errno.EIO))
+
+    with pytest.raises(OutputFolderUnavailableError):
+        build_real_repository(tmp_path).save_document(document_pdf)
+
+
+def test_assembly_failure_reaches_the_caller_unchanged(tmp_path):
+    def unreadable_page(stream: BinaryIO) -> None:
+        raise ScanFailedError("A scanned page could not be read as an image")
+
+    with pytest.raises(ScanFailedError):
+        build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME, unreadable_page))
+
+
+def test_memory_error_of_the_assembly_reaches_the_caller_unchanged(tmp_path):
+    def memory_exhausted(stream: BinaryIO) -> None:
+        raise MemoryError
+
+    with pytest.raises(MemoryError):
+        build_real_repository(tmp_path).save_document(build_document_pdf(DOCUMENT_NAME, memory_exhausted))
+
+
+def test_missing_output_folder_is_created_for_the_document(tmp_path):
+    output_folder = tmp_path / "external disk" / "scans"
+
+    result = build_real_repository(output_folder).save_document(build_document_pdf(DOCUMENT_NAME))
+
+    assert result.output_path == output_folder / "Contrato do apartamento.pdf"
+
+
+def test_output_folder_below_a_file_refuses_the_document(tmp_path):
+    blocking_file = tmp_path / "scans"
+    blocking_file.write_bytes(b"not a folder")
+
+    with pytest.raises(OutputFolderUnavailableError):
+        build_real_repository(blocking_file / "nested").save_document(build_document_pdf(DOCUMENT_NAME))

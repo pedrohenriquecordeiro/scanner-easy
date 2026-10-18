@@ -40,12 +40,10 @@ class StorageGuardService:
         self._free_space_reader = free_space_reader
 
     def ensure_space_for_scan(self, folder: Path, settings: ScanSettings) -> None:
-        free_space = self._free_space_reader(folder)
-        required_space = MINIMUM_FREE_SPACE_BYTES + SAFETY_MARGIN_PAGES * estimated_page_bytes(settings)
-        if free_space < required_space:
-            raise InsufficientStorageError(
-                f"Only {free_space} bytes are free in {folder}; {required_space} bytes are required"
-            )
+        self._ensure_free_space(folder, MINIMUM_FREE_SPACE_BYTES + SAFETY_MARGIN_PAGES * estimated_page_bytes(settings))
+
+    def ensure_space_for_file(self, folder: Path, file_size_in_bytes: int) -> None:
+        self._ensure_free_space(folder, MINIMUM_FREE_SPACE_BYTES + file_size_in_bytes)
 
     def estimate_pages_remaining(self, folder: Path, settings: ScanSettings) -> int:
         usable_space = self._free_space_reader(folder) - MINIMUM_FREE_SPACE_BYTES
@@ -53,3 +51,10 @@ class StorageGuardService:
 
     def free_space_in_bytes(self, folder: Path) -> int:
         return self._free_space_reader(folder)
+
+    def _ensure_free_space(self, folder: Path, required_space: int) -> None:
+        free_space = self._free_space_reader(folder)
+        if free_space < required_space:
+            raise InsufficientStorageError(
+                f"Only {free_space} bytes are free in {folder}; {required_space} bytes are required"
+            )

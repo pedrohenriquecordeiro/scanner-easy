@@ -190,3 +190,35 @@ def test_unavailable_folder_propagates_from_the_free_space_query():
 
 def test_default_reader_reads_the_real_disk(tmp_path):
     assert StorageGuardService().free_space_in_bytes(tmp_path) > 0
+
+
+DOCUMENT_SIZE_IN_BYTES = 5_000_000
+
+
+def test_free_space_exactly_at_the_minimum_plus_the_file_size_is_accepted():
+    guard = build_guard(MINIMUM_FREE_SPACE_BYTES + DOCUMENT_SIZE_IN_BYTES)
+
+    guard.ensure_space_for_file(OUTPUT_FOLDER, DOCUMENT_SIZE_IN_BYTES)
+
+
+def test_free_space_one_byte_below_the_minimum_plus_the_file_size_is_refused():
+    guard = build_guard(MINIMUM_FREE_SPACE_BYTES + DOCUMENT_SIZE_IN_BYTES - 1)
+
+    with pytest.raises(InsufficientStorageError):
+        guard.ensure_space_for_file(OUTPUT_FOLDER, DOCUMENT_SIZE_IN_BYTES)
+
+
+def test_space_check_for_a_file_asks_the_reader_about_the_given_folder():
+    reader = RecordingFreeSpaceReader(MINIMUM_FREE_SPACE_BYTES + DOCUMENT_SIZE_IN_BYTES)
+
+    StorageGuardService(reader).ensure_space_for_file(OUTPUT_FOLDER, DOCUMENT_SIZE_IN_BYTES)
+
+    assert reader.requested_folders == [OUTPUT_FOLDER]
+
+
+def test_unavailable_folder_propagates_from_the_space_check_for_a_file():
+    reader = RecordingFreeSpaceReader(MINIMUM_FREE_SPACE_BYTES + DOCUMENT_SIZE_IN_BYTES)
+    reader.failure = OutputFolderUnavailableError("The external disk was disconnected")
+
+    with pytest.raises(OutputFolderUnavailableError):
+        StorageGuardService(reader).ensure_space_for_file(OUTPUT_FOLDER, DOCUMENT_SIZE_IN_BYTES)

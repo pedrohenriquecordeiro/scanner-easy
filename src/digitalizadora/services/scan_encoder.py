@@ -4,12 +4,15 @@ from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scanned_image import ScannedImage
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.pdf_assembly_service import PdfAssemblyService, PdfDocumentSpecification
+from digitalizadora.services.pdf_assembly_service import (
+    DEFAULT_PDF_TITLE_TEMPLATE,
+    PdfAssemblyService,
+    PdfDocumentSpecification,
+)
 from digitalizadora.services.thumbnail_service import ThumbnailService
 
 EXPECTED_MEDIA_TYPE = "image/jpeg"
 THUMBNAIL_MAXIMUM_EDGE_PIXELS = 480
-PDF_TITLE_TEMPLATE = "Digitalização {started_at:%Y-%m-%d %H:%M:%S}"
 
 
 class ScanEncoder:
@@ -43,7 +46,7 @@ class ScanEncoder:
             return normalised_jpeg
         specification = PdfDocumentSpecification(
             dots_per_inch=job.request.settings.dots_per_inch,
-            title=PDF_TITLE_TEMPLATE.format(started_at=job.started_at),
+            title=DEFAULT_PDF_TITLE_TEMPLATE.format(moment=job.started_at),
             created_at=job.started_at,
         )
         return self._pdf_assembly_service.build_pdf([normalised_jpeg], specification)

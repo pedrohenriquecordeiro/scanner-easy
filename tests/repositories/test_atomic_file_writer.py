@@ -3,6 +3,7 @@ import fcntl
 import os
 import stat
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
 
@@ -288,3 +289,66 @@ def test_failure_to_publish_leaves_no_temporary_file(tmp_path, monkeypatch):
         AtomicFileWriter().write_new_file(tmp_path / "report.pdf", b"content")
 
     assert list_file_names(tmp_path) == []
+
+
+STREAMED_CONTENT = b"%PDF-1.4 streamed content"
+
+
+def write_streamed_content(stream: BinaryIO) -> None:
+    stream.write(STREAMED_CONTENT[:9])
+    stream.write(STREAMED_CONTENT[9:])
+
+
+class AssemblyFailureError(Exception):
+    pass
+
+
+def fail_after_writing_a_part(stream: BinaryIO) -> None:
+    stream.write(b"half of a PDF")
+    raise AssemblyFailureError("the assembly failed in the middle")
+
+
+def test_write_new_file_from_stores_what_the_callback_writes(tmp_path):
+    destination = tmp_path / "report.pdf"
+
+    AtomicFileWriter().write_new_file_from(destination, write_streamed_content)
+
+    assert destination.read_bytes() == STREAMED_CONTENT
+
+
+def test_write_new_file_from_returns_the_written_size(tmp_path):
+    written_size = AtomicFileWriter().write_new_file_from(tmp_path / "report.pdf", write_streamed_content)
+
+    assert written_size == len(STREAMED_CONTENT)
+
+
+def test_callback_failure_reaches_the_caller_unchanged(tmp_path):
+    with pytest.raises(AssemblyFailureError, match="the assembly failed in the middle"):
+        AtomicFileWriter().write_new_file_from(tmp_path / "report.pdf", fail_after_writing_a_part)
+
+
+def test_callback_failure_leaves_neither_temporary_file_nor_destination(tmp_path):
+    with pytest.raises(AssemblyFailureError):
+        AtomicFileWriter().write_new_file_from(tmp_path / "report.pdf", fail_after_writing_a_part)
+
+    assert list_file_names(tmp_path) == []
+
+
+def test_existing_destination_is_refused_before_the_callback_runs(tmp_path):
+    destination = tmp_path / "report.pdf"
+    destination.write_bytes(b"original")
+    written_streams: list[BinaryIO] = []
+
+    with pytest.raises(FileExistsError):
+        AtomicFileWriter().write_new_file_from(destination, written_streams.append)
+
+    assert written_streams == []
+
+
+def test_write_new_file_from_flushes_the_file_and_then_the_directory(tmp_path, monkeypatch):
+    recorder = FullSyncRecorder()
+    monkeypatch.setattr(fcntl, "fcntl", recorder)
+
+    AtomicFileWriter().write_new_file_from(tmp_path / "report.pdf", write_streamed_content)
+
+    assert recorder.synchronised_kinds == ["file", "directory"]
