@@ -1180,4 +1180,4 @@ Baseline antes da revisão: 4039 testes; depois, **4081 passam** (17 pulados; co
 ### 15.4 Testes e histórico
 
 - Os ajudantes de teste sem parâmetro booleano (`build_job(output_format, adjustment)`, `job_with`) e com no máximo 3 parâmetros (`rectangle((esquerda, topo, direita, base))`, `render_request`, ajudantes `turn_last_scan`, `put_last_crops` e `detect_last_crops`); o teste de 409 durante a digitalização, de 0,8 s, virou cinco testes sem espera (a digitalização fica presa por um portão). Os testes de integração do aplicativo inteiro seguem em 0,1 a 0,2 s cada (subir o aplicativo e escanear no simulador): aberto.
-- Os dois commits locais de mesmo assunto "erros e textos novos do ajuste da última digitalização" foram juntos num só, para o histórico ficar bissectável (nada tinha sido enviado).
+- O commit `493241f` deixa a suíte vermelha (falta uma linha de teste, que o commit seguinte, de mesmo assunto, traz). O histórico reescrito, com os dois juntos e a mesma árvore final, ficou pronto no branch local `tmp-bisect-fix`; o `main` não foi reescrito (a ferramenta recusou mover o branch). Para adotar antes do envio: `git branch -f main tmp-bisect-fix`.
