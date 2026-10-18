@@ -104,9 +104,10 @@ class ScanOutputService:
     def _save_outputs(self, master_jpeg: bytes, framing: PageFraming, job: ScanJob) -> tuple[SavedScanFile, ...]:
         identity = OutputIdentity(job.started_at, job.request.settings.dots_per_inch, job.request.output_format)
         request = OutputsRequest(framing, identity)
+        encoded_scans = self._render_outputs(master_jpeg, request)
+        output_paths = self._scan_output_repository.save_scans(encoded_scans)
         saved_files = []
-        for encoded_scan in self._render_outputs(master_jpeg, request):
-            output_path = self._scan_output_repository.save(encoded_scan)
+        for encoded_scan, output_path in zip(encoded_scans, output_paths, strict=True):
             described_file = self._scan_output_repository.describe_saved_scan(output_path)
             saved_files.append(
                 described_file or SavedScanFile(output_path.name, len(encoded_scan.content), UNKNOWN_MODIFICATION_TIME)

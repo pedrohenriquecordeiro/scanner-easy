@@ -4,6 +4,10 @@ from tests.web.panel_scenario_runner import NODE_EXECUTABLE, run_last_scan_scena
 
 FIRST_FILE = "2026_10_18__16_14_03_000000006.pdf"
 SECOND_FILE = "2026_10_18__16_14_03_000000007.pdf"
+PAIR_FIRST_FILE = "2026_10_18__16_14_03_000000006__1.pdf"
+PAIR_SECOND_FILE = "2026_10_18__16_14_03_000000006__2.pdf"
+NEW_PAIR_FIRST_FILE = "2026_10_18__16_14_03_000000009__1.pdf"
+NEW_PAIR_SECOND_FILE = "2026_10_18__16_14_03_000000009__2.pdf"
 UPPER_OUTLINE = "5,2 90,2 90,55 5,55"
 LOWER_OUTLINE = "5,60 90,60 90,95 5,95"
 WHOLE_OUTLINE = "10,10 80,10 80,90 10,90"
@@ -61,7 +65,7 @@ def test_the_panel_is_hidden_before_any_scan(scenario_results: dict) -> None:
 
 
 def test_the_panel_lists_one_file_per_line(scenario_results: dict) -> None:
-    assert scenario_results["panel_after_two_photos"]["file_names"] == f"{FIRST_FILE}\n{SECOND_FILE}"
+    assert scenario_results["panel_after_two_photos"]["file_names"] == f"{PAIR_FIRST_FILE}\n{PAIR_SECOND_FILE}"
 
 
 def test_the_panel_shows_the_total_size_of_the_files(scenario_results: dict) -> None:
@@ -126,7 +130,7 @@ def test_the_status_line_names_the_only_file(scenario_results: dict) -> None:
 
 def test_the_status_line_names_both_files(scenario_results: dict) -> None:
     assert scenario_results["panel_after_two_photos"]["status_line"] == (
-        f"Pronto! 2 arquivos salvos: {FIRST_FILE} e {SECOND_FILE}"
+        f"Pronto! 2 arquivos salvos: {PAIR_FIRST_FILE} e {PAIR_SECOND_FILE}"
     )
 
 
@@ -157,7 +161,7 @@ def test_the_panel_is_hidden_in_the_document_mode(scenario_results: dict) -> Non
 def test_a_new_scan_replaces_the_files_the_frames_and_the_thumbnail(scenario_results: dict) -> None:
     panel = scenario_results["panel_follows_a_new_scan"]
     assert (panel["file_names"], visible_outlines(panel), panel["thumbnail_source"]) == (
-        f"{SECOND_FILE}\n2026_10_18__16_14_03_000000008.pdf",
+        f"{NEW_PAIR_FIRST_FILE}\n{NEW_PAIR_SECOND_FILE}",
         [UPPER_OUTLINE, LOWER_OUTLINE],
         "/api/scans/last/thumbnail?version=4",
     )

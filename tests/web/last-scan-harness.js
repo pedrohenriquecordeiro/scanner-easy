@@ -24,6 +24,10 @@ const OTHER_SCAN_IDENTIFIER = "0a1b2c3d4e5f6071";
 const FIRST_FILE = "2026_10_18__16_14_03_000000006.pdf";
 const SECOND_FILE = "2026_10_18__16_14_03_000000007.pdf";
 const THIRD_FILE = "2026_10_18__16_14_03_000000008.pdf";
+const PAIR_FIRST_FILE = "2026_10_18__16_14_03_000000006__1.pdf";
+const PAIR_SECOND_FILE = "2026_10_18__16_14_03_000000006__2.pdf";
+const NEW_PAIR_FIRST_FILE = "2026_10_18__16_14_03_000000009__1.pdf";
+const NEW_PAIR_SECOND_FILE = "2026_10_18__16_14_03_000000009__2.pdf";
 const UPPER_CROP = rectangle_crop(0.05, 0.02, 0.9, 0.55);
 const LOWER_CROP = rectangle_crop(0.05, 0.6, 0.9, 0.95);
 const WHOLE_CROP = rectangle_crop(0.1, 0.1, 0.8, 0.9);
@@ -61,7 +65,7 @@ function build_last_result(changes) {
 }
 
 const ONE_FILE_RESULT = build_last_result({});
-const TWO_PHOTOS_RESULT = build_last_result({ file_names: [FIRST_FILE, SECOND_FILE], crops: [UPPER_CROP, LOWER_CROP] });
+const TWO_PHOTOS_RESULT = build_last_result({ file_names: [PAIR_FIRST_FILE, PAIR_SECOND_FILE], crops: [UPPER_CROP, LOWER_CROP] });
 const ONE_PHOTO_RESULT = build_last_result({ crops: [WHOLE_CROP] });
 
 const ONE_PHOTO_NEW_FILE_RESULT = build_last_result({ file_names: [SECOND_FILE], crops: [WHOLE_CROP] });
@@ -185,7 +189,7 @@ const SCENARIOS = {
     const page = await load_quick_page(ONE_FILE_RESULT);
     const next_result = build_last_result({
       scan_identifier: OTHER_SCAN_IDENTIFIER,
-      file_names: [SECOND_FILE, THIRD_FILE],
+      file_names: [NEW_PAIR_FIRST_FILE, NEW_PAIR_SECOND_FILE],
       crops: [UPPER_CROP, LOWER_CROP],
     });
     await poll_quick_state(page, next_result, { last_result_revision: FIRST_REVISION + 1 });
@@ -381,7 +385,7 @@ const SCENARIOS = {
     return { enlarge_button_focused: page.is_focused("last-scan-enlarge-button") };
   },
   async apply_a_second_frame_that_writes_two_new_files() {
-    const applied_result = build_last_result({ file_names: [SECOND_FILE, THIRD_FILE], crops: [WHOLE_CROP, LOWER_CROP] });
+    const applied_result = build_last_result({ file_names: [NEW_PAIR_FIRST_FILE, NEW_PAIR_SECOND_FILE], crops: [WHOLE_CROP, LOWER_CROP] });
     const page = await load_quick_page(ONE_PHOTO_RESULT, { [CROPS_KEY]: respond(build_answer(applied_result)) });
     await open_the_dialog(page);
     await page.click(page.element("frame-add-button"));
@@ -443,7 +447,7 @@ const SCENARIOS = {
     };
   },
   async detect_that_finds_two_photos() {
-    const detected_result = build_last_result({ file_names: [SECOND_FILE, THIRD_FILE], crops: [UPPER_CROP, LOWER_CROP] });
+    const detected_result = build_last_result({ file_names: [NEW_PAIR_FIRST_FILE, NEW_PAIR_SECOND_FILE], crops: [UPPER_CROP, LOWER_CROP] });
     const page = await load_quick_page(ONE_FILE_RESULT, {
       [DETECT_KEY]: respond(
         build_answer(detected_result, { crops_detected: true, ignored_region_count: 0 }),
@@ -498,7 +502,7 @@ const SCENARIOS = {
   async frames_changed_elsewhere_while_the_dialog_is_open() {
     const page = await load_quick_page(ONE_PHOTO_RESULT);
     await open_the_dialog(page);
-    const changed_result = build_last_result({ file_names: [FIRST_FILE, SECOND_FILE], crops: [DETECTED_CROP, LOWER_CROP] });
+    const changed_result = build_last_result({ file_names: [PAIR_FIRST_FILE, PAIR_SECOND_FILE], crops: [DETECTED_CROP, LOWER_CROP] });
     await poll_quick_state(page, changed_result, { last_result_revision: FIRST_REVISION + 1 });
     return read_dialog(page);
   },

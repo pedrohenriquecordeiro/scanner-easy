@@ -6,6 +6,8 @@ SCAN_IDENTIFIER = "9f3c1d2e4b5a6978"
 FIRST_FILE = "2026_10_18__16_14_03_000000006.pdf"
 SECOND_FILE = "2026_10_18__16_14_03_000000007.pdf"
 THIRD_FILE = "2026_10_18__16_14_03_000000008.pdf"
+NEW_PAIR_FIRST_FILE = "2026_10_18__16_14_03_000000009__1.pdf"
+NEW_PAIR_SECOND_FILE = "2026_10_18__16_14_03_000000009__2.pdf"
 APPLIED_STATUS = f"Moldura aplicada. 1 arquivo novo salvo: {SECOND_FILE}. O arquivo anterior foi mantido."
 UPPER_OUTLINE = "5,2 90,2 90,55 5,55"
 LOWER_OUTLINE = "5,60 90,60 90,95 5,95"
@@ -133,8 +135,9 @@ def test_applying_after_opening_by_keyboard_returns_to_the_enlarge_button(scenar
 def test_a_second_frame_writes_two_new_files_and_the_panel_names_them(scenario_results: dict) -> None:
     panel = scenario_results["apply_a_second_frame_that_writes_two_new_files"]["panel"]
     assert (panel["status"], panel["file_names"]) == (
-        f"Moldura aplicada. 2 arquivos novos salvos: {SECOND_FILE} e {THIRD_FILE}. O arquivo anterior foi mantido.",
-        f"{SECOND_FILE}\n{THIRD_FILE}",
+        f"Moldura aplicada. 2 arquivos novos salvos: {NEW_PAIR_FIRST_FILE} e {NEW_PAIR_SECOND_FILE}. "
+        "O arquivo anterior foi mantido.",
+        f"{NEW_PAIR_FIRST_FILE}\n{NEW_PAIR_SECOND_FILE}",
     )
 
 
@@ -202,7 +205,8 @@ def test_detection_in_the_dialog_gives_the_two_photos_their_frames(scenario_resu
 def test_detection_tells_the_panel_about_the_new_file(scenario_results: dict) -> None:
     panel = scenario_results["detect_that_finds_two_photos"]["panel"]
     assert panel["status"] == (
-        f"Molduras detectadas. 2 arquivos novos salvos: {SECOND_FILE} e {THIRD_FILE}. O arquivo anterior foi mantido."
+        f"Molduras detectadas. 2 arquivos novos salvos: {NEW_PAIR_FIRST_FILE} e {NEW_PAIR_SECOND_FILE}. "
+        "O arquivo anterior foi mantido."
     )
 
 

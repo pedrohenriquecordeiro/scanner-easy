@@ -20,9 +20,11 @@ from tests.fakes.quick_scan_parts import (
 
 FIRST_FILE = "2026_10_13__15_30_12_000000000.jpg"
 SECOND_FILE = "2026_10_13__15_30_12_000000001.jpg"
-THIRD_FILE = "2026_10_13__15_30_12_000000002.jpg"
-FOURTH_FILE = "2026_10_13__15_30_12_000000003.jpg"
-FIFTH_FILE = "2026_10_13__15_30_12_000000004.jpg"
+FIRST_WRITE_FIRST_PHOTO = "2026_10_13__15_30_12_000000000__1.jpg"
+FIRST_WRITE_SECOND_PHOTO = "2026_10_13__15_30_12_000000000__2.jpg"
+SECOND_WRITE_FIRST_PHOTO = "2026_10_13__15_30_12_000000001__1.jpg"
+THIRD_WRITE_FIRST_PHOTO = "2026_10_13__15_30_12_000000002__1.jpg"
+THIRD_WRITE_SECOND_PHOTO = "2026_10_13__15_30_12_000000002__2.jpg"
 
 
 @pytest.fixture
@@ -137,7 +139,7 @@ def test_an_output_folder_that_is_not_reachable_restores_no_panel(parts):
 
 def test_a_slot_with_at_least_one_file_is_restored(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
-    (parts.output_folder / SECOND_FILE).unlink()
+    (parts.output_folder / FIRST_WRITE_SECOND_PHOTO).unlink()
     restarted = restart(parts)
 
     restarted.last_scan_edit_service.restore_after_start()
@@ -194,13 +196,13 @@ def test_a_pending_render_that_died_halfway_gets_its_own_complete_files(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
     crops = parts.slot_repository.load().last_scan.framing.crops
     commit_a_pending_render(parts, PageFraming(PageRotation.CLOCKWISE_90, crops))
-    (parts.output_folder / THIRD_FILE).write_bytes(b"written before the crash")
+    (parts.output_folder / SECOND_WRITE_FIRST_PHOTO).write_bytes(b"written before the crash")
     restarted = restart(parts)
 
     restarted.last_scan_edit_service.restore_after_start()
 
     saved_files = restarted.progress_tracker.snapshot().last_scan.saved_files
-    assert [saved_file.file_name for saved_file in saved_files] == [FOURTH_FILE, FIFTH_FILE]
+    assert [saved_file.file_name for saved_file in saved_files] == [THIRD_WRITE_FIRST_PHOTO, THIRD_WRITE_SECOND_PHOTO]
 
 def test_a_finished_render_clears_the_pending_mark(parts):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))
@@ -232,7 +234,7 @@ def test_a_pending_render_with_two_new_frames_writes_two_new_files(parts):
 
     restarted.last_scan_edit_service.restore_after_start()
 
-    assert restarted.saved_names() == [FIRST_FILE, SECOND_FILE, THIRD_FILE]
+    assert restarted.saved_names() == [FIRST_FILE, FIRST_WRITE_FIRST_PHOTO, FIRST_WRITE_SECOND_PHOTO]
 
 def test_a_pending_render_with_one_frame_less_keeps_every_earlier_file(parts):
     parts.scan(TWO_PHOTOS, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
@@ -242,7 +244,7 @@ def test_a_pending_render_with_one_frame_less_keeps_every_earlier_file(parts):
 
     restarted.last_scan_edit_service.restore_after_start()
 
-    assert restarted.saved_names() == [FIRST_FILE, SECOND_FILE, THIRD_FILE]
+    assert restarted.saved_names() == [FIRST_FILE, FIRST_WRITE_FIRST_PHOTO, FIRST_WRITE_SECOND_PHOTO]
 
 def test_restoring_never_raises_when_the_slot_cannot_be_read(parts, monkeypatch):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG))

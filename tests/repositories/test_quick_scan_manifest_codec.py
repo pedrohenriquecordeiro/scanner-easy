@@ -22,8 +22,8 @@ from tests.fakes.page_crops import quadrilateral, rectangle
 MOMENT = datetime(2026, 10, 18, 12, 41, 3, tzinfo=timezone(timedelta(hours=-3)))
 UPPER_CROP = quadrilateral((0.039, 0.28), (0.65, 0.019), (0.894, 0.321), (0.282, 0.582))
 LOWER_CROP = quadrilateral((0.171, 0.604), (0.878, 0.584), (0.896, 0.931), (0.189, 0.951))
-FIRST_FILE = SavedScanFile("2026_10_18__16_14_03_000000006.pdf", 211873, 1760802063123456789)
-SECOND_FILE = SavedScanFile("2026_10_18__16_14_03_000000007.pdf", 98211, 1760802063223456789)
+FIRST_FILE = SavedScanFile("2026_10_18__16_14_03_000000006__1.pdf", 211873, 1760802063123456789)
+SECOND_FILE = SavedScanFile("2026_10_18__16_14_03_000000006__2.pdf", 98211, 1760802063223456789)
 ONE_RECTANGLE = PageFraming().with_crops([rectangle((0.1, 0.2, 0.5, 0.9))])
 SLOT = QuickScanSlot(
     last_scan=LastScan(
@@ -105,7 +105,7 @@ def test_the_crops_are_written_with_their_four_corners():
 
 def test_a_saved_file_is_written_with_its_size_and_modification_time():
     assert encoded_document()["saved_files"][0] == {
-        "file_name": "2026_10_18__16_14_03_000000006.pdf",
+        "file_name": "2026_10_18__16_14_03_000000006__1.pdf",
         "size_in_bytes": 211873,
         "modified_at_nanoseconds": 1760802063123456789,
     }

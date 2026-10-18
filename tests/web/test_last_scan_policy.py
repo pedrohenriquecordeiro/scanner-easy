@@ -7,9 +7,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 ONE_FILE = "['2026_10_18__16_14_03_000000006.pdf']"
-TWO_FILES = "['2026_10_18__16_14_03_000000006.pdf', '2026_10_18__16_14_03_000000007.pdf']"
+TWO_FILES = "['2026_10_18__16_14_03_000000006__1.pdf', '2026_10_18__16_14_03_000000006__2.pdf']"
 NEW_FILE = "['2026_10_18__16_14_04_000000001.pdf']"
-TWO_NEW_FILES = "['2026_10_18__16_14_04_000000001.pdf', '2026_10_18__16_14_04_000000002.pdf']"
+TWO_NEW_FILES = "['2026_10_18__16_14_04_000000001__1.pdf', '2026_10_18__16_14_04_000000001__2.pdf']"
 ONE_CROP = "[{}]"
 
 
@@ -43,7 +43,7 @@ STATUS_CASES = [
     ),
     pytest.param(
         f"describe_saved_scan_status({{file_names: {TWO_FILES}}})",
-        "Pronto! 2 arquivos salvos: 2026_10_18__16_14_03_000000006.pdf e 2026_10_18__16_14_03_000000007.pdf",
+        "Pronto! 2 arquivos salvos: 2026_10_18__16_14_03_000000006__1.pdf e 2026_10_18__16_14_03_000000006__2.pdf",
         id="two-files",
     ),
     pytest.param(
@@ -66,7 +66,8 @@ EDIT_CASES = [
     pytest.param(
         edit("set_crops", ONE_FILE, answer(TWO_NEW_FILES, "[{}, {}]")),
         "Moldura aplicada. 2 arquivos novos salvos: "
-        "2026_10_18__16_14_04_000000001.pdf e 2026_10_18__16_14_04_000000002.pdf. O arquivo anterior foi mantido.",
+        "2026_10_18__16_14_04_000000001__1.pdf e 2026_10_18__16_14_04_000000001__2.pdf. "
+        "O arquivo anterior foi mantido.",
         id="a-second-frame-writes-two-new-files",
     ),
     pytest.param(
@@ -88,7 +89,8 @@ EDIT_CASES = [
     pytest.param(
         edit("detect_crops", ONE_FILE, answer(TWO_NEW_FILES, "[{}, {}]", extra=", crops_detected: true")),
         "Molduras detectadas. 2 arquivos novos salvos: "
-        "2026_10_18__16_14_04_000000001.pdf e 2026_10_18__16_14_04_000000002.pdf. O arquivo anterior foi mantido.",
+        "2026_10_18__16_14_04_000000001__1.pdf e 2026_10_18__16_14_04_000000001__2.pdf. "
+        "O arquivo anterior foi mantido.",
         id="detection-found-two-photos",
     ),
     pytest.param(

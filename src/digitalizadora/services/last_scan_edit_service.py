@@ -213,9 +213,9 @@ class LastScanEditService:
                 outputs = self._output_renderer.render_outputs(master, request)
         except OSError as error:
             raise SavedScanUnreadableError(f"The master of {last_scan.scan_identifier} cannot be read") from error
+        output_paths = self._scan_output_repository.save_scans_in_folder(last_scan.output_folder, outputs)
         saved_files = []
-        for encoded_scan in outputs:
-            output_path = self._scan_output_repository.save_in_folder(last_scan.output_folder, encoded_scan)
+        for encoded_scan, output_path in zip(outputs, output_paths, strict=True):
             described_file = self._scan_output_repository.describe_saved_scan(output_path)
             saved_files.append(
                 described_file or SavedScanFile(output_path.name, len(encoded_scan.content), UNKNOWN_MODIFICATION_TIME)

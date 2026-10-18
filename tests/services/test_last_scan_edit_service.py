@@ -1,6 +1,7 @@
 import asyncio
 import errno
 import threading
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
 
@@ -42,8 +43,11 @@ from tests.fakes.scripted_file_writer import ScriptedFileWriter
 from tests.fakes.synthetic_scans import build_scan_jpeg
 
 FIRST_FILE = "2026_10_13__15_30_12_000000000.jpg"
+FIRST_WRITE_FIRST_PHOTO = "2026_10_13__15_30_12_000000000__1.jpg"
+FIRST_WRITE_SECOND_PHOTO = "2026_10_13__15_30_12_000000000__2.jpg"
 SECOND_FILE = "2026_10_13__15_30_12_000000001.jpg"
-THIRD_FILE = "2026_10_13__15_30_12_000000002.jpg"
+SECOND_WRITE_FIRST_PHOTO = "2026_10_13__15_30_12_000000001__1.jpg"
+SECOND_WRITE_SECOND_PHOTO = "2026_10_13__15_30_12_000000001__2.jpg"
 LEFT_BOX = rectangle((0.05, 0.05, 0.45, 0.45))
 RIGHT_BOX = rectangle((0.55, 0.55, 0.95, 0.95))
 TILTED_BOX = quadrilateral((0.30, 0.10), (0.80, 0.22), (0.70, 0.60), (0.20, 0.48))
@@ -231,8 +235,8 @@ async def test_adding_a_second_frame_writes_two_new_files_and_keeps_the_old_one(
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
     assert (parts.saved_names(), latest_file_names(parts)) == (
-        [FIRST_FILE, SECOND_FILE, THIRD_FILE],
-        [SECOND_FILE, THIRD_FILE],
+        [FIRST_FILE, SECOND_WRITE_FIRST_PHOTO, SECOND_WRITE_SECOND_PHOTO],
+        [SECOND_WRITE_FIRST_PHOTO, SECOND_WRITE_SECOND_PHOTO],
     )
 
 async def test_new_files_after_the_output_folder_changed_go_next_to_the_first_file(parts, service, tmp_path):
@@ -242,7 +246,7 @@ async def test_new_files_after_the_output_folder_changed_go_next_to_the_first_fi
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert parts.saved_names() == [FIRST_FILE, SECOND_FILE, THIRD_FILE]
+    assert parts.saved_names() == [FIRST_FILE, SECOND_WRITE_FIRST_PHOTO, SECOND_WRITE_SECOND_PHOTO]
 
 async def test_a_scan_edited_after_the_output_folder_changed_can_still_be_turned(parts, service, tmp_path):
     parts.scan(ONE_PHOTO, build_job(OutputFormat.JPEG, WITH_AUTO_CROP))
@@ -270,7 +274,10 @@ async def test_adding_a_second_frame_lists_only_the_new_files_in_the_slot(parts,
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert [f.file_name for f in parts.slot_repository.load().last_scan.saved_files] == [SECOND_FILE, THIRD_FILE]
+    assert [f.file_name for f in parts.slot_repository.load().last_scan.saved_files] == [
+        SECOND_WRITE_FIRST_PHOTO,
+        SECOND_WRITE_SECOND_PHOTO,
+    ]
 
 async def test_each_file_has_the_size_of_its_frame(parts, service):
     one_whole_scan(parts)
@@ -285,7 +292,10 @@ async def test_the_new_files_get_names_after_the_existing_ones(parts, service):
 
     await service.set_crops([LEFT_BOX, RIGHT_BOX])
 
-    assert latest_file_names(parts) == ["2026_10_13__15_30_12_000000002.jpg", "2026_10_13__15_30_12_000000003.jpg"]
+    assert latest_file_names(parts) == [
+        "2026_10_13__15_30_12_000000002__1.jpg",
+        "2026_10_13__15_30_12_000000002__2.jpg",
+    ]
 
 async def test_removing_a_frame_writes_one_new_file_and_deletes_nothing(parts, service):
     two_photo_scan(parts)
@@ -293,8 +303,8 @@ async def test_removing_a_frame_writes_one_new_file_and_deletes_nothing(parts, s
     await service.set_crops(current_last_scan(parts).framing.crops[:1])
 
     assert (parts.saved_names(), latest_file_names(parts)) == (
-        [FIRST_FILE, SECOND_FILE, THIRD_FILE],
-        [THIRD_FILE],
+        [FIRST_WRITE_FIRST_PHOTO, FIRST_WRITE_SECOND_PHOTO, SECOND_FILE],
+        [SECOND_FILE],
     )
 
 async def test_removing_the_first_frame_writes_the_second_photo_as_the_new_file(parts, service):
@@ -307,7 +317,7 @@ async def test_removing_the_first_frame_writes_the_second_photo_as_the_new_file(
 
 async def test_a_file_edited_after_it_was_saved_stays_as_it_is(parts, service):
     two_photo_scan(parts)
-    second_path = parts.output_folder / SECOND_FILE
+    second_path = parts.output_folder / FIRST_WRITE_SECOND_PHOTO
     edited_content = second_path.read_bytes() + b"edited later"
     second_path.write_bytes(edited_content)
 
@@ -317,8 +327,8 @@ async def test_a_file_edited_after_it_was_saved_stays_as_it_is(parts, service):
 
 async def test_an_edit_works_when_the_earlier_files_are_gone(parts, service):
     two_photo_scan(parts)
-    (parts.output_folder / FIRST_FILE).unlink()
-    (parts.output_folder / SECOND_FILE).unlink()
+    (parts.output_folder / FIRST_WRITE_FIRST_PHOTO).unlink()
+    (parts.output_folder / FIRST_WRITE_SECOND_PHOTO).unlink()
 
     await service.rotate_clockwise()
 
@@ -386,8 +396,8 @@ async def test_detecting_two_photos_on_a_scan_saved_whole_writes_two_new_files(p
 
     assert (result.crops_detected, parts.saved_names(), latest_file_names(parts)) == (
         True,
-        [FIRST_FILE, SECOND_FILE, THIRD_FILE],
-        [SECOND_FILE, THIRD_FILE],
+        [FIRST_FILE, SECOND_WRITE_FIRST_PHOTO, SECOND_WRITE_SECOND_PHOTO],
+        [SECOND_WRITE_FIRST_PHOTO, SECOND_WRITE_SECOND_PHOTO],
     )
 
 async def test_detecting_reports_no_regions_ignored_for_two_photos(parts, service):
@@ -487,7 +497,7 @@ async def test_a_failed_edit_restores_the_manifest_to_the_framing_of_before(tmp_
     failing_output_repository = FileSystemScanOutputRepository(
         parts.output_repository._settings_repository,
         parts.output_repository._naming_policy,
-        ScriptedFileWriter({FIRST_FILE: OSError(errno.EIO, "disk error")}),
+        ScriptedFileWriter({SECOND_FILE: OSError(errno.EIO, "disk error")}),
     )
     failing_parts = build_quick_scan_parts(tmp_path, output_repository=failing_output_repository)
     failing_parts.progress_tracker.restore_last_scan(
@@ -529,14 +539,14 @@ async def test_a_scan_that_starts_during_an_edit_is_refused_as_busy(tmp_path):
     one_whole_scan(parts)
     inside_edit = threading.Event()
     release_edit = threading.Event()
-    original_save = parts.output_repository.save_in_folder
+    original_save = parts.output_repository.save_scans_in_folder
 
-    def hold_the_edit(output_folder: Path, encoded_scan: EncodedScan) -> Path:
+    def hold_the_edit(output_folder: Path, encoded_scans: Sequence[EncodedScan]) -> tuple[Path, ...]:
         inside_edit.set()
         release_edit.wait(timeout=5)
-        return original_save(output_folder, encoded_scan)
+        return original_save(output_folder, encoded_scans)
 
-    parts.output_repository.save_in_folder = hold_the_edit
+    parts.output_repository.save_scans_in_folder = hold_the_edit
     edit = asyncio.create_task(parts.last_scan_edit_service.rotate_clockwise())
     await asyncio.to_thread(inside_edit.wait, 5)
 

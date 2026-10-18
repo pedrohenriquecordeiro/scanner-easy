@@ -8,8 +8,8 @@ from digitalizadora.domain.page_rotation import PageRotation
 from tests.fakes.page_crops import rectangle
 
 MOMENT = datetime(2026, 10, 18, 12, 41, 3, tzinfo=timezone(timedelta(hours=-3)))
-FIRST_FILE = SavedScanFile("2026_10_18__16_14_03_000000006.pdf", 1000, 1)
-SECOND_FILE = SavedScanFile("2026_10_18__16_14_03_000000007.pdf", 234, 2)
+FIRST_FILE = SavedScanFile("2026_10_18__16_14_03_000000006__1.pdf", 1000, 1)
+SECOND_FILE = SavedScanFile("2026_10_18__16_14_03_000000006__2.pdf", 234, 2)
 LAST_SCAN = LastScan(
     scan_identifier="9f3c1a2b4d5e6f70",
     scanned_at=MOMENT,
@@ -24,7 +24,7 @@ def test_the_total_size_adds_up_the_files():
 
 
 def test_a_saved_file_lives_in_the_output_folder():
-    expected_path = Path("/Users/pedro/Pictures/Digitalizadora/2026_10_18__16_14_03_000000007.pdf")
+    expected_path = Path("/Users/pedro/Pictures/Digitalizadora/2026_10_18__16_14_03_000000006__2.pdf")
     assert LAST_SCAN.saved_file_path(SECOND_FILE) == expected_path
 
 

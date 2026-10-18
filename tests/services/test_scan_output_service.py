@@ -1,3 +1,4 @@
+import errno
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -8,7 +9,6 @@ from PIL import Image
 
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.color_mode import ColorMode
-from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     ImageAdjustmentFailedError,
@@ -41,7 +41,7 @@ from digitalizadora.services.storage_guard_service import (
 )
 from digitalizadora.services.thumbnail_service import ThumbnailService
 from tests.fakes.document_service_parts import InstantFileWriter
-from tests.fakes.fixed_clock import FixedClock
+from tests.fakes.fixed_clock import FixedClock, TickingClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
@@ -90,22 +90,18 @@ class StubCropDetectionService(PageCropDetectionService):
         return super().detect_crops(jpeg_content)
 
 
-class FailingOutputRepository(FileSystemScanOutputRepository):
-    """Saves for real, but the save with the given number (from 1) fails."""
+class FileWriterThatFailsOnWrite(InstantFileWriter):
+    """Writes for real, but the write with the given number (from 1) fails."""
 
-    def __init__(self, inner: FileSystemScanOutputRepository, failing_save_number: int) -> None:
-        self._inner = inner
-        self._failing_save_number = failing_save_number
-        self._save_count = 0
+    def __init__(self, failing_write_number: int) -> None:
+        self._failing_write_number = failing_write_number
+        self._write_count = 0
 
-    def __getattr__(self, name: str):
-        return getattr(self._inner, name)
-
-    def save(self, encoded_scan: EncodedScan) -> Path:
-        self._save_count += 1
-        if self._save_count == self._failing_save_number:
-            raise OutputFolderUnavailableError("The external disk was disconnected")
-        return self._inner.save(encoded_scan)
+    def write_new_file(self, destination: Path, content: bytes) -> None:
+        self._write_count += 1
+        if self._write_count == self._failing_write_number:
+            raise OSError(errno.EIO, "The external disk was disconnected")
+        super().write_new_file(destination, content)
 
 
 class Environment:
@@ -115,7 +111,7 @@ class Environment:
         self.free_space_reader = RecordingFreeSpaceReader(free_space)
         settings_repository = InMemoryApplicationSettingsRepository(self._settings())
         self.output_repository = FileSystemScanOutputRepository(
-            settings_repository, ScanFileNamingPolicy(FixedClock(STARTED_AT)), InstantFileWriter()
+            settings_repository, ScanFileNamingPolicy(TickingClock(STARTED_AT)), InstantFileWriter()
         )
         self.slot_repository = FileSystemQuickScanSlotRepository(
             self.slot_folder, InstantFileWriter(), FixedClock(STARTED_AT)
@@ -137,6 +133,13 @@ class Environment:
         )
         return ScanOutputService(
             parts, output_repository or self.output_repository, slot_repository or self.slot_repository
+        )
+
+    def repository_failing_on_write(self, failing_write_number: int) -> FileSystemScanOutputRepository:
+        return FileSystemScanOutputRepository(
+            InMemoryApplicationSettingsRepository(self._settings()),
+            ScanFileNamingPolicy(TickingClock(STARTED_AT)),
+            FileWriterThatFailsOnWrite(failing_write_number),
         )
 
     def saved_names(self) -> list[str]:
@@ -282,12 +285,12 @@ def test_one_photo_with_the_crop_saves_one_cropped_file(environment):
     assert read_image_size(saved_path)[0] < TWO_PHOTOS_SIZE[0]
 
 
-def test_two_photos_with_the_crop_save_two_files_with_distinct_sorted_names(environment):
+def test_two_photos_with_the_crop_save_two_files_with_one_timestamp_and_a_counter(environment):
     stored_scan = environment.build_service().store(TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP))
 
     assert [saved_file.file_name for saved_file in stored_scan.last_scan.saved_files] == [
-        "2026_10_13__15_30_12_000000000.jpg",
-        "2026_10_13__15_30_12_000000001.jpg",
+        "2026_10_13__15_30_12_000000000__1.jpg",
+        "2026_10_13__15_30_12_000000000__2.jpg",
     ]
 
 
@@ -420,7 +423,7 @@ def test_the_next_scan_gets_a_later_name_than_the_first(environment):
 
     stored_scan = service.store(ONE_PHOTO, job_with(OutputFormat.JPEG))
 
-    assert stored_scan.last_scan.saved_files[0].file_name == "2026_10_13__15_30_12_000000002.jpg"
+    assert stored_scan.last_scan.saved_files[0].file_name == "2026_10_13__15_30_12_000000001.jpg"
 
 
 def test_an_encoder_error_propagates_and_nothing_is_saved(environment):
@@ -433,7 +436,7 @@ def test_an_encoder_error_propagates_and_nothing_is_saved(environment):
 
 
 def test_a_repository_error_propagates(environment):
-    failing_repository = FailingOutputRepository(environment.output_repository, 1)
+    failing_repository = environment.repository_failing_on_write(1)
 
     with pytest.raises(OutputFolderUnavailableError):
         environment.build_service(output_repository=failing_repository).store(ONE_PHOTO, job_with())
@@ -441,7 +444,7 @@ def test_a_repository_error_propagates(environment):
 
 def test_a_failure_on_the_second_file_keeps_the_slot_of_the_previous_scan(environment):
     environment.build_service().store(ONE_PHOTO, job_with())
-    failing_repository = FailingOutputRepository(environment.output_repository, 2)
+    failing_repository = environment.repository_failing_on_write(2)
 
     with pytest.raises(DigitalizadoraError):
         environment.build_service(output_repository=failing_repository).store(
@@ -452,14 +455,14 @@ def test_a_failure_on_the_second_file_keeps_the_slot_of_the_previous_scan(enviro
 
 
 def test_a_failure_on_the_second_file_leaves_the_first_in_the_folder(environment):
-    failing_repository = FailingOutputRepository(environment.output_repository, 2)
+    failing_repository = environment.repository_failing_on_write(2)
 
     with pytest.raises(DigitalizadoraError):
         environment.build_service(output_repository=failing_repository).store(
             TWO_PHOTOS, job_with(OutputFormat.JPEG, WITH_AUTO_CROP)
         )
 
-    assert environment.saved_names() == ["2026_10_13__15_30_12_000000000.jpg"]
+    assert environment.saved_names() == ["2026_10_13__15_30_12_000000000__1.jpg"]
 
 
 def test_the_frames_are_in_reading_order_in_the_last_scan(environment):

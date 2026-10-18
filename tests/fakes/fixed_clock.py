@@ -17,3 +17,16 @@ class FixedClock:
 
     def advance(self, seconds: float) -> None:
         self._moment = self._moment + timedelta(seconds=seconds)
+
+
+class TickingClock(FixedClock):
+    """A clock whose every reading in nanoseconds is one nanosecond later than the one before, as two writes are."""
+
+    def __init__(self, moment: datetime) -> None:
+        super().__init__(moment)
+        self._readings = 0
+
+    def now_in_nanoseconds(self) -> int:
+        reading = super().now_in_nanoseconds() + self._readings
+        self._readings += 1
+        return reading

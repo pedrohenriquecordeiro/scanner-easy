@@ -34,7 +34,7 @@ from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.storage_guard_service import StorageGuardService
 from digitalizadora.services.thumbnail_service import ThumbnailService
 from tests.fakes.document_service_parts import InstantFileWriter
-from tests.fakes.fixed_clock import FixedClock
+from tests.fakes.fixed_clock import TickingClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg
 
@@ -117,7 +117,7 @@ def build_quick_scan_parts_in(
 ) -> QuickScanParts:
     output_folder = folders.output_folder
     slot_folder = folders.slot_folder
-    clock = FixedClock(STARTED_AT)
+    clock = TickingClock(STARTED_AT)
     settings_repository = InMemoryApplicationSettingsRepository(
         ApplicationSettings(output_folder, OutputFormat.PDF, ScanPreset.DOCUMENT.settings)
     )

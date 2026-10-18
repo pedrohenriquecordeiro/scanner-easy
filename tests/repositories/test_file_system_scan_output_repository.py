@@ -64,13 +64,13 @@ SECOND_NAME = "2026_10_13__15_30_12_000000001"
 
 
 def test_file_is_named_with_the_local_date_time_and_nanoseconds_of_the_clock(tmp_path):
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+    saved_path = build_real_repository(tmp_path).save_scans([build_encoded_scan()])[0]
 
     assert saved_path == tmp_path / f"{FIRST_NAME}.pdf"
 
 
 def test_saved_file_holds_the_encoded_content(tmp_path):
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+    saved_path = build_real_repository(tmp_path).save_scans([build_encoded_scan()])[0]
 
     assert saved_path.read_bytes() == b"scan content"
 
@@ -78,16 +78,16 @@ def test_saved_file_holds_the_encoded_content(tmp_path):
 def test_a_file_saved_in_a_folder_goes_there_and_not_to_the_output_folder_of_the_settings(tmp_path):
     other_folder = tmp_path / "other"
 
-    saved_path = build_real_repository(tmp_path / "scans").save_in_folder(other_folder, build_encoded_scan())
+    saved_path = build_real_repository(tmp_path / "scans").save_scans_in_folder(other_folder, [build_encoded_scan()])[0]
 
     assert saved_path == other_folder / f"{FIRST_NAME}.pdf"
 
 
 def test_a_second_save_at_the_same_reading_gets_the_next_nanosecond(tmp_path):
     repository = build_real_repository(tmp_path)
-    repository.save(build_encoded_scan())
+    repository.save_scans([build_encoded_scan()])[0]
 
-    second_path = repository.save(build_encoded_scan())
+    second_path = repository.save_scans([build_encoded_scan()])[0]
 
     assert second_path.name == f"{SECOND_NAME}.pdf"
 
@@ -96,7 +96,7 @@ def test_old_files_with_the_daily_counter_are_left_alone_and_never_collide(tmp_p
     (tmp_path / "2026-10-13_00001.pdf").write_bytes(b"old")
     (tmp_path / "2026-10-13_00007.jpg").write_bytes(b"old")
 
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+    saved_path = build_real_repository(tmp_path).save_scans([build_encoded_scan()])[0]
 
     assert (saved_path.name, (tmp_path / "2026-10-13_00001.pdf").read_bytes()) == (f"{FIRST_NAME}.pdf", b"old")
 
@@ -104,22 +104,22 @@ def test_old_files_with_the_daily_counter_are_left_alone_and_never_collide(tmp_p
 def test_the_date_of_the_name_follows_the_clock_and_not_the_folder_content(tmp_path):
     (tmp_path / "2026_10_12__15_30_12_000000000.pdf").write_bytes(b"x")
 
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+    saved_path = build_real_repository(tmp_path).save_scans([build_encoded_scan()])[0]
 
     assert saved_path.name == f"{FIRST_NAME}.pdf"
 
 
 def test_pdf_and_jpeg_saved_at_the_same_reading_get_distinct_names(tmp_path):
     repository = build_real_repository(tmp_path)
-    repository.save(build_encoded_scan(OutputFormat.PDF))
+    repository.save_scans([build_encoded_scan(OutputFormat.PDF)])[0]
 
-    saved_path = repository.save(build_encoded_scan(OutputFormat.JPEG))
+    saved_path = repository.save_scans([build_encoded_scan(OutputFormat.JPEG)])[0]
 
     assert saved_path.name == f"{FIRST_NAME}.jpg"
 
 
 def test_jpeg_uses_the_jpg_extension(tmp_path):
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan(OutputFormat.JPEG))
+    saved_path = build_real_repository(tmp_path).save_scans([build_encoded_scan(OutputFormat.JPEG)])[0]
 
     assert saved_path.name == f"{FIRST_NAME}.jpg"
 
@@ -128,7 +128,7 @@ def test_unrelated_files_and_leftover_temporary_files_are_ignored(tmp_path):
     for name in ("notes.txt", "2026-10-13_abc.pdf", ".2026_10_13__15_30_12_000000000.pdf.4242-0a1b2c3d.part"):
         (tmp_path / name).write_bytes(b"x")
 
-    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+    saved_path = build_real_repository(tmp_path).save_scans([build_encoded_scan()])[0]
 
     assert saved_path.name == f"{FIRST_NAME}.pdf"
 
@@ -136,7 +136,7 @@ def test_unrelated_files_and_leftover_temporary_files_are_ignored(tmp_path):
 def test_missing_output_folder_is_created(tmp_path):
     output_folder = tmp_path / "external disk" / "scans"
 
-    saved_path = build_real_repository(output_folder).save(build_encoded_scan())
+    saved_path = build_real_repository(output_folder).save_scans([build_encoded_scan()])[0]
 
     assert saved_path.parent == output_folder
     assert saved_path.exists()
@@ -180,7 +180,7 @@ def test_output_folder_that_is_a_file_raises_output_folder_unavailable(tmp_path)
     blocking_file.write_bytes(b"not a folder")
 
     with pytest.raises(OutputFolderUnavailableError):
-        build_real_repository(blocking_file).save(build_encoded_scan())
+        build_real_repository(blocking_file).save_scans([build_encoded_scan()])[0]
 
 
 def test_output_folder_below_a_file_raises_output_folder_unavailable(tmp_path):
@@ -188,7 +188,7 @@ def test_output_folder_below_a_file_raises_output_folder_unavailable(tmp_path):
     blocking_file.write_bytes(b"not a folder")
 
     with pytest.raises(OutputFolderUnavailableError):
-        build_real_repository(blocking_file / "nested").save(build_encoded_scan())
+        build_real_repository(blocking_file / "nested").save_scans([build_encoded_scan()])[0]
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permission bits")
@@ -198,7 +198,7 @@ def test_read_only_output_folder_raises_output_folder_unavailable(tmp_path):
     output_folder.chmod(READ_ONLY_FOLDER_MODE)
     try:
         with pytest.raises(OutputFolderUnavailableError):
-            build_real_repository(output_folder).save(build_encoded_scan())
+            build_real_repository(output_folder).save_scans([build_encoded_scan()])[0]
     finally:
         output_folder.chmod(WRITABLE_FOLDER_MODE)
 
@@ -208,7 +208,7 @@ def test_full_disk_while_writing_raises_insufficient_storage(tmp_path, error_num
     repository = build_repository(tmp_path, FailingFileWriter(error_number))
 
     with pytest.raises(InsufficientStorageError):
-        repository.save(build_encoded_scan())
+        repository.save_scans([build_encoded_scan()])[0]
 
 
 def test_full_disk_while_creating_the_folder_raises_insufficient_storage(tmp_path, monkeypatch):
@@ -218,20 +218,20 @@ def test_full_disk_while_creating_the_folder_raises_insufficient_storage(tmp_pat
     monkeypatch.setattr(Path, "mkdir", full_disk_mkdir)
 
     with pytest.raises(InsufficientStorageError):
-        build_real_repository(tmp_path / "scans").save(build_encoded_scan())
+        build_real_repository(tmp_path / "scans").save_scans([build_encoded_scan()])[0]
 
 
 def test_input_output_error_while_writing_raises_output_folder_unavailable(tmp_path):
     repository = build_repository(tmp_path, FailingFileWriter(errno.EIO))
 
     with pytest.raises(OutputFolderUnavailableError):
-        repository.save(build_encoded_scan())
+        repository.save_scans([build_encoded_scan()])[0]
 
 
 def test_name_taken_by_another_process_moves_to_the_following_number(tmp_path):
     repository = build_repository(tmp_path, RacingFileWriter(AtomicFileWriter()))
 
-    saved_path = repository.save(build_encoded_scan())
+    saved_path = repository.save_scans([build_encoded_scan()])[0]
 
     assert saved_path.name == f"{SECOND_NAME}.pdf"
     assert (tmp_path / f"{FIRST_NAME}.pdf").read_bytes() == b"written by another process"
@@ -240,7 +240,7 @@ def test_name_taken_by_another_process_moves_to_the_following_number(tmp_path):
 def test_last_allowed_attempt_still_saves_the_file(tmp_path):
     file_writer = FileWriterThatSucceedsOnAttempt(MAXIMUM_NAME_ATTEMPTS)
 
-    saved_path = build_repository(tmp_path, file_writer).save(build_encoded_scan())
+    saved_path = build_repository(tmp_path, file_writer).save_scans([build_encoded_scan()])[0]
 
     assert saved_path.name == "2026_10_13__15_30_12_000000999.pdf"
     assert len(file_writer.attempted_destinations) == MAXIMUM_NAME_ATTEMPTS
@@ -250,7 +250,7 @@ def test_one_attempt_beyond_the_limit_raises_output_folder_unavailable(tmp_path)
     file_writer = FileWriterThatSucceedsOnAttempt(MAXIMUM_NAME_ATTEMPTS + 1)
 
     with pytest.raises(OutputFolderUnavailableError):
-        build_repository(tmp_path, file_writer).save(build_encoded_scan())
+        build_repository(tmp_path, file_writer).save_scans([build_encoded_scan()])[0]
 
     assert len(file_writer.attempted_destinations) == MAXIMUM_NAME_ATTEMPTS
 
@@ -539,8 +539,8 @@ def test_describe_saved_scan_of_a_file_that_is_gone_is_none(tmp_path):
 def test_saving_the_same_image_twice_keeps_both_files_under_different_names(tmp_path):
     repository = build_real_repository(tmp_path)
 
-    first_path = repository.save(build_encoded_scan())
-    second_path = repository.save(build_encoded_scan())
+    first_path = repository.save_scans([build_encoded_scan()])[0]
+    second_path = repository.save_scans([build_encoded_scan()])[0]
 
     assert (first_path.name, second_path.name, first_path.read_bytes(), second_path.read_bytes()) == (
         "2026_10_13__15_30_12_000000000.pdf",
@@ -548,3 +548,63 @@ def test_saving_the_same_image_twice_keeps_both_files_under_different_names(tmp_
         b"scan content",
         b"scan content",
     )
+
+
+def two_encoded_scans() -> list[EncodedScan]:
+    return [build_encoded_scan(OutputFormat.JPEG), build_encoded_scan(OutputFormat.JPEG)]
+
+
+def test_two_files_of_one_write_share_the_timestamp_and_take_counters(tmp_path):
+    saved_paths = build_real_repository(tmp_path).save_scans(two_encoded_scans())
+
+    assert [path.name for path in saved_paths] == [f"{FIRST_NAME}__1.jpg", f"{FIRST_NAME}__2.jpg"]
+
+
+def test_a_write_of_one_file_has_no_counter(tmp_path):
+    saved_paths = build_real_repository(tmp_path).save_scans([build_encoded_scan(OutputFormat.JPEG)])
+
+    assert [path.name for path in saved_paths] == [f"{FIRST_NAME}.jpg"]
+
+
+def test_a_write_of_nothing_creates_nothing(tmp_path):
+    assert (build_real_repository(tmp_path / "scans").save_scans([]), (tmp_path / "scans").exists()) == ((), False)
+
+
+def test_each_file_of_a_write_holds_its_own_content(tmp_path):
+    scans = [
+        EncodedScan(b"first", OutputFormat.JPEG, SCANNED_AT),
+        EncodedScan(b"second", OutputFormat.JPEG, SCANNED_AT),
+    ]
+
+    saved_paths = build_real_repository(tmp_path).save_scans(scans)
+
+    assert [path.read_bytes() for path in saved_paths] == [b"first", b"second"]
+
+
+def test_a_taken_counter_moves_the_whole_write_one_nanosecond_ahead_keeping_the_counters(tmp_path):
+    (tmp_path / f"{FIRST_NAME}__2.jpg").write_bytes(b"another process")
+
+    saved_paths = build_real_repository(tmp_path).save_scans(two_encoded_scans())
+
+    assert [path.name for path in saved_paths] == [f"{SECOND_NAME}__1.jpg", f"{SECOND_NAME}__2.jpg"]
+
+
+def test_the_file_made_before_a_taken_counter_is_taken_back(tmp_path):
+    (tmp_path / f"{FIRST_NAME}__2.jpg").write_bytes(b"another process")
+
+    build_real_repository(tmp_path).save_scans(two_encoded_scans())
+
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        f"{FIRST_NAME}__2.jpg",
+        f"{SECOND_NAME}__1.jpg",
+        f"{SECOND_NAME}__2.jpg",
+    ]
+
+
+def test_a_write_in_a_folder_keeps_the_files_of_the_earlier_write(tmp_path):
+    repository = build_real_repository(tmp_path)
+    repository.save_scans(two_encoded_scans())
+
+    saved_paths = repository.save_scans_in_folder(tmp_path, two_encoded_scans())
+
+    assert [path.name for path in saved_paths] == [f"{SECOND_NAME}__1.jpg", f"{SECOND_NAME}__2.jpg"]

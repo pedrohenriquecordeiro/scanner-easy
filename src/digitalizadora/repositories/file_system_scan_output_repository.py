@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from itertools import islice
 from pathlib import Path
 
@@ -9,7 +9,7 @@ from digitalizadora.domain.errors import OutputFolderUnavailableError
 from digitalizadora.domain.last_scan import SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import ApplicationSettingsRepository
-from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
+from digitalizadora.domain.scan_file_naming_policy import SINGLE_FILE_COUNT, ScanFileNamingPolicy
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.output_folder_preparer import prepare_output_folder, translate_storage_error
@@ -34,18 +34,26 @@ class FileSystemScanOutputRepository:
     def ensure_output_folder_ready(self) -> None:
         prepare_output_folder(self.output_folder())
 
-    def save(self, encoded_scan: EncodedScan) -> Path:
-        return self.save_in_folder(self.output_folder(), encoded_scan)
+    def save_scans(self, encoded_scans: Sequence[EncodedScan]) -> tuple[Path, ...]:
+        return self.save_scans_in_folder(self.output_folder(), encoded_scans)
 
-    def save_in_folder(self, output_folder: Path, encoded_scan: EncodedScan) -> Path:
-        """Under a timestamp name in that folder; an edit of an old scan saves in the folder of the scan."""
-        candidate_names = self._generated_file_names(output_folder, encoded_scan.output_format)
-        destination, _ = self._write_under_a_free_name(
-            output_folder,
-            candidate_names,
-            lambda candidate: self._file_writer.write_new_file(candidate, encoded_scan.content),
+    def save_scans_in_folder(self, output_folder: Path, encoded_scans: Sequence[EncodedScan]) -> tuple[Path, ...]:
+        """The files of one write, in that folder, under names of one timestamp (a counter tells them apart).
+
+        All the files have the output format of the first one. An edit of an old scan saves in the folder of the
+        scan. A name taken by another process takes back the files already made and moves all of them one
+        nanosecond ahead."""
+        if not encoded_scans:
+            return ()
+        name_groups = self._generated_name_groups(output_folder, encoded_scans)
+        for file_names in name_groups:
+            try:
+                return self._write_files(output_folder, file_names, encoded_scans)
+            except FileExistsError:
+                continue
+        raise OutputFolderUnavailableError(
+            f"No free file name in {output_folder} after {MAXIMUM_NAME_ATTEMPTS} attempts"
         )
-        return destination
 
     def save_document(self, document_pdf: DocumentPdfToSave) -> ScanResult:
         """Streams the PDF under the first free name; a name that already exists is skipped before assembling.
@@ -77,14 +85,42 @@ class FileSystemScanOutputRepository:
 
     def _document_file_names(self, folder: Path, document_pdf: DocumentPdfToSave) -> Iterator[str]:
         if not document_pdf.document_name:
-            return self._generated_file_names(folder, OutputFormat.PDF)
+            self._prepare_folder(folder)
+            return self._single_file_names()
         self._prepare_folder(folder)
         attempt_numbers = range(FIRST_ATTEMPT_NUMBER, FIRST_ATTEMPT_NUMBER + MAXIMUM_NAME_ATTEMPTS)
         return (build_document_file_name(document_pdf.document_name, number) for number in attempt_numbers)
 
-    def _generated_file_names(self, folder: Path, output_format: OutputFormat) -> Iterator[str]:
+    def _single_file_names(self) -> Iterator[str]:
+        name_groups = self._naming_policy.name_groups(OutputFormat.PDF, SINGLE_FILE_COUNT)
+        limited_name_groups = islice(name_groups, MAXIMUM_NAME_ATTEMPTS)
+        return (file_names[0] for file_names in limited_name_groups)
+
+    def _generated_name_groups(self, folder: Path, encoded_scans: Sequence[EncodedScan]) -> Iterator[tuple[str, ...]]:
         self._prepare_folder(folder)
-        return islice(self._naming_policy.file_names(output_format), MAXIMUM_NAME_ATTEMPTS)
+        name_groups = self._naming_policy.name_groups(encoded_scans[0].output_format, len(encoded_scans))
+        return islice(name_groups, MAXIMUM_NAME_ATTEMPTS)
+
+    def _write_files(
+        self, folder: Path, file_names: tuple[str, ...], encoded_scans: Sequence[EncodedScan]
+    ) -> tuple[Path, ...]:
+        written_paths: list[Path] = []
+        for file_name, encoded_scan in zip(file_names, encoded_scans, strict=True):
+            destination = folder / file_name
+            try:
+                self._file_writer.write_new_file(destination, encoded_scan.content)
+            except FileExistsError:
+                self._take_back(written_paths)
+                raise
+            except OSError as error:
+                raise translate_storage_error(error, f"Cannot write {destination}") from error
+            written_paths.append(destination)
+        return tuple(written_paths)
+
+    def _take_back(self, written_paths: Iterable[Path]) -> None:
+        """Only the files this write has just created, so that no file of a half-made group stays behind."""
+        for written_path in written_paths:
+            written_path.unlink(missing_ok=True)
 
     def _prepare_folder(self, folder: Path) -> None:
         try:

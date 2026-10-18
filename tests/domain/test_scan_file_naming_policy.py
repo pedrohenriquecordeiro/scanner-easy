@@ -10,8 +10,14 @@ SCANNED_AT = datetime(2026, 10, 13, 15, 30, 12, 123456, tzinfo=TIME_ZONE)
 LAST_NANOSECOND_OF_THE_SECOND = datetime(2026, 10, 13, 15, 30, 59, 999999, tzinfo=TIME_ZONE)
 
 
+def first_name_groups(
+    moment: datetime, output_format: OutputFormat, file_count: int, group_count: int
+) -> list[tuple[str, ...]]:
+    return list(islice(ScanFileNamingPolicy(FixedClock(moment)).name_groups(output_format, file_count), group_count))
+
+
 def first_names(moment: datetime, output_format: OutputFormat, count: int) -> list[str]:
-    return list(islice(ScanFileNamingPolicy(FixedClock(moment)).file_names(output_format), count))
+    return [group[0] for group in first_name_groups(moment, output_format, 1, count)]
 
 
 def test_name_has_local_date_time_and_nine_digit_nanoseconds_with_the_pdf_extension() -> None:
@@ -44,7 +50,38 @@ def test_candidates_are_unique_and_sorted() -> None:
 
 def test_each_iteration_reads_the_clock_when_the_first_name_is_requested() -> None:
     clock = FixedClock(SCANNED_AT)
-    names = ScanFileNamingPolicy(clock).file_names(OutputFormat.PDF)
+    names = ScanFileNamingPolicy(clock).name_groups(OutputFormat.PDF, 1)
     clock.advance(1)
 
-    assert next(names) == "2026_10_13__15_30_13_123456000.pdf"
+    assert next(names) == ("2026_10_13__15_30_13_123456000.pdf",)
+
+
+def test_two_files_share_the_timestamp_and_take_a_counter_from_one() -> None:
+    assert first_name_groups(SCANNED_AT, OutputFormat.JPEG, 2, 1) == [
+        ("2026_10_13__15_30_12_123456000__1.jpg", "2026_10_13__15_30_12_123456000__2.jpg")
+    ]
+
+
+def test_the_counter_is_a_plain_integer_and_grows_beyond_nine() -> None:
+    names = first_name_groups(SCANNED_AT, OutputFormat.JPEG, 10, 1)[0]
+
+    assert names[9] == "2026_10_13__15_30_12_123456000__10.jpg"
+
+
+def test_a_single_file_has_no_counter() -> None:
+    assert first_name_groups(SCANNED_AT, OutputFormat.JPEG, 1, 1) == [("2026_10_13__15_30_12_123456000.jpg",)]
+
+
+def test_the_next_group_advances_the_timestamp_by_one_nanosecond_and_keeps_the_counters() -> None:
+    groups = first_name_groups(SCANNED_AT, OutputFormat.PDF, 2, 2)
+
+    assert groups[1] == ("2026_10_13__15_30_12_123456001__1.pdf", "2026_10_13__15_30_12_123456001__2.pdf")
+
+
+def test_a_group_reads_the_clock_once() -> None:
+    clock = FixedClock(SCANNED_AT)
+    groups = ScanFileNamingPolicy(clock).name_groups(OutputFormat.JPEG, 2)
+    first_group = next(groups)
+    clock.advance(5)
+
+    assert next(groups)[0] == first_group[0].replace("123456000", "123456001")

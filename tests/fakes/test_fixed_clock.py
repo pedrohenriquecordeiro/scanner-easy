@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from tests.fakes.fixed_clock import FixedClock
+from tests.fakes.fixed_clock import FixedClock, TickingClock
 
 MOMENT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=timezone(timedelta(hours=-3)))
 
@@ -42,3 +42,11 @@ def test_nanoseconds_reading_advances_with_the_clock() -> None:
     clock.advance(2)
 
     assert clock.now_in_nanoseconds() - before == 2_000_000_000
+
+
+def test_a_ticking_clock_reads_one_nanosecond_later_each_time() -> None:
+    clock = TickingClock(MOMENT)
+
+    first_reading = clock.now_in_nanoseconds()
+
+    assert clock.now_in_nanoseconds() - first_reading == 1
