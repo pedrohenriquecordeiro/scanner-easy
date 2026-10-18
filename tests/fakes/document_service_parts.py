@@ -19,6 +19,7 @@ from digitalizadora.repositories.documents.file_system_document_draft_repository
 )
 from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.storage.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.documents.document_draft_service import DocumentDraftCollaborators, DocumentDraftService
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
@@ -34,7 +35,6 @@ from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
 from digitalizadora.services.output.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.output.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.output.scan_encoder import ScanEncoder
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scanner.scan_service import ScanService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT
 from tests.fakes.fixed_clock import FixedClock

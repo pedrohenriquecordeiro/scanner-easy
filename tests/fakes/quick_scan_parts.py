@@ -22,6 +22,7 @@ from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_reposito
     FileSystemQuickScanSlotRepository,
 )
 from digitalizadora.repositories.storage.file_system_scan_output_repository import FileSystemScanOutputRepository
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
@@ -34,7 +35,6 @@ from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEd
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import QuickScanOutputRenderer
 from digitalizadora.services.quick_scan.scan_output_service import ScanOutputParts, ScanOutputService
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from tests.fakes.document_service_parts import InstantFileWriter
 from tests.fakes.fixed_clock import TickingClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository

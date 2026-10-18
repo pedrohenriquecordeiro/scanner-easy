@@ -11,7 +11,7 @@ from digitalizadora.domain.quick_scan.scan_progress import ScanPhase
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scanning.scan_job import ScanJob
 from digitalizadora.domain.scanning.scan_request import ScanRequest
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scanner.scan_destination import ScanDestination
 
 logger = logging.getLogger(__name__)

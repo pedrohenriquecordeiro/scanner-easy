@@ -18,9 +18,9 @@ from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_reposito
     FileSystemQuickScanSlotRepository,
 )
 from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from tests.controllers.controller_test_support import SCANNED_AT, build_test_client
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.sample_images import build_sample_jpeg

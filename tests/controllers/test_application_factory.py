@@ -36,10 +36,10 @@ from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_reposito
 from digitalizadora.repositories.storage.atomic_file_writer import AtomicFileWriter
 from digitalizadora.services.application.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.application.application_state_service import ApplicationStateService
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.application.storage_guard_service import StorageGuardService
 from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scanner.printer_connection_service import PrinterConnectionState
 from tests.controllers.controller_test_support import (
     SCANNED_AT,

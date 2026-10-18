@@ -42,11 +42,11 @@ Tudo em `src/digitalizadora/`. Cada camada tem subpacotes por funcionalidade com
 | `domain/documents` | `DocumentDraft`, `DocumentPage`, política de nome do documento, reconciliação do rascunho com o disco. |
 | `domain/errors.py` | Hierarquia de `DigitalizadoraError`; cada erro tem um `code` estável. |
 | `services/scanner` | `ScanService` (a sequência única de digitalização), `PrinterConnectionService` (acha a impressora, USB primeiro), `ScanDestination`. |
-| `services/quick_scan` | `ScanOutputService`, `LastScanEditService`, `LastScanViewService`, `ScanProgressTracker`, `QuickScanOutputRenderer`. |
+| `services/quick_scan` | `ScanOutputService`, `LastScanEditService`, `LastScanViewService`, `QuickScanOutputRenderer`. |
 | `services/documents` | `DocumentDraftService` (casos de uso), `DocumentDraftStore` (estado e recuperação), `DocumentPageCapture`, `DocumentFinalizer`, `DocumentPdfAssembler`, `DocumentPageCropDetector`, `DocumentPageViewService`, `RenderedPageSource`. |
 | `services/imaging` | `PageCropDetectionService` (usa `paper_edge_detection`, `photo_region_detection`, `edge_refinement`), `PageFramingRenderer`, `PageImageViewService`, `ThumbnailService`, `jpeg_reencoding`, `image_pixel_limit`. |
 | `services/output` | `ScanEncoder`, `PdfAssemblyService`, `JpegResolutionService`. |
-| `services/application` | `ApplicationSettingsService`, `ApplicationStateService`, `StorageGuardService` (espaço livre). |
+| `services/application` | `ApplicationSettingsService`, `ApplicationStateService`, `StorageGuardService` (espaço livre), `ScanProgressTracker` (fase e resultado da digitalização). |
 | `repositories/settings` | `JsonApplicationSettingsRepository`, `JsonScannerEndpointRepository`. |
 | `repositories/storage` | `AtomicFileWriter`, `FileSystemScanOutputRepository`, `output_folder_preparer`, `crop_codec`. |
 | `repositories/quick_scan` | `FileSystemQuickScanSlotRepository` e o codec do manifesto. |

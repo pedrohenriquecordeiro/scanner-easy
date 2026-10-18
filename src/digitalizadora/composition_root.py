@@ -42,6 +42,7 @@ from digitalizadora.repositories.storage.file_system_scan_output_repository impo
 from digitalizadora.repositories.storage.output_folder_preparer import prepare_output_folder
 from digitalizadora.services.application.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.application.application_state_service import ApplicationStateService
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.application.storage_guard_service import StorageGuardService, read_free_space_in_bytes
 from digitalizadora.services.documents.document_draft_service import DocumentDraftCollaborators, DocumentDraftService
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
@@ -62,7 +63,6 @@ from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEd
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import QuickScanOutputRenderer
 from digitalizadora.services.quick_scan.scan_output_service import ScanOutputParts, ScanOutputService
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scanner.printer_connection_service import PrinterConnectionService
 from digitalizadora.services.scanner.scan_service import ScanService
 

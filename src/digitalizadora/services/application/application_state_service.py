@@ -4,8 +4,8 @@ from digitalizadora.domain.errors import OutputFolderUnavailableError
 from digitalizadora.domain.ports import ApplicationSettingsRepository
 from digitalizadora.domain.quick_scan.scan_progress import ScanProgressSnapshot
 from digitalizadora.domain.settings.application_settings import ApplicationSettings
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.application.storage_guard_service import StorageGuardService
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 
 
 @dataclass(frozen=True)

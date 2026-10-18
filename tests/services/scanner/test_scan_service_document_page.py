@@ -18,7 +18,7 @@ from digitalizadora.domain.scanning.scan_request import ScanRequest
 from digitalizadora.domain.scanning.scan_result import ScanResult
 from digitalizadora.domain.scanning.scanned_image import ScannedImage
 from digitalizadora.domain.settings.scan_preset import ScanPreset
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scanner.scan_service import ScanService
 from tests.fakes.document_drafts import build_document_page, page_identifier_at
 from tests.fakes.fixed_clock import FixedClock

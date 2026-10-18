@@ -19,11 +19,11 @@ from digitalizadora.domain.ports import QuickScanSlotRepository, ScanOutputRepos
 from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.imaging.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 from digitalizadora.services.output.scan_encoder import OutputIdentity
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import OutputsRequest, QuickScanOutputRenderer
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 
 LOGGER = logging.getLogger(__name__)
 UNKNOWN_MODIFICATION_TIME = 0

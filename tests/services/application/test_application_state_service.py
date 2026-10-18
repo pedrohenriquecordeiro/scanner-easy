@@ -10,11 +10,11 @@ from digitalizadora.services.application.application_state_service import (
     ApplicationStateService,
     StorageState,
 )
+from digitalizadora.services.application.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.application.storage_guard_service import (
     StorageGuardService,
     read_free_space_in_bytes,
 )
-from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
