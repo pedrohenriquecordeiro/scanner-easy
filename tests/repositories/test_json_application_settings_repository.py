@@ -55,6 +55,7 @@ def test_save_writes_the_documented_json_shape(tmp_path):
         "color_mode": "color",
         "capture_mode": "single",
         "auto_crop": False,
+        "crop_margin": True,
         "jpeg_quality": 90,
     }
 
@@ -481,3 +482,29 @@ def test_a_missing_auto_crop_is_not_reported_as_a_problem(tmp_path, caplog):
         build_repository(storage_file).load()
 
     assert caplog.records == []
+
+
+def test_a_missing_crop_margin_is_read_as_on_without_a_warning(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, VALID_DOCUMENT)
+
+    with caplog.at_level(logging.WARNING):
+        settings = build_repository(storage_file).load()
+
+    assert (settings.adjustment.crop_margin, caplog.records) == (True, [])
+
+
+def test_a_saved_crop_margin_turned_off_is_read_back(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    repository = build_repository(storage_file)
+    repository.save(dataclasses.replace(CUSTOM_SETTINGS, adjustment=ImageAdjustment(crop_margin=False)))
+
+    assert repository.load().adjustment.crop_margin is False
+
+
+@pytest.mark.parametrize("invalid_crop_margin", [1, 0, "false", None, [False]])
+def test_an_invalid_crop_margin_is_read_as_on(tmp_path, invalid_crop_margin):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "crop_margin": invalid_crop_margin})
+
+    assert build_repository(storage_file).load().adjustment.crop_margin is True

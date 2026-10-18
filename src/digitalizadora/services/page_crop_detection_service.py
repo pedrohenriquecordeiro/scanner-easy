@@ -1,7 +1,7 @@
 import io
 import logging
 import math
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -27,6 +27,18 @@ MAXIMUM_MARGIN_HALVINGS = 10
 # A photo this close to upright is taken as upright: the crop is then a plain rectangle.
 AXIS_SNAP_DEGREES = 1.5
 PREVIEW_COLOR_MODE = "RGB"
+
+
+@dataclass(frozen=True)
+class _PageGeometry:
+    """The page size in pixels and the margin around what was found, as a share of the longest side."""
+
+    full_size: tuple[int, int]
+    margin_ratio: float
+
+    @property
+    def margin_pixels(self) -> float:
+        return self.margin_ratio * max(self.full_size)
 
 
 @dataclass(frozen=True)
@@ -68,10 +80,10 @@ def _region_of_edges(edges: PaperEdges, full_size: tuple[int, int]) -> PixelRegi
     )
 
 
-def _crop_around(region: PixelRegion, full_size: tuple[int, int]) -> PageCrop | None:
-    """The region with a margin of a hundredth of the longest side, or None when it is the whole image."""
-    margin = round(CROP_MARGIN_RATIO * max(full_size))
-    grown_region = region.grown_within(margin, full_size)
+def _crop_around(region: PixelRegion, page: _PageGeometry) -> PageCrop | None:
+    """The region with the margin of the page, or None when it is the whole image."""
+    full_size = page.full_size
+    grown_region = region.grown_within(round(page.margin_pixels), full_size)
     if grown_region.as_box() == (0, 0, *full_size):
         return None
     try:
@@ -98,12 +110,12 @@ def _is_inside(corners: Corners, size: tuple[int, int]) -> bool:
     return all(0 <= x <= width and 0 <= y <= height for x, y in corners)
 
 
-def _grown_within_the_page(corners: Corners, full_size: tuple[int, int]) -> Corners:
+def _grown_within_the_page(corners: Corners, page: _PageGeometry) -> Corners:
     """Pushed out by the margin; a margin that would take a corner off the page is halved until it fits."""
-    margin = CROP_MARGIN_RATIO * max(full_size)
+    margin = page.margin_pixels
     for _ in range(MAXIMUM_MARGIN_HALVINGS):
         grown_corners = grow_rectangle(corners, margin)
-        if _is_inside(grown_corners, full_size):
+        if _is_inside(grown_corners, page.full_size):
             return grown_corners
         margin /= 2
     return corners
@@ -113,10 +125,11 @@ def _clamped(value: float) -> float:
     return min(1.0, max(0.0, value))
 
 
-def _rotated_crop(region: PhotoRegion, preview_size: tuple[int, int], full_size: tuple[int, int]) -> PageCrop | None:
+def _rotated_crop(region: PhotoRegion, preview_size: tuple[int, int], page: _PageGeometry) -> PageCrop | None:
+    full_size = page.full_size
     scale_x, scale_y = full_size[0] / preview_size[0], full_size[1] / preview_size[1]
     corners_on_the_page: Corners = tuple((x * scale_x, y * scale_y) for x, y in region.corners)  # type: ignore[assignment]
-    grown_corners = _grown_within_the_page(corners_on_the_page, full_size)
+    grown_corners = _grown_within_the_page(corners_on_the_page, page)
     try:
         return PageCrop.rounded(
             [CropCorner(_clamped(x / full_size[0]), _clamped(y / full_size[1])) for x, y in grown_corners]
@@ -126,12 +139,12 @@ def _rotated_crop(region: PhotoRegion, preview_size: tuple[int, int], full_size:
         return None
 
 
-def _crop_of_region(region: PhotoRegion, preview_size: tuple[int, int], full_size: tuple[int, int]) -> PageCrop | None:
+def _crop_of_region(region: PhotoRegion, preview_size: tuple[int, int], page: _PageGeometry) -> PageCrop | None:
     angle = abs(region.top_edge_angle_degrees)
     if angle <= AXIS_SNAP_DEGREES or angle >= 90 - AXIS_SNAP_DEGREES:
         bounding_region = _bounding_region(region, preview_size)
-        return _crop_around(bounding_region.scaled(preview_size, full_size), full_size)
-    return _rotated_crop(region, preview_size, full_size)
+        return _crop_around(bounding_region.scaled(preview_size, page.full_size), page)
+    return _rotated_crop(region, preview_size, page)
 
 
 class PageCropDetectionService:
@@ -142,28 +155,32 @@ class PageCropDetectionService:
     only when the border is not uniform (an open lid) the detection by side answers, with one rectangle.
     """
 
+    def __init__(self, crop_margin_enabled: Callable[[], bool] = lambda: True) -> None:
+        self._crop_margin_enabled = crop_margin_enabled
+
     def detect_crops(self, jpeg_content: bytes) -> DetectedCrops:
         with _failures_of_the_detection():
             preview, full_size = _read_preview(jpeg_content)
+            page = _PageGeometry(full_size, CROP_MARGIN_RATIO if self._crop_margin_enabled() else 0.0)
             detection = detect_photo_regions(preview)
             if detection is None:
-                detected_crops = DetectedCrops(self._crops_by_side(preview, full_size), 0)
+                detected_crops = DetectedCrops(self._crops_by_side(preview, page), 0)
             else:
-                detected_crops = self._crops_of_regions(detection, preview.size, full_size)
+                detected_crops = self._crops_of_regions(detection, preview.size, page)
             if not detected_crops.crops:
                 LOGGER.info("The automatic crop found no reliable photo or sheet; the whole image is kept")
             return detected_crops
 
     def _crops_of_regions(
-        self, detection: PhotoRegions, preview_size: tuple[int, int], full_size: tuple[int, int]
+        self, detection: PhotoRegions, preview_size: tuple[int, int], page: _PageGeometry
     ) -> DetectedCrops:
-        crops = [_crop_of_region(region, preview_size, full_size) for region in detection.regions]
+        crops = [_crop_of_region(region, preview_size, page) for region in detection.regions]
         found_crops = [crop for crop in crops if crop is not None]
         return DetectedCrops(put_in_reading_order(found_crops), detection.ignored_count)
 
-    def _crops_by_side(self, preview: Image.Image, full_size: tuple[int, int]) -> tuple[PageCrop, ...]:
+    def _crops_by_side(self, preview: Image.Image, page: _PageGeometry) -> tuple[PageCrop, ...]:
         edges = detect_paper_edges(preview)
         if edges is None:
             return ()
-        crop = _crop_around(_region_of_edges(edges, full_size), full_size)
+        crop = _crop_around(_region_of_edges(edges, page.full_size), page)
         return () if crop is None else (crop,)

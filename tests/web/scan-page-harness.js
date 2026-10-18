@@ -19,6 +19,7 @@ const SETTINGS = {
   color_mode: "color",
   capture_mode: "single",
   auto_crop: false,
+  crop_margin: true,
   jpeg_quality: 90,
 };
 const OLD_SERVER_SETTINGS = {
@@ -85,6 +86,13 @@ class PageUnderTest extends BrowserPage {
     await this.flush();
   }
 
+  async set_crop_margin(is_checked) {
+    const checkbox = this.element("crop-margin-checkbox");
+    checkbox.checked = is_checked;
+    this.dispatch_simple_event(checkbox, "change");
+    await this.flush();
+  }
+
   async set_auto_crop(is_checked) {
     const checkbox = this.element("auto-crop-checkbox");
     checkbox.focus();
@@ -98,6 +106,8 @@ class PageUnderTest extends BrowserPage {
       resolution: this.element("resolution-select").value,
       color_mode: this.element("color-mode-select").value,
       auto_crop: this.element("auto-crop-checkbox").checked,
+      crop_margin: this.element("crop-margin-checkbox").checked,
+      crop_margin_disabled: this.element("crop-margin-checkbox").disabled,
       jpeg_quality: this.element("jpeg-quality-input").value,
       jpeg_quality_text: this.element("jpeg-quality-value").textContent,
       warning_hidden: this.element("resolution-warning").hidden,
@@ -182,6 +192,11 @@ const SCENARIOS = {
   change_the_resolution: () => change_setting_through("resolution-select", (page) => page.choose_option("resolution-select", "600")),
   change_the_color_mode: () => change_setting_through("color-mode-select", (page) => page.choose_option("color-mode-select", "grayscale")),
   turn_auto_crop_on: () => change_setting_through("auto-crop-checkbox", (page) => page.set_auto_crop(true)),
+  turn_crop_margin_off: () => change_setting_through("crop-margin-checkbox", (page) => page.set_crop_margin(false)),
+  async crop_margin_with_the_auto_crop_on() {
+    const page = await load_page({ "GET /api/settings": build_json_response(200, { ...SETTINGS, auto_crop: true, crop_margin: false }) });
+    return page.read_settings_controls();
+  },
   async move_the_quality_slider() {
     const page = await load_page({});
     await page.move_quality_slider("75");

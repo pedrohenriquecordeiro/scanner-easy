@@ -448,3 +448,13 @@ def test_a_refused_quality_or_adjustment_saves_nothing(
         settings_service.update(invalid_update)
 
     assert settings_repository.load() == INITIAL_SETTINGS
+
+
+def test_a_crop_margin_choice_is_saved(adjusted_service: ApplicationSettingsService) -> None:
+    update = SettingsUpdate(output_folder="/Volumes/External/scans", output_format="jpg", crop_margin=False)
+
+    assert adjusted_service.update(update).adjustment == ImageAdjustment(auto_crop=True, crop_margin=False)
+
+
+def test_the_crop_margin_is_on_by_default() -> None:
+    assert ImageAdjustment().crop_margin is True

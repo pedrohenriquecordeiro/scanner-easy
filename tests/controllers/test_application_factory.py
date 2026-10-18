@@ -76,6 +76,7 @@ SETTINGS_BODY = {
     "color_mode": "color",
     "capture_mode": "single",
     "auto_crop": False,
+    "crop_margin": True,
     "jpeg_quality": 90,
 }
 CONNECTED_STATE = PrinterConnectionState(

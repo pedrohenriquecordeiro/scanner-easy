@@ -247,6 +247,7 @@ function collect_elements() {
     resolution_warning: document.getElementById("resolution-warning"),
     resolution_warning_text: document.getElementById("resolution-warning-text"),
     auto_crop_checkbox: document.getElementById("auto-crop-checkbox"),
+    crop_margin_checkbox: document.getElementById("crop-margin-checkbox"),
     jpeg_quality_input: document.getElementById("jpeg-quality-input"),
     jpeg_quality_value: document.getElementById("jpeg-quality-value"),
     output_folder_input: document.getElementById("output-folder-input"),
@@ -394,6 +395,9 @@ class ScanPage {
     color_mode_select.addEventListener("change", () => this.change_setting({ color_mode: color_mode_select.value }));
     auto_crop_checkbox.addEventListener("change", () =>
       this.change_setting_then_focus_scan_button({ auto_crop: auto_crop_checkbox.checked }),
+    );
+    this.elements.crop_margin_checkbox.addEventListener("change", () =>
+      this.change_setting({ crop_margin: this.elements.crop_margin_checkbox.checked }),
     );
     const { jpeg_quality_input, jpeg_quality_value } = this.elements;
     // The number follows the slider while it moves (a screen reader reads it); the setting is saved a moment after
@@ -748,6 +752,9 @@ class ScanPage {
   render_adjustment_controls(settings) {
     const { auto_crop_checkbox, jpeg_quality_input, jpeg_quality_value } = this.elements;
     auto_crop_checkbox.checked = settings.auto_crop === true;
+    // The margin only matters while the automatic crop is on; the choice stays visible but cannot change otherwise.
+    this.elements.crop_margin_checkbox.checked = settings.crop_margin !== false;
+    this.elements.crop_margin_checkbox.disabled = settings.auto_crop !== true;
     if (this.has_newer_quality_than_the_answer()) {
       return;
     }

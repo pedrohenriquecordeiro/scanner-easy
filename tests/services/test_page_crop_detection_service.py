@@ -369,3 +369,22 @@ def test_the_card_at_about_25_degrees_is_framed_as_a_tilted_crop(service):
 
     assert len(crops) == 1
     assert crops[0].is_rectangle is False
+
+
+def test_without_the_crop_margin_the_frame_of_a_sheet_is_tight(sheet_on_dark_lid):
+    tight_service = PageCropDetectionService(lambda: False)
+
+    tight_crop = only_crop(tight_service, sheet_on_dark_lid)
+    margin_crop = only_crop(PageCropDetectionService(), sheet_on_dark_lid)
+
+    assert box_of(tight_crop).left > box_of(margin_crop).left
+
+
+def test_the_crop_margin_is_read_at_every_detection(sheet_on_dark_lid):
+    choices = iter([True, False])
+    service = PageCropDetectionService(lambda: next(choices))
+
+    first_left = box_of(only_crop(service, sheet_on_dark_lid)).left
+    second_left = box_of(only_crop(service, sheet_on_dark_lid)).left
+
+    assert second_left > first_left

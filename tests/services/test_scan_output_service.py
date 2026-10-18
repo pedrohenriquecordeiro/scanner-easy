@@ -79,6 +79,7 @@ def job_with(output_format: OutputFormat = OutputFormat.PDF, adjustment: ImageAd
 
 class StubCropDetectionService(PageCropDetectionService):
     def __init__(self, failure: Exception | None = None) -> None:
+        super().__init__()
         self._failure = failure
         self.detection_count = 0
 

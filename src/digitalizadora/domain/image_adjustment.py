@@ -34,6 +34,7 @@ def rendered_size_factor(jpeg_quality: int) -> int:
 @dataclass(frozen=True)
 class ImageAdjustment:
     auto_crop: bool = False
+    crop_margin: bool = True
     jpeg_quality: int = DEFAULT_JPEG_QUALITY
 
     def __post_init__(self) -> None:

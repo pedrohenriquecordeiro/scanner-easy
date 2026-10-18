@@ -18,6 +18,7 @@ SETTINGS_BODY = {
     "color_mode": "color",
     "capture_mode": "single",
     "auto_crop": False,
+    "crop_margin": True,
     "jpeg_quality": 90,
 }
 OUTPUT_FOLDER_UNAVAILABLE_TEXT = "Pasta de saída indisponível. Se for um disco externo, confira se está conectado."
@@ -185,6 +186,7 @@ def test_pages_remaining_are_described_in_portuguese(
         ("change_the_resolution", {"dots_per_inch": 600}),
         ("change_the_color_mode", {"color_mode": "grayscale"}),
         ("turn_auto_crop_on", {"auto_crop": True}),
+        ("turn_crop_margin_off", {"crop_margin": False}),
     ],
 )
 def test_changing_a_setting_sends_all_the_saved_settings_with_the_change(
@@ -209,6 +211,16 @@ def test_a_refused_select_change_keeps_the_focus_on_the_select(scenario_results:
 
 def test_the_scan_button_gets_the_focus_after_toggling_the_auto_crop(scenario_results: dict) -> None:
     assert scenario_results["turn_auto_crop_on"]["scan_button_focused"] is True
+
+
+def test_the_crop_margin_is_on_and_disabled_while_the_auto_crop_is_off(scenario_results: dict) -> None:
+    controls = scenario_results["default_settings_controls"]
+    assert (controls["crop_margin"], controls["crop_margin_disabled"]) == (True, True)
+
+
+def test_the_saved_crop_margin_choice_shows_and_is_enabled_with_the_auto_crop_on(scenario_results: dict) -> None:
+    controls = scenario_results["crop_margin_with_the_auto_crop_on"]
+    assert (controls["crop_margin"], controls["crop_margin_disabled"]) == (False, False)
 
 
 def test_saved_settings_fill_the_quality_controls(scenario_results: dict) -> None:

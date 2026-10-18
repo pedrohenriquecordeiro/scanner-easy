@@ -12,5 +12,6 @@ def build_settings_body(settings: ApplicationSettings) -> SettingsBody:
         "color_mode": settings.scan_settings.color_mode.value,
         "capture_mode": settings.capture_mode.value,
         "auto_crop": settings.adjustment.auto_crop,
+        "crop_margin": settings.adjustment.crop_margin,
         "jpeg_quality": settings.adjustment.jpeg_quality,
     }

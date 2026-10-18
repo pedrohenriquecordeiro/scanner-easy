@@ -69,6 +69,7 @@ def test_get_settings_returns_the_saved_settings(client: TestClient) -> None:
             "color_mode": "color",
             "capture_mode": "document",
             "auto_crop": False,
+            "crop_margin": True,
             "jpeg_quality": 90,
         },
     )
@@ -83,6 +84,7 @@ def test_put_settings_returns_the_new_settings(client: TestClient) -> None:
             **VALID_BODY,
             "capture_mode": "document",
             "auto_crop": False,
+            "crop_margin": True,
             "jpeg_quality": 90,
         },
     )
@@ -349,3 +351,19 @@ def test_a_mistyped_field_saves_nothing(
     client.put("/api/settings", json={**VALID_BODY, "auto_crop": "true"})
 
     assert settings_repository.load() == INITIAL_SETTINGS
+
+
+def test_put_settings_saves_the_crop_margin(
+    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
+) -> None:
+    client.put("/api/settings", json={**VALID_BODY, "crop_margin": False})
+
+    assert settings_repository.load().adjustment.crop_margin is False
+
+
+def test_a_mistyped_crop_margin_answers_422_and_saves_nothing(
+    client: TestClient, settings_repository: InMemoryApplicationSettingsRepository
+) -> None:
+    response = client.put("/api/settings", json={**VALID_BODY, "crop_margin": "false"})
+
+    assert (response.status_code, settings_repository.load()) == (HTTPStatus.UNPROCESSABLE_ENTITY, INITIAL_SETTINGS)

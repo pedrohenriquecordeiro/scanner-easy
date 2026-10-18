@@ -19,6 +19,7 @@ DOTS_PER_INCH_KEY = "dots_per_inch"
 COLOR_MODE_KEY = "color_mode"
 SCAN_PRESET_KEY = "scan_preset"
 AUTO_CROP_KEY = "auto_crop"
+CROP_MARGIN_KEY = "crop_margin"
 JPEG_QUALITY_KEY = "jpeg_quality"
 SCAN_QUALITY_KEY = "scan_quality"
 KNOWN_CAPTURE_MODE_VALUES = frozenset(capture_mode.value for capture_mode in CaptureMode)
@@ -63,6 +64,16 @@ def _read_auto_crop(document: dict[str, object]) -> tuple[bool, RejectedValue | 
     if isinstance(raw_auto_crop, bool):
         return raw_auto_crop, None
     return False, RejectedValue(AUTO_CROP_KEY, repr(raw_auto_crop), "no automatic crop")
+
+
+def _read_crop_margin(document: dict[str, object]) -> tuple[bool, RejectedValue | None]:
+    """A file from before the option has no key: the margin stays, as it always was."""
+    if CROP_MARGIN_KEY not in document:
+        return True, None
+    raw_crop_margin = document[CROP_MARGIN_KEY]
+    if isinstance(raw_crop_margin, bool):
+        return raw_crop_margin, None
+    return True, RejectedValue(CROP_MARGIN_KEY, repr(raw_crop_margin), "the safety margin on the crop")
 
 
 def _read_jpeg_quality(document: dict[str, object]) -> tuple[int, RejectedValue | None]:
@@ -122,10 +133,17 @@ def read_application_settings(document: object) -> SettingsReading:
     scan_settings, rejected_quality = _read_scan_settings(document)
     capture_mode, rejected_capture_mode = _read_capture_mode(document)
     auto_crop, rejected_auto_crop = _read_auto_crop(document)
+    crop_margin, rejected_crop_margin = _read_crop_margin(document)
     jpeg_quality, rejected_jpeg_quality = _read_jpeg_quality(document)
     rejected_values = tuple(
         rejected
-        for rejected in (rejected_quality, rejected_capture_mode, rejected_auto_crop, rejected_jpeg_quality)
+        for rejected in (
+            rejected_quality,
+            rejected_capture_mode,
+            rejected_auto_crop,
+            rejected_crop_margin,
+            rejected_jpeg_quality,
+        )
         if rejected is not None
     )
     settings = ApplicationSettings(
@@ -133,7 +151,7 @@ def read_application_settings(document: object) -> SettingsReading:
         output_format=output_format,
         scan_settings=scan_settings,
         capture_mode=capture_mode,
-        adjustment=ImageAdjustment(auto_crop=auto_crop, jpeg_quality=jpeg_quality),
+        adjustment=ImageAdjustment(auto_crop=auto_crop, crop_margin=crop_margin, jpeg_quality=jpeg_quality),
     )
     return SettingsReading(settings, rejected_values)
 
@@ -172,6 +190,7 @@ class JsonApplicationSettingsRepository:
             COLOR_MODE_KEY: settings.scan_settings.color_mode.value,
             CAPTURE_MODE_KEY: settings.capture_mode.value,
             AUTO_CROP_KEY: settings.adjustment.auto_crop,
+            CROP_MARGIN_KEY: settings.adjustment.crop_margin,
             JPEG_QUALITY_KEY: settings.adjustment.jpeg_quality,
         }
         self._storage_file.parent.mkdir(parents=True, exist_ok=True)

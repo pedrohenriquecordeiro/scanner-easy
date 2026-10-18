@@ -26,6 +26,7 @@ class SettingsUpdate:
     dots_per_inch: int | None = None
     color_mode: str | None = None
     auto_crop: bool | None = None
+    crop_margin: bool | None = None
     jpeg_quality: int | None = None
 
 
@@ -100,6 +101,7 @@ class ApplicationSettingsService:
     def _resolve_adjustment(update: SettingsUpdate, saved: ApplicationSettings) -> ImageAdjustment:
         return ImageAdjustment(
             auto_crop=saved.adjustment.auto_crop if update.auto_crop is None else update.auto_crop,
+            crop_margin=saved.adjustment.crop_margin if update.crop_margin is None else update.crop_margin,
             jpeg_quality=saved.adjustment.jpeg_quality if update.jpeg_quality is None else update.jpeg_quality,
         )
 

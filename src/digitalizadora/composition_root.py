@@ -165,7 +165,7 @@ def build_container(
     repositories.document_draft.claim_exclusive_access()
     _prepare_saved_output_folder(repositories.settings)
     scanner_access = _build_scanner_access(chosen_overrides)
-    shared_services = _build_shared_services(clock, chosen_overrides)
+    shared_services = _build_shared_services(clock, chosen_overrides, repositories.settings)
     services = _build_services(repositories, scanner_access, shared_services)
     # Before the server answers (6.6.2); recover_draft never raises, so the server always starts.
     services.document_draft.recover_draft()
@@ -240,13 +240,15 @@ def _build_gateway_factory(scanner_access: _ScannerAccess) -> Callable[[ScannerE
     return build_gateway
 
 
-def _build_shared_services(clock: Clock, overrides: ContainerOverrides) -> _SharedServices:
+def _build_shared_services(
+    clock: Clock, overrides: ContainerOverrides, settings_repository: ApplicationSettingsRepository
+) -> _SharedServices:
     thumbnail_service = ThumbnailService()
     page_framing_renderer = PageFramingRenderer()
     scan_encoder = ScanEncoder(JpegResolutionService(), PdfAssemblyService(), thumbnail_service)
     return _SharedServices(
         clock=clock,
-        crop_detection=PageCropDetectionService(),
+        crop_detection=PageCropDetectionService(lambda: settings_repository.load().adjustment.crop_margin),
         image_view=PageImageViewService(),
         page_framing_renderer=page_framing_renderer,
         scan_encoder=scan_encoder,

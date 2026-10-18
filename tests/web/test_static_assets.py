@@ -522,3 +522,10 @@ def test_folder_button_is_renamed_to_save_folder() -> None:
 
 def test_page_has_no_finalize_wording_left_for_the_user() -> None:
     assert "Finalizar" not in read_static_file("index.html")
+
+
+def test_the_crop_margin_checkbox_comes_right_after_the_auto_crop_one_with_its_label_and_hint() -> None:
+    page = " ".join(read_static_file("index.html").split())
+    assert page.index('id="auto-crop-checkbox"') < page.index('id="crop-margin-checkbox"')
+    assert "Margem de segurança no corte" in page
+    assert "Deixa uma pequena folga em volta da moldura; desmarque para cortar rente." in page
