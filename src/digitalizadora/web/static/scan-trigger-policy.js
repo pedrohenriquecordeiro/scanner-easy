@@ -1,6 +1,7 @@
 "use strict";
 
-// Pure rules for when a key press or click may start a scan; application.js wires them to the page.
+// Pure rules for when a key press or click may start a scan, and when the last scan may be adjusted; application.js
+// and last-scan-panel.js wire them to the page.
 
 const IDLE_PHASE = "idle";
 const SPACE_KEY_CODE = "Space";
@@ -32,6 +33,15 @@ function can_start_scan(scan_activity) {
   return scan_activity.scan_phase === IDLE_PHASE && !scan_activity.is_start_request_pending;
 }
 
-function can_rotate_last_scan(scan_activity, rotation_activity) {
-  return can_start_scan(scan_activity) && !rotation_activity.is_rotation_pending;
+function can_start_capture(capture_activity) {
+  // An adjustment of the last scan or of a document runs on the server's files: a scan waits for it (409 otherwise).
+  return can_start_scan(capture_activity) && !capture_activity.is_edit_request_pending;
+}
+
+function can_edit_last_scan(scan_activity, last_scan_state) {
+  return (
+    can_start_scan(scan_activity) &&
+    last_scan_state.is_editable &&
+    !last_scan_state.is_edit_pending
+  );
 }

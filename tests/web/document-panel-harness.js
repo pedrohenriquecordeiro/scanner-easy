@@ -37,6 +37,9 @@ const {
   INVALID_DOCUMENT_NAME_BODY,
   ROTATION_PATH_KEY,
   DAMAGED_PAGE_BODY,
+  rectangle_crop,
+  quadrilateral_crop,
+  read_overlay,
   build_document_body,
   build_state,
   respond,
@@ -52,18 +55,13 @@ async function play_first_page_after_a_draft_end(page) {
   return page.count_name_requests() - name_requests_before;
 }
 
-const TURNED_SECOND_PAGE = { [SECOND_PAGE]: { rotation_degrees: 90, crop: null } };
-const SECOND_PAGE_CROP = { left: 0.13, top: 0.115, right: 0.914, bottom: 0.915 };
-const FRAMED_SECOND_PAGE = { [SECOND_PAGE]: { rotation_degrees: 90, crop: SECOND_PAGE_CROP } };
-const FIRST_PAGE_CROP = { left: 0.2, top: 0.1, right: 0.7, bottom: 0.9 };
-
-function describe_overlay(overlay) {
-  return {
-    hidden: overlay.hidden,
-    aria_hidden: overlay.getAttribute("aria-hidden"),
-    style: { left: overlay.style.left, top: overlay.style.top, width: overlay.style.width, height: overlay.style.height },
-  };
-}
+const TURNED_SECOND_PAGE = { [SECOND_PAGE]: { rotation_degrees: 90, crops: [] } };
+const SECOND_PAGE_CROP = rectangle_crop(0.13, 0.115, 0.914, 0.915);
+const FRAMED_SECOND_PAGE = { [SECOND_PAGE]: { rotation_degrees: 90, crops: [SECOND_PAGE_CROP] } };
+const FIRST_PAGE_CROP = rectangle_crop(0.2, 0.1, 0.7, 0.9);
+const TILTED_CROP = quadrilateral_crop([[0.4, 0.55], [0.93, 0.44], [0.97, 0.8], [0.44, 0.91]]);
+const UPPER_CROP = rectangle_crop(0.05, 0.02, 0.9, 0.55);
+const LOWER_CROP = rectangle_crop(0.05, 0.6, 0.9, 0.95);
 
 async function load_page_with_a_framed_second_page() {
   const body = respond(build_document_body({ revision: 1, page_identifiers: THREE_PAGES, framings: FRAMED_SECOND_PAGE }));
@@ -113,10 +111,53 @@ const SCENARIOS = {
   async framed_tiles() {
     const page = await load_page_with_a_framed_second_page();
     return {
-      overlays: [1, 2, 3].map((position) => describe_overlay(page.tile_overlay(position))),
+      overlays: [1, 2, 3].map((position) => read_overlay(page.tile_overlay(position))),
       labels: [1, 2, 3].map((position) => page.tile_at(position).getAttribute("aria-label")),
       thumbnail_source: page.tile_thumbnail(2).src,
     };
+  },
+  async tiles_with_two_frames_and_a_tilted_frame() {
+    const page = await load_page({
+      "GET /api/document": respond(
+        build_document_body({
+          revision: 1,
+          page_identifiers: THREE_PAGES,
+          framings: {
+            [FIRST_PAGE]: { rotation_degrees: 0, crops: [UPPER_CROP, LOWER_CROP] },
+            [SECOND_PAGE]: { rotation_degrees: 0, crops: [TILTED_CROP] },
+          },
+        }),
+      ),
+    });
+    return {
+      two_frames: read_overlay(page.tile_overlay(1)),
+      tilted: read_overlay(page.tile_overlay(2)),
+      count_texts: [1, 2, 3].map((position) => ({
+        hidden: page.tile_crop_count(position).hidden,
+        text: page.tile_crop_count(position).textContent,
+      })),
+      labels: [1, 2, 3].map((position) => page.tile_at(position).getAttribute("aria-label")),
+    };
+  },
+  async rotate_a_page_with_two_frames() {
+    const page = await load_page({
+      "GET /api/document": respond(
+        build_document_body({
+          revision: 1,
+          page_identifiers: THREE_PAGES,
+          framings: { [SECOND_PAGE]: { rotation_degrees: 0, crops: [UPPER_CROP, LOWER_CROP] } },
+        }),
+      ),
+      [ROTATION_PATH_KEY]: respond(
+        build_document_body({
+          revision: 2,
+          page_identifiers: THREE_PAGES,
+          framings: { [SECOND_PAGE]: { rotation_degrees: 90, crops: [UPPER_CROP, LOWER_CROP] } },
+        }),
+      ),
+    });
+    await page.click(page.tile_button(2, "rotate"));
+    return { announcement: page.element("document-announcement").textContent };
   },
   async tile_enlarge_buttons() {
     const page = await load_page({});
@@ -154,11 +195,11 @@ const SCENARIOS = {
       build_document_body({
         revision: 2,
         page_identifiers: THREE_PAGES,
-        framings: { [FIRST_PAGE]: { rotation_degrees: 0, crop: FIRST_PAGE_CROP } },
+        framings: { [FIRST_PAGE]: { rotation_degrees: 0, crops: [FIRST_PAGE_CROP] } },
       }),
     );
     await page.poll(build_state({ revision: 2, page_count: 3 }));
-    const framed = describe_overlay(page.tile_overlay(1));
+    const framed = read_overlay(page.tile_overlay(1));
     const framed_label = page.tile_at(1).getAttribute("aria-label");
     page.responses["GET /api/document"] = respond(build_document_body({ revision: 3, page_identifiers: THREE_PAGES }));
     await page.poll(build_state({ revision: 3, page_count: 3 }));

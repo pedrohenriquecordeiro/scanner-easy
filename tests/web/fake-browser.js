@@ -17,8 +17,12 @@ const PAGE_SCRIPT_FILE_NAMES = [
   "error-banner.js",
   "document-page-policy.js",
   "page-frame-geometry.js",
+  "frame-dialog-policy.js",
+  "last-scan-policy.js",
+  "frame-overlay.js",
   "page-frame-editor.js",
   "document-panel.js",
+  "last-scan-panel.js",
   "application.js",
 ];
 const TAG_PATTERN = /<(\/?)([a-z][a-z0-9]*)\b([^>]*)>/g;
@@ -277,6 +281,13 @@ class FakeDocument extends FakeEventTarget {
   createElement(tag_name) {
     const upper_tag_name = tag_name.toUpperCase();
     return upper_tag_name === DIALOG_TAG_NAME ? new FakeDialog(this) : new FakeElement(upper_tag_name, this);
+  }
+
+  createElementNS(namespace, tag_name) {
+    // The elements of a drawing keep the case of their name, like the real ones.
+    const element = new FakeElement(tag_name, this);
+    element.namespace = namespace;
+    return element;
   }
 
   getElementById(element_identifier) {
@@ -540,7 +551,7 @@ class BrowserPage {
     const pointer = {
       clientX: pointer_position.x,
       clientY: pointer_position.y,
-      pointerId: 1,
+      pointerId: pointer_position.pointer_identifier ?? 1,
       button: pointer_position.button ?? 0,
     };
     return this.document.dispatch(element, build_event(event_type, pointer));

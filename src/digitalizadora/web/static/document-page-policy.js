@@ -2,8 +2,8 @@
 
 // Pure rules of the Documento mode (no DOM); document-panel.js and application.js wire them to the page.
 // Uses IDLE_PHASE, SPACE_KEY_CODE, BUTTON_TAG_NAME, KEYBOARD_RESERVED_TAG_NAMES and can_start_scan from
-// scan-trigger-policy.js, describe_expected_scan_duration from scan-quality-policy.js and describe_frame from
-// page-frame-geometry.js, which index.html loads first (the geometry only when a frame text is built).
+// scan-trigger-policy.js and describe_expected_scan_duration from scan-quality-policy.js, which index.html loads
+// first. The texts of the frame dialog are shared with the quick mode (last-scan-policy.js).
 
 const DOCUMENT_PATH = "/api/document";
 const DOCUMENT_PAGES_PATH = `${DOCUMENT_PATH}/pages`;
@@ -89,10 +89,9 @@ const ACTIVE_PAGE_PHASE_TEXTS = Object.freeze({
 });
 const PAGE_REMOVAL_VERBS = Object.freeze({ discard_last: "descartada", delete: "excluída" });
 const NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter salva.";
-const NO_FRAME_DETECTED_TEXT = "Não achei uma borda confiável nesta página. A moldura não mudou.";
-const FRAME_CHANGES_DISCARDED_TEXT = "Alterações da moldura descartadas.";
-const FRAME_IMAGE_FAILED_TEXT = "Não consegui carregar a imagem ampliada desta página.";
 const FRAME_PAGE_GONE_TEXT = "Essa página não está mais no documento.";
+const PAGE_SUBJECT_TEXT = "nesta página";
+const TWO_FRAMES_COUNT = 2;
 
 function build_page_path(page_identifier) {
   return `${DOCUMENT_PAGES_PATH}/${page_identifier}`;
@@ -102,12 +101,12 @@ function build_page_rotation_path(page_identifier) {
   return `${build_page_path(page_identifier)}/rotation`;
 }
 
-function build_page_crop_path(page_identifier) {
-  return `${build_page_path(page_identifier)}/crop`;
+function build_page_crops_path(page_identifier) {
+  return `${build_page_path(page_identifier)}/crops`;
 }
 
-function build_page_crop_detection_path(page_identifier) {
-  return `${build_page_crop_path(page_identifier)}/detect`;
+function build_page_crops_detection_path(page_identifier) {
+  return `${build_page_crops_path(page_identifier)}/detect`;
 }
 
 function build_page_thumbnail_address(page_identifier, rotation_degrees) {
@@ -369,15 +368,29 @@ function describe_page_rotation(page_rotation) {
 }
 
 function describe_page_rotation_result(rotation_result) {
-  const { position, rotation_degrees, crop } = rotation_result;
+  const { position, rotation_degrees, crop_count } = rotation_result;
   const rotation_text = describe_page_rotation({ position, rotation_degrees });
-  return crop === null ? rotation_text : `${rotation_text} A moldura acompanhou o giro.`;
+  if (crop_count === 0) {
+    return rotation_text;
+  }
+  return crop_count === 1 ? `${rotation_text} A moldura acompanhou o giro.` : `${rotation_text} As molduras acompanharam o giro.`;
 }
 
 function describe_tile_label(tile_label) {
-  const { position, page_count, crop } = tile_label;
+  const { position, page_count, crop_count } = tile_label;
   const position_text = `Página ${position} de ${page_count}`;
-  return crop === null ? position_text : `${position_text}, com moldura de corte`;
+  if (crop_count === 0) {
+    return position_text;
+  }
+  if (crop_count === 1) {
+    return `${position_text}, com moldura de corte`;
+  }
+  return `${position_text}, com ${crop_count} molduras de corte (${crop_count} páginas no PDF)`;
+}
+
+function describe_crop_count(crop_count) {
+  // Said in words on the tile for whoever does not see the colours; one frame needs no count.
+  return crop_count >= TWO_FRAMES_COUNT ? `${crop_count} molduras` : null;
 }
 
 function describe_enlarge_label(position) {
@@ -388,21 +401,15 @@ function describe_frame_dialog_title(page_position) {
   return `Página ${page_position.position} de ${page_position.page_count}: moldura de corte`;
 }
 
-function describe_detected_frame(frame) {
-  return `Moldura detectada e salva. ${describe_frame(frame)}`;
-}
-
-function describe_frame_applied(position) {
-  return `Moldura aplicada à página ${position}.`;
-}
-
-function describe_frame_removed(position) {
-  return `Corte removido da página ${position}.`;
-}
-
-function describe_crop_application(crop_application) {
-  const { position, crop } = crop_application;
-  return crop === null ? describe_frame_removed(position) : describe_frame_applied(position);
+function describe_page_crop_application(crop_application) {
+  const { position, crop_count } = crop_application;
+  if (crop_count === 0) {
+    return `Corte removido da página ${position}.`;
+  }
+  if (crop_count === 1) {
+    return `Moldura aplicada à página ${position}.`;
+  }
+  return `Molduras aplicadas à página ${position} (${crop_count} páginas no PDF).`;
 }
 
 function join_positions(positions) {

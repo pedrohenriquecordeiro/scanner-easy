@@ -3,7 +3,7 @@
 // Runs the real static scripts in the fake browser of fake-browser.js (fake DOM, timers and fetch), plays each
 // scenario and prints one JSON object with what the page did. tests/web/test_scan_page_behaviour.py asserts on it.
 
-const { BrowserPage, build_deferred_response, build_json_response } = require("./fake-browser.js");
+const { BrowserPage, build_json_response } = require("./fake-browser.js");
 
 const ACTIVE_POLL_DELAY_MILLISECONDS = 500;
 const PRINTER_POLL_DELAY_MILLISECONDS = 15000;
@@ -18,6 +18,7 @@ const SETTINGS = {
   color_mode: "color",
   capture_mode: "single",
   auto_crop: false,
+  jpeg_quality: 90,
 };
 const OLD_SERVER_SETTINGS = {
   output_folder: "/Users/teste/Digitalizadora",
@@ -31,11 +32,15 @@ const AVAILABLE_STORAGE = { free_space_in_bytes: 12e9, estimated_pages_remaining
 const LOW_STORAGE = { free_space_in_bytes: 1e9, estimated_pages_remaining: 300, output_folder_available: true };
 const UNAVAILABLE_STORAGE = { free_space_in_bytes: 0, estimated_pages_remaining: 0, output_folder_available: false };
 const CONFLICT_BODY = { code: "scan_already_running", message: "Já existe uma digitalização em andamento." };
-const FINISHED_SCAN_RESULT = { file_name: "2026-10-17_00001.pdf", size_in_bytes: 1234567, scanned_at: "2026-10-17T10:00:00" };
-const LAST_SCAN_ROTATION_KEY = "POST /api/scans/last/rotation";
-const NO_LAST_SCAN_BODY = { code: "no_last_scan", message: "Ainda não há uma digitalização para girar." };
-const FIRST_REVISION = 1;
-const ROTATED_REVISION = 2;
+const FINISHED_SCAN_RESULT = {
+  scan_identifier: "9f3c1d2e4b5a6978",
+  file_names: ["2026-10-17_00001.pdf"],
+  total_size_in_bytes: 1234567,
+  scanned_at: "2026-10-17T10:00:00",
+  rotation_degrees: 0,
+  crops: [],
+  is_editable: true,
+};
 
 function build_default_responses() {
   return {
@@ -54,19 +59,6 @@ function build_state(scan_phase, storage, settings) {
     settings: settings ?? SETTINGS,
     storage,
   };
-}
-
-function build_finished_state(last_result_revision) {
-  return {
-    ...build_state("idle", AVAILABLE_STORAGE),
-    scans_completed: 1,
-    last_result: FINISHED_SCAN_RESULT,
-    last_result_revision,
-  };
-}
-
-function respond_with_finished_state(last_result_revision) {
-  return { "GET /api/state": build_json_response(200, build_finished_state(last_result_revision)) };
 }
 
 function build_printer(route) {
@@ -105,9 +97,24 @@ class PageUnderTest extends BrowserPage {
       resolution: this.element("resolution-select").value,
       color_mode: this.element("color-mode-select").value,
       auto_crop: this.element("auto-crop-checkbox").checked,
+      jpeg_quality: this.element("jpeg-quality-input").value,
+      jpeg_quality_text: this.element("jpeg-quality-value").textContent,
       warning_hidden: this.element("resolution-warning").hidden,
       warning_text: this.element("resolution-warning-text").textContent,
     };
+  }
+
+  async move_quality_slider(value) {
+    const slider = this.element("jpeg-quality-input");
+    slider.focus();
+    slider.value = value;
+    this.dispatch_simple_event(slider, "input");
+    await this.flush();
+  }
+
+  async release_quality_slider() {
+    this.dispatch_simple_event(this.element("jpeg-quality-input"), "change");
+    await this.flush();
   }
 
   settings_request_body() {
@@ -116,22 +123,6 @@ class PageUnderTest extends BrowserPage {
 
   count_scan_requests() {
     return this.count_requests("POST /api/scans");
-  }
-
-  read_last_scan_panel() {
-    return {
-      panel_hidden: this.element("last-scan-panel").hidden,
-      thumbnail_source: this.element("last-scan-thumbnail").src,
-      rotate_disabled: this.element("last-scan-rotate-button").disabled,
-      rotation_status: this.element("last-scan-rotation-status").textContent,
-    };
-  }
-
-  async refresh_state_to(state_response) {
-    this.responses["GET /api/state"] = state_response;
-    this.timers.run_pending_with_delay(0);
-    this.timers.run_pending_with_delay(2000);
-    await this.flush();
   }
 }
 
@@ -172,9 +163,58 @@ const SCENARIOS = {
   space_on_the_resolution_select: () => count_scans_after_space_on("resolution-select"),
   space_on_the_color_mode_select: () => count_scans_after_space_on("color-mode-select"),
   space_on_the_auto_crop_checkbox: () => count_scans_after_space_on("auto-crop-checkbox"),
+  space_on_the_quality_slider: () => count_scans_after_space_on("jpeg-quality-input"),
   change_the_resolution: () => change_setting_through("resolution-select", (page) => page.choose_option("resolution-select", "600")),
   change_the_color_mode: () => change_setting_through("color-mode-select", (page) => page.choose_option("color-mode-select", "grayscale")),
   turn_auto_crop_on: () => change_setting_through("auto-crop-checkbox", (page) => page.set_auto_crop(true)),
+  async move_the_quality_slider() {
+    const page = await load_page({});
+    await page.move_quality_slider("75");
+    return { controls: page.read_settings_controls(), settings_requests: page.count_requests("PUT /api/settings") };
+  },
+  async move_the_quality_slider_to_nonsense() {
+    const page = await load_page({});
+    await page.move_quality_slider("abc");
+    return page.read_settings_controls();
+  },
+  async release_the_quality_slider() {
+    const saved = { ...SETTINGS, jpeg_quality: 75 };
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, saved) });
+    await page.move_quality_slider("75");
+    await page.release_quality_slider();
+    return {
+      settings_request_body: page.settings_request_body(),
+      controls: page.read_settings_controls(),
+      slider_focused: page.is_focused("jpeg-quality-input"),
+      scan_button_focused: page.is_focused("scan-button"),
+    };
+  },
+  async refused_quality() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(422, INVALID_SETTINGS_BODY) });
+    await page.move_quality_slider("75");
+    await page.release_quality_slider();
+    return { banner_text: page.element("error-banner-text").textContent, controls: page.read_settings_controls() };
+  },
+  async quality_filled_from_the_saved_settings() {
+    const page = await load_page({ "GET /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 60 }) });
+    return page.read_settings_controls();
+  },
+  async quality_kept_while_another_setting_changes() {
+    const saved = { ...SETTINGS, jpeg_quality: 60, dots_per_inch: 600 };
+    const page = await load_page({
+      "GET /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 60 }),
+      "PUT /api/settings": build_json_response(200, saved),
+    });
+    await page.choose_option("resolution-select", "600");
+    return { settings_request_body: page.settings_request_body() };
+  },
+  async settings_without_the_crop_hint() {
+    const page = await load_page({});
+    return {
+      has_hint: page.element("auto-crop-hint") !== null,
+      checkbox_description: page.element("auto-crop-checkbox").getAttribute("aria-describedby"),
+    };
+  },
   async settings_without_preset_and_rotation() {
     const page = await load_page({});
     return {
@@ -318,137 +358,6 @@ const SCENARIOS = {
   async printer_on_wifi() {
     const page = await load_page({ "GET /api/printer": build_json_response(200, build_printer("network")) });
     return { chip_text: page.element("printer-status-text").textContent };
-  },
-  async last_scan_panel_after_a_scan() {
-    const page = await load_page(respond_with_finished_state(FIRST_REVISION));
-    return page.read_last_scan_panel();
-  },
-  async last_scan_panel_of_a_server_without_revisions() {
-    const state = { ...build_finished_state(FIRST_REVISION), scans_completed: 7 };
-    delete state.last_result_revision;
-    const page = await load_page({ "GET /api/state": build_json_response(200, state) });
-    return page.read_last_scan_panel();
-  },
-  async last_scan_panel_before_any_scan() {
-    const page = await load_page({});
-    return page.read_last_scan_panel();
-  },
-  async rotate_last_scan_by_pointer() {
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
-    });
-    await page.click(page.element("last-scan-rotate-button"));
-    const right_after = page.read_last_scan_panel();
-    await page.refresh_state_to(build_json_response(200, build_finished_state(ROTATED_REVISION)));
-    return {
-      rotation_requests: page.count_requests(LAST_SCAN_ROTATION_KEY),
-      request_headers: page.find_request(LAST_SCAN_ROTATION_KEY).headers,
-      status_right_after: right_after.rotation_status,
-      thumbnail_after_the_next_state: page.read_last_scan_panel().thumbnail_source,
-      scan_button_focused: page.is_focused("scan-button"),
-    };
-  },
-  async rotate_last_scan_again() {
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
-    });
-    await page.click(page.element("last-scan-rotate-button"));
-    const status_after_the_first = page.read_last_scan_panel().rotation_status;
-    const second_answer = build_deferred_response();
-    page.responses[LAST_SCAN_ROTATION_KEY] = second_answer;
-    await page.click(page.element("last-scan-rotate-button"));
-    const status_while_the_second_is_pending = page.read_last_scan_panel().rotation_status;
-    second_answer.answer(build_json_response(200, { last_result: FINISHED_SCAN_RESULT }));
-    await page.flush();
-    return {
-      status_after_the_first,
-      status_while_the_second_is_pending,
-      status_after_the_second: page.read_last_scan_panel().rotation_status,
-    };
-  },
-  async rotate_last_scan_that_fails_after_a_success() {
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
-    });
-    await page.click(page.element("last-scan-rotate-button"));
-    page.responses[LAST_SCAN_ROTATION_KEY] = build_json_response(404, NO_LAST_SCAN_BODY);
-    await page.click(page.element("last-scan-rotate-button"));
-    return { rotation_status: page.read_last_scan_panel().rotation_status };
-  },
-  async rotate_last_scan_by_keyboard() {
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
-    });
-    await page.press_with_keyboard(page.element("last-scan-rotate-button"));
-    return {
-      rotation_requests: page.count_requests(LAST_SCAN_ROTATION_KEY),
-      rotate_button_focused: page.is_focused("last-scan-rotate-button"),
-    };
-  },
-  async space_after_clicking_rotate_last_scan() {
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
-    });
-    await page.click(page.element("last-scan-rotate-button"));
-    await page.press_key("Space");
-    return {
-      rotation_requests: page.count_requests(LAST_SCAN_ROTATION_KEY),
-      scan_requests: page.count_scan_requests(),
-    };
-  },
-  async rotate_last_scan_while_scanning() {
-    const page = await load_page({
-      "GET /api/state": build_json_response(200, {
-        ...build_finished_state(FIRST_REVISION),
-        scan_phase: "scanning",
-      }),
-    });
-    const disabled_during_the_scan = page.read_last_scan_panel().rotate_disabled;
-    await page.click(page.element("last-scan-rotate-button"));
-    return { disabled_during_the_scan, rotation_requests: page.count_requests(LAST_SCAN_ROTATION_KEY) };
-  },
-  async rotate_last_scan_while_the_request_is_pending() {
-    const rotation_answer = build_deferred_response();
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: rotation_answer,
-    });
-    await page.click(page.element("last-scan-rotate-button"));
-    await page.click(page.element("last-scan-rotate-button"));
-    const disabled_during = page.read_last_scan_panel().rotate_disabled;
-    rotation_answer.answer(build_json_response(200, { last_result: FINISHED_SCAN_RESULT }));
-    await page.flush();
-    return {
-      disabled_during,
-      disabled_after: page.read_last_scan_panel().rotate_disabled,
-      rotation_requests: page.count_requests(LAST_SCAN_ROTATION_KEY),
-    };
-  },
-  async rotate_last_scan_refused() {
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: build_json_response(404, NO_LAST_SCAN_BODY),
-    });
-    await page.click(page.element("last-scan-rotate-button"));
-    return {
-      banner_text: page.element("error-banner-text").textContent,
-      rotation_status: page.read_last_scan_panel().rotation_status,
-      rotate_disabled: page.read_last_scan_panel().rotate_disabled,
-    };
-  },
-  async rotation_message_goes_away_with_the_next_scan() {
-    const page = await load_page({
-      ...respond_with_finished_state(FIRST_REVISION),
-      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
-    });
-    await page.click(page.element("last-scan-rotate-button"));
-    await page.press_key("Space");
-    return { rotation_status: page.read_last_scan_panel().rotation_status };
   },
   async byte_counts() {
     const page = new PageUnderTest({});

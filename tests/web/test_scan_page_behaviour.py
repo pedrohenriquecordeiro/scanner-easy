@@ -18,9 +18,8 @@ SETTINGS_BODY = {
     "color_mode": "color",
     "capture_mode": "single",
     "auto_crop": False,
+    "jpeg_quality": 90,
 }
-ROTATION_REFUSED_MESSAGE = "Ainda não há uma digitalização para girar."
-ROTATED_MESSAGE = "Última digitalização girada 90° para a direita."
 OUTPUT_FOLDER_UNAVAILABLE_TEXT = "Pasta de saída indisponível. Se for um disco externo, confira se está conectado."
 
 pytestmark = pytest.mark.skipif(
@@ -62,6 +61,7 @@ def test_space_on_the_focused_scan_button_starts_one_scan(scenario_results: dict
         "space_on_the_resolution_select",
         "space_on_the_color_mode_select",
         "space_on_the_auto_crop_checkbox",
+        "space_on_the_quality_slider",
     ],
 )
 def test_space_keeps_its_own_meaning_in_other_controls(scenario_results: dict, scenario_name: str) -> None:
@@ -267,93 +267,56 @@ def test_scanning_status_follows_the_resolution(scenario_results: dict) -> None:
     assert scenario_results["scanning_at_a_high_resolution"]["status_text"] == "Digitalizando… (vários minutos)"
 
 
-def test_the_thumbnail_of_the_last_scan_follows_the_revision_of_the_file(scenario_results: dict) -> None:
-    assert scenario_results["last_scan_panel_after_a_scan"]["thumbnail_source"] == "/api/scans/last/thumbnail?version=1"
+def test_the_quality_slider_starts_at_the_default(scenario_results: dict) -> None:
+    controls = scenario_results["default_settings_controls"]
+    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("90", "90")
 
 
-def test_a_server_without_revisions_versions_the_thumbnail_by_the_scan_count(scenario_results: dict) -> None:
-    result = scenario_results["last_scan_panel_of_a_server_without_revisions"]
-    assert result["thumbnail_source"] == "/api/scans/last/thumbnail?version=7"
+def test_the_saved_quality_fills_the_slider_and_its_number(scenario_results: dict) -> None:
+    controls = scenario_results["quality_filled_from_the_saved_settings"]
+    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("60", "60")
 
 
-def test_the_last_scan_panel_is_hidden_before_any_scan(scenario_results: dict) -> None:
-    assert scenario_results["last_scan_panel_before_any_scan"]["panel_hidden"] is True
+def test_a_server_without_the_quality_setting_leaves_the_default(scenario_results: dict) -> None:
+    controls = scenario_results["old_server_controls"]
+    assert (controls["jpeg_quality"], controls["jpeg_quality_text"]) == ("90", "90")
 
 
-def test_the_last_scan_panel_offers_the_rotation_once_idle(scenario_results: dict) -> None:
-    result = scenario_results["last_scan_panel_after_a_scan"]
-    assert (result["panel_hidden"], result["rotate_disabled"]) == (False, False)
+def test_the_number_follows_the_slider_while_it_moves(scenario_results: dict) -> None:
+    assert scenario_results["move_the_quality_slider"]["controls"]["jpeg_quality_text"] == "75"
 
 
-def test_rotating_the_last_scan_sends_one_post(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_by_pointer"]["rotation_requests"] == 1
+def test_moving_the_slider_saves_nothing_until_it_is_let_go(scenario_results: dict) -> None:
+    assert scenario_results["move_the_quality_slider"]["settings_requests"] == 0
 
 
-def test_rotating_the_last_scan_sends_the_required_header(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_by_pointer"]["request_headers"] == {"X-Requested-With": "digitalizadora"}
+def test_a_value_the_slider_cannot_hold_shows_the_default(scenario_results: dict) -> None:
+    assert scenario_results["move_the_quality_slider_to_nonsense"]["jpeg_quality_text"] == "90"
 
 
-def test_rotating_the_last_scan_says_so(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_by_pointer"]["status_right_after"] == ROTATED_MESSAGE
+def test_letting_the_slider_go_saves_the_quality_with_the_other_settings(scenario_results: dict) -> None:
+    body = scenario_results["release_the_quality_slider"]["settings_request_body"]
+    assert body == {**SETTINGS_BODY, "jpeg_quality": 75}
 
 
-def test_rotating_the_last_scan_again_empties_the_status_until_the_answer(scenario_results: dict) -> None:
-    result = scenario_results["rotate_last_scan_again"]
-    assert (
-        result["status_after_the_first"],
-        result["status_while_the_second_is_pending"],
-        result["status_after_the_second"],
-    ) == (ROTATED_MESSAGE, "", ROTATED_MESSAGE)
+def test_letting_the_slider_go_keeps_the_focus_on_it(scenario_results: dict) -> None:
+    result = scenario_results["release_the_quality_slider"]
+    assert (result["slider_focused"], result["scan_button_focused"]) == (True, False)
 
 
-def test_a_failed_rotation_does_not_leave_the_old_success_text(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_that_fails_after_a_success"]["rotation_status"] == ""
+def test_another_setting_goes_with_the_saved_quality(scenario_results: dict) -> None:
+    body = scenario_results["quality_kept_while_another_setting_changes"]["settings_request_body"]
+    assert (body["jpeg_quality"], body["dots_per_inch"]) == (60, 600)
 
 
-def test_rotating_the_last_scan_reloads_the_thumbnail_with_the_new_revision(scenario_results: dict) -> None:
-    result = scenario_results["rotate_last_scan_by_pointer"]
-    assert result["thumbnail_after_the_next_state"] == "/api/scans/last/thumbnail?version=2"
+def test_a_refused_quality_shows_the_server_message_and_puts_the_slider_back(scenario_results: dict) -> None:
+    result = scenario_results["refused_quality"]
+    assert (result["banner_text"], result["controls"]["jpeg_quality"], result["controls"]["jpeg_quality_text"]) == (
+        "A resolução escolhida não é aceita.",
+        "90",
+        "90",
+    )
 
 
-def test_rotating_the_last_scan_by_pointer_focuses_the_scan_button(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_by_pointer"]["scan_button_focused"] is True
-
-
-def test_rotating_the_last_scan_by_keyboard_keeps_the_focus_on_the_button(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_by_keyboard"] == {"rotation_requests": 1, "rotate_button_focused": True}
-
-
-def test_space_after_clicking_the_rotation_scans_instead_of_rotating_again(scenario_results: dict) -> None:
-    assert scenario_results["space_after_clicking_rotate_last_scan"] == {"rotation_requests": 1, "scan_requests": 1}
-
-
-def test_the_rotation_of_the_last_scan_is_disabled_during_a_scan(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_while_scanning"] == {
-        "disabled_during_the_scan": True,
-        "rotation_requests": 0,
-    }
-
-
-def test_the_rotation_of_the_last_scan_is_disabled_while_it_runs_and_only_once(scenario_results: dict) -> None:
-    result = scenario_results["rotate_last_scan_while_the_request_is_pending"]
-    assert (result["disabled_during"], result["rotation_requests"]) == (True, 1)
-
-
-def test_the_rotation_of_the_last_scan_is_enabled_again_afterwards(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_while_the_request_is_pending"]["disabled_after"] is False
-
-
-def test_a_refused_rotation_of_the_last_scan_shows_the_catalog_message(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_refused"]["banner_text"] == ROTATION_REFUSED_MESSAGE
-
-
-def test_a_refused_rotation_of_the_last_scan_says_nothing_in_the_panel(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_refused"]["rotation_status"] == ""
-
-
-def test_a_refused_rotation_of_the_last_scan_leaves_the_button_enabled(scenario_results: dict) -> None:
-    assert scenario_results["rotate_last_scan_refused"]["rotate_disabled"] is False
-
-
-def test_the_rotation_message_goes_away_when_the_next_scan_starts(scenario_results: dict) -> None:
-    assert scenario_results["rotation_message_goes_away_with_the_next_scan"]["rotation_status"] == ""
+def test_the_crop_checkbox_has_no_hint_any_more(scenario_results: dict) -> None:
+    assert scenario_results["settings_without_the_crop_hint"] == {"has_hint": False, "checkbox_description": None}

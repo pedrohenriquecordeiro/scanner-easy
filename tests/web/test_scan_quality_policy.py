@@ -28,7 +28,22 @@ WARNING_CASES = [
     pytest.param("describe_resolution_warning(undefined)", None, id="server-without-resolution"),
 ]
 
-ALL_CASES = DURATION_CASES + WARNING_CASES
+JPEG_QUALITY_CASES = [
+    pytest.param("parse_jpeg_quality('75')", 75, id="a-quality-in-the-range"),
+    pytest.param("parse_jpeg_quality(75)", 75, id="a-number-in-the-range"),
+    pytest.param("parse_jpeg_quality('50')", 50, id="the-lowest-quality"),
+    pytest.param("parse_jpeg_quality('100')", 100, id="the-highest-quality"),
+    pytest.param("parse_jpeg_quality('49')", 90, id="below-the-range-gives-the-default"),
+    pytest.param("parse_jpeg_quality('101')", 90, id="above-the-range-gives-the-default"),
+    pytest.param("parse_jpeg_quality('abc')", 90, id="text-gives-the-default"),
+    pytest.param("parse_jpeg_quality('')", 90, id="empty-gives-the-default"),
+    pytest.param("parse_jpeg_quality('75.5')", 90, id="a-fraction-gives-the-default"),
+    pytest.param("parse_jpeg_quality(undefined)", 90, id="a-server-without-the-setting-gives-the-default"),
+    pytest.param("parse_jpeg_quality(null)", 90, id="null-gives-the-default"),
+    pytest.param("[MINIMUM_JPEG_QUALITY, DEFAULT_JPEG_QUALITY, MAXIMUM_JPEG_QUALITY]", [50, 90, 100], id="limits"),
+]
+
+ALL_CASES = DURATION_CASES + WARNING_CASES + JPEG_QUALITY_CASES
 
 
 @pytest.fixture(scope="module")
@@ -43,4 +58,9 @@ def test_expected_scan_duration_text(policy_results: dict, expression: str, expe
 
 @pytest.mark.parametrize(("expression", "expected"), WARNING_CASES)
 def test_resolution_warning_text(policy_results: dict, expression: str, expected: object) -> None:
+    assert policy_results[expression] == expected
+
+
+@pytest.mark.parametrize(("expression", "expected"), JPEG_QUALITY_CASES)
+def test_the_jpeg_quality_is_read_within_its_range(policy_results: dict, expression: str, expected: object) -> None:
     assert policy_results[expression] == expected

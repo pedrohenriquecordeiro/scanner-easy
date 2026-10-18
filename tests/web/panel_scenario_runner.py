@@ -6,6 +6,7 @@ from pathlib import Path
 NODE_EXECUTABLE = shutil.which("node")
 HARNESS_PATH = Path(__file__).resolve().parent / "document-panel-harness.js"
 FRAME_EDITOR_HARNESS_PATH = Path(__file__).resolve().parent / "page-frame-editor-harness.js"
+LAST_SCAN_HARNESS_PATH = Path(__file__).resolve().parent / "last-scan-harness.js"
 HARNESS_TIMEOUT_SECONDS = 30
 
 
@@ -27,3 +28,7 @@ def run_panel_scenarios(scenario_names: tuple[str, ...]) -> dict:
 
 def run_frame_editor_scenarios(scenario_names: tuple[str, ...]) -> dict:
     return run_harness_scenarios(FRAME_EDITOR_HARNESS_PATH, scenario_names)
+
+
+def run_last_scan_scenarios(scenario_names: tuple[str, ...]) -> dict:
+    return run_harness_scenarios(LAST_SCAN_HARNESS_PATH, scenario_names)

@@ -17,7 +17,7 @@ const SCANNED_AT = "2026-10-17T10:00:00-03:00";
 const POLL_DELAYS_MILLISECONDS = [0, 500, 2000];
 const TILE_BUTTON_INDEXES = Object.freeze({ move_left: 0, move_right: 1, delete: 2, rotate: 3, move_to: 4, enlarge: 5 });
 const RECOVERY_SWITCH_STORAGE_KEY = "digitalizadora.recovery_switch_session";
-const TILE_ACTIONS_INDEX = 3;
+const TILE_ACTIONS_INDEX = 4;
 const RIGHT_HALF_POSITION = 90;
 
 const QUICK_SETTINGS = {
@@ -41,11 +41,15 @@ const FINALIZED_BODY = {
 };
 const LAST_FINISHED_DOCUMENT = { ...FINALIZED_BODY, finalized_at: "2026-10-17T10:05:00-03:00" };
 const LAST_SCAN_RESULT = {
-  file_name: "2026-10-17_00001.pdf",
+  scan_identifier: "9f3c1d2e4b5a6978",
+  file_names: ["2026-10-17_00001.pdf"],
   output_folder: "/Users/teste/Digitalizadora",
   output_format: "pdf",
-  size_in_bytes: 1234567,
+  total_size_in_bytes: 1234567,
   scanned_at: "2026-10-17T09:00:00-03:00",
+  rotation_degrees: 0,
+  crops: [],
+  is_editable: true,
 };
 const RESUMED_RECOVERY = { outcome: "resumed", kept_page_count: 3, dropped_page_positions: [], set_aside_folder: null };
 const SCAN_ALREADY_RUNNING_BODY = {
@@ -80,7 +84,45 @@ const DAMAGED_PAGE_BODY = {
   page_identifier: SECOND_PAGE,
 };
 
-const NO_FRAMING = Object.freeze({ rotation_degrees: 0, crop: null });
+const NO_FRAMING = Object.freeze({ rotation_degrees: 0, crops: [] });
+
+// A crop of the server's body: four corners in fractions of the page, clockwise from the top left.
+function rectangle_crop(left, top, right, bottom) {
+  return {
+    top_left: { x: left, y: top },
+    top_right: { x: right, y: top },
+    bottom_right: { x: right, y: bottom },
+    bottom_left: { x: left, y: bottom },
+  };
+}
+
+function quadrilateral_crop(points) {
+  const [top_left, top_right, bottom_right, bottom_left] = points.map(([x, y]) => ({ x, y }));
+  return { top_left, top_right, bottom_right, bottom_left };
+}
+
+// What an overlay of frames (frame-overlay.js) shows: the container, its drawing and its numbered badges.
+function read_overlay(container) {
+  const [drawing, ...badges] = container.children;
+  const [shade, ...outlines] = drawing.children;
+  return {
+    hidden: container.hidden,
+    aria_hidden: container.getAttribute("aria-hidden"),
+    shade_path: shade.getAttribute("d"),
+    outlines: outlines.map((outline) => ({
+      visible: outline.style.display !== "none",
+      points: outline.getAttribute("points"),
+      is_active: outline.classList.contains("is-active"),
+      is_second_colour: outline.classList.contains("frame-colour-second"),
+    })),
+    badges: badges.map((badge) => ({
+      hidden: badge.hidden,
+      text: badge.textContent,
+      left: badge.style.left ?? null,
+      top: badge.style.top ?? null,
+    })),
+  };
+}
 
 function build_page(page_identifier, framing) {
   return {
@@ -119,11 +161,12 @@ function build_document_body(body_parts) {
 }
 
 function build_state(state_parts) {
-  const { revision, page_count, scans_completed, last_result, settings } = state_parts;
+  const { revision, page_count, scans_completed, last_result, last_result_revision, settings } = state_parts;
   return {
     scan_phase: state_parts.scan_phase ?? "idle",
     scans_completed: scans_completed ?? 0,
     last_result: last_result ?? null,
+    ...(last_result_revision === undefined ? {} : { last_result_revision }),
     last_error: null,
     settings: settings ?? DOCUMENT_SETTINGS,
     storage: AVAILABLE_STORAGE,
@@ -192,6 +235,10 @@ class DocumentPageUnderTest extends BrowserPage {
 
   tile_overlay(position) {
     return this.tile_at(position).children[0].children[1];
+  }
+
+  tile_crop_count(position) {
+    return this.tile_at(position).children[3];
   }
 
   grid_page_identifiers() {
@@ -279,6 +326,9 @@ module.exports = {
   INVALID_CROP_BODY,
   PAGE_NOT_FOUND_BODY,
   NO_FRAMING,
+  rectangle_crop,
+  quadrilateral_crop,
+  read_overlay,
   DAMAGED_PAGE_BODY,
   build_page,
   build_draft,

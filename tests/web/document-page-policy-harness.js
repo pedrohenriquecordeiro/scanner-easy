@@ -13,6 +13,8 @@ const SCRIPT_FILE_NAMES = [
   "scan-quality-policy.js",
   "document-page-policy.js",
   "page-frame-geometry.js",
+  "frame-dialog-policy.js",
+  "last-scan-policy.js",
 ];
 const STANDARD_INPUT_DESCRIPTOR = 0;
 
@@ -109,6 +111,16 @@ function mode_switch_check(changes) {
   return { document_body: { draft_session, recovery }, capture_mode, switched_draft_session };
 }
 
+// Helpers for the geometry tests: a frame from [[x, y], ...] and back, evaluated beside the real scripts.
+const FRAME_HELPERS_SOURCE = `
+function frame_from_points(points) {
+  return build_frame_from_corner_list(points.map(([x, y]) => ({ x, y })));
+}
+function points_of(frame) {
+  return frame === null ? null : list_frame_corners(frame).map((corner) => [corner.x, corner.y]);
+}
+`;
+
 function build_context() {
   const context = vm.createContext({
     SCAN_BUTTON,
@@ -130,6 +142,7 @@ function build_context() {
   for (const file_name of SCRIPT_FILE_NAMES) {
     vm.runInContext(fs.readFileSync(path.join(STATIC_DIRECTORY, file_name), "utf8"), context, { filename: file_name });
   }
+  vm.runInContext(FRAME_HELPERS_SOURCE, context, { filename: "frame-helpers.js" });
   return context;
 }
 

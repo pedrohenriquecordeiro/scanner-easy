@@ -6,14 +6,13 @@ pytestmark = pytest.mark.skipif(
     NODE_EXECUTABLE is None, reason="Node.js is not installed, so document-page-policy.js cannot be exercised"
 )
 
-FRAME_CROP = "{left: 0.13, top: 0.12, right: 0.91, bottom: 0.91}"
-FRAME_OF_THE_PAGE = "{left: 0.13, top: 0.115, right: 0.914, bottom: 0.915}"
-
 ADDRESS_CASES = [
     pytest.param("build_page_path('abc')", "/api/document/pages/abc", id="page"),
     pytest.param("build_page_rotation_path('abc')", "/api/document/pages/abc/rotation", id="rotation"),
-    pytest.param("build_page_crop_path('abc')", "/api/document/pages/abc/crop", id="crop"),
-    pytest.param("build_page_crop_detection_path('abc')", "/api/document/pages/abc/crop/detect", id="crop-detection"),
+    pytest.param("build_page_crops_path('abc')", "/api/document/pages/abc/crops", id="crops"),
+    pytest.param(
+        "build_page_crops_detection_path('abc')", "/api/document/pages/abc/crops/detect", id="crops-detection"
+    ),
     pytest.param(
         "build_page_thumbnail_address('abc', 0)",
         "/api/document/pages/abc/thumbnail?rotation_degrees=0",
@@ -33,13 +32,21 @@ ADDRESS_CASES = [
 
 LABEL_CASES = [
     pytest.param(
-        "describe_tile_label({position: 2, page_count: 3, crop: null})", "Página 2 de 3", id="tile-without-a-frame"
+        "describe_tile_label({position: 2, page_count: 3, crop_count: 0})", "Página 2 de 3", id="tile-without-a-frame"
     ),
     pytest.param(
-        f"describe_tile_label({{position: 2, page_count: 3, crop: {FRAME_CROP}}})",
+        "describe_tile_label({position: 2, page_count: 3, crop_count: 1})",
         "Página 2 de 3, com moldura de corte",
         id="tile-with-a-frame",
     ),
+    pytest.param(
+        "describe_tile_label({position: 2, page_count: 3, crop_count: 2})",
+        "Página 2 de 3, com 2 molduras de corte (2 páginas no PDF)",
+        id="tile-with-two-frames",
+    ),
+    pytest.param("describe_crop_count(0)", None, id="no-frame-needs-no-count"),
+    pytest.param("describe_crop_count(1)", None, id="one-frame-needs-no-count"),
+    pytest.param("describe_crop_count(2)", "2 molduras", id="two-frames-are-counted"),
     pytest.param(
         "describe_enlarge_label(2)",
         "Ampliar a página 2 e ajustar a moldura de corte",
@@ -54,44 +61,37 @@ LABEL_CASES = [
 
 ANNOUNCEMENT_CASES = [
     pytest.param(
-        "describe_page_rotation_result({position: 2, rotation_degrees: 90, crop: null})",
+        "describe_page_rotation_result({position: 2, rotation_degrees: 90, crop_count: 0})",
         "Página 2 girada 90° para a direita (total: 90°).",
         id="rotation-without-a-frame",
     ),
     pytest.param(
-        f"describe_page_rotation_result({{position: 2, rotation_degrees: 180, crop: {FRAME_CROP}}})",
+        "describe_page_rotation_result({position: 2, rotation_degrees: 180, crop_count: 1})",
         "Página 2 girada 90° para a direita (total: 180°). A moldura acompanhou o giro.",
         id="rotation-with-a-frame",
     ),
     pytest.param(
-        f"describe_detected_frame({FRAME_OF_THE_PAGE})",
-        "Moldura detectada e salva. Moldura: esquerda 13%, topo 12%, direita 91%, base 92%.",
-        id="frame-detected",
+        "describe_page_rotation_result({position: 2, rotation_degrees: 270, crop_count: 2})",
+        "Página 2 girada 90° para a direita (total: 270°). As molduras acompanharam o giro.",
+        id="rotation-with-two-frames",
     ),
     pytest.param(
-        "NO_FRAME_DETECTED_TEXT",
-        "Não achei uma borda confiável nesta página. A moldura não mudou.",
-        id="frame-not-detected",
-    ),
-    pytest.param("describe_frame_applied(2)", "Moldura aplicada à página 2.", id="frame-applied"),
-    pytest.param("describe_frame_removed(2)", "Corte removido da página 2.", id="frame-removed"),
-    pytest.param(
-        f"describe_crop_application({{position: 2, crop: {FRAME_CROP}}})",
+        "describe_page_crop_application({position: 2, crop_count: 1})",
         "Moldura aplicada à página 2.",
-        id="a-crop-was-applied",
+        id="a-frame-was-applied",
     ),
     pytest.param(
-        "describe_crop_application({position: 2, crop: null})",
+        "describe_page_crop_application({position: 2, crop_count: 2})",
+        "Molduras aplicadas à página 2 (2 páginas no PDF).",
+        id="two-frames-were-applied",
+    ),
+    pytest.param(
+        "describe_page_crop_application({position: 2, crop_count: 0})",
         "Corte removido da página 2.",
-        id="no-crop-removes-the-crop",
-    ),
-    pytest.param("FRAME_CHANGES_DISCARDED_TEXT", "Alterações da moldura descartadas.", id="changes-discarded"),
-    pytest.param(
-        "FRAME_IMAGE_FAILED_TEXT",
-        "Não consegui carregar a imagem ampliada desta página.",
-        id="enlarged-view-failed",
+        id="no-frame-removes-the-crop",
     ),
     pytest.param("FRAME_PAGE_GONE_TEXT", "Essa página não está mais no documento.", id="page-gone"),
+    pytest.param("PAGE_SUBJECT_TEXT", "nesta página", id="subject-of-the-detection-texts"),
 ]
 
 KEY_CASES = [

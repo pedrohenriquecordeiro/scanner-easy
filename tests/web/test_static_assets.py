@@ -12,8 +12,12 @@ SCRIPT_FILE_NAMES = [
     "error-banner.js",
     "document-page-policy.js",
     "page-frame-geometry.js",
+    "frame-dialog-policy.js",
+    "last-scan-policy.js",
+    "frame-overlay.js",
     "page-frame-editor.js",
     "document-panel.js",
+    "last-scan-panel.js",
     "application.js",
 ]
 STATIC_FILE_NAMES = ["index.html", "application.css", *SCRIPT_FILE_NAMES]
@@ -23,6 +27,8 @@ SCRIPT_IDENTIFIER_PATTERNS = (
 )
 PAGE_IDENTIFIER_PATTERN = re.compile(r"""\bid\s*=\s*["']([^"']+)["']""")
 EXTERNAL_ADDRESS_PATTERN = re.compile(r"""https?://|(?:src|href)\s*=\s*["']//""")
+# The name of the SVG space of names, which every drawing in a page carries; the browser never fetches it.
+SVG_NAMESPACE_NAME = "http://www.w3.org/2000/svg"
 SCRIPT_SOURCE_PATTERN = re.compile(r"""<script\s+src="/static/([^"]+)\"""")
 COLLECTED_ELEMENT_PATTERN = re.compile(r"""^\s+([a-z_]+): (?:document\.getElementById\(|\{)""", re.MULTILINE)
 PANEL_ELEMENT_PATTERN = re.compile(r"""\belements\.([a-z_]+)""")
@@ -64,20 +70,25 @@ FRAME_DIALOG_ELEMENT_IDENTIFIERS = [
     "page-frame-dialog",
     "page-frame-title",
     "page-frame-help",
+    "page-frame-limits",
     "frame-stage",
     "frame-image",
-    "frame-cutout",
-    "frame-box",
+    "frame-overlay-host",
     "frame-move-button",
-    "frame-handle-north",
-    "frame-handle-north-east",
-    "frame-handle-east",
-    "frame-handle-south-east",
-    "frame-handle-south",
-    "frame-handle-south-west",
-    "frame-handle-west",
-    "frame-handle-north-west",
+    "frame-corner-top-left",
+    "frame-corner-top-right",
+    "frame-corner-bottom-right",
+    "frame-corner-bottom-left",
+    "frame-edge-top",
+    "frame-edge-right",
+    "frame-edge-bottom",
+    "frame-edge-left",
+    "frame-rotate-handle",
+    "frame-select-button",
     "frame-status",
+    "frame-add-button",
+    "frame-remove-button",
+    "frame-turn-button",
     "frame-detect-button",
     "frame-clear-button",
     "frame-rotate-button",
@@ -85,9 +96,16 @@ FRAME_DIALOG_ELEMENT_IDENTIFIERS = [
     "frame-apply-button",
 ]
 LAST_SCAN_ELEMENT_IDENTIFIERS = [
+    "last-scan-panel",
+    "last-scan-thumbnail-frame",
+    "last-scan-thumbnail",
+    "last-scan-file-names",
+    "last-scan-size",
+    "last-scan-time",
     "last-scan-rotate-button",
+    "last-scan-enlarge-button",
     "last-scan-hint",
-    "last-scan-rotation-status",
+    "last-scan-status",
 ]
 SETTINGS_ELEMENT_IDENTIFIERS = [
     "resolution-select",
@@ -95,10 +113,19 @@ SETTINGS_ELEMENT_IDENTIFIERS = [
     "resolution-warning",
     "resolution-warning-text",
     "auto-crop-checkbox",
-    "auto-crop-hint",
+    "jpeg-quality-input",
+    "jpeg-quality-value",
+    "jpeg-quality-hint",
     "output-folder-save-button",
 ]
 REMOVED_ELEMENT_IDENTIFIERS = [
+    "auto-crop-hint",
+    "last-scan-rotation-status",
+    "last-scan-file-name",
+    "frame-box",
+    "frame-cutout",
+    "frame-handle-north",
+    "frame-handle-north-west",
     "preset-select",
     "preset-custom-option",
     "rotation-select",
@@ -129,7 +156,7 @@ def find_identifiers_used_by_script(script: str) -> set[str]:
 
 def find_elements_used_by_the_document_panel() -> set[str]:
     used_elements: set[str] = set()
-    for file_name in ("document-panel.js", "page-frame-editor.js"):
+    for file_name in ("document-panel.js", "page-frame-editor.js", "last-scan-panel.js"):
         script = read_static_file(file_name)
         used_elements.update(PANEL_ELEMENT_PATTERN.findall(script))
         for destructured_names in PANEL_DESTRUCTURED_ELEMENTS_PATTERN.findall(script):
@@ -197,7 +224,7 @@ def test_page_declares_brazilian_portuguese_language() -> None:
 
 @pytest.mark.parametrize("file_name", STATIC_FILE_NAMES)
 def test_static_file_has_no_external_address(file_name: str) -> None:
-    assert EXTERNAL_ADDRESS_PATTERN.search(read_static_file(file_name)) is None
+    assert EXTERNAL_ADDRESS_PATTERN.search(read_static_file(file_name).replace(SVG_NAMESPACE_NAME, "")) is None
 
 
 @pytest.mark.parametrize("file_name", SCRIPT_FILE_NAMES)
@@ -217,16 +244,21 @@ def test_page_loads_the_trigger_policy_before_the_application_script() -> None:
     assert page.index(POLICY_SCRIPT_PATH) < page.index(APPLICATION_SCRIPT_PATH)
 
 
-def test_page_loads_the_eight_scripts_in_dependency_order() -> None:
+def test_page_loads_the_scripts_in_dependency_order() -> None:
     assert SCRIPT_SOURCE_PATTERN.findall(read_static_file("index.html")) == SCRIPT_FILE_NAMES
 
 
 @pytest.mark.parametrize(
     "api_path",
-    ["/api/settings", "/api/state", "/api/printer", "/api/scans", "/api/document/pages", "/api/scans/last/rotation"],
+    ["/api/settings", "/api/state", "/api/printer", "/api/scans", "/api/document/pages"],
 )
 def test_script_calls_api_path(api_path: str) -> None:
     assert api_path in read_static_file("application.js")
+
+
+@pytest.mark.parametrize("api_path", ["/api/scans/last", "/rotation", "/crops", "/detect", "/thumbnail", "/preview"])
+def test_last_scan_policy_builds_the_routes_of_the_last_scan(api_path: str) -> None:
+    assert api_path in read_static_file("last-scan-policy.js")
 
 
 @pytest.mark.parametrize("path_text", ["/last", "/page-order", "/name", "/finalize"])
@@ -235,15 +267,20 @@ def test_document_panel_calls_document_route(path_text: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "path_text", ['"/api/document"', "/pages", "/thumbnail", "/preview", "/rotation", "/crop", "/detect"]
+    "path_text", ['"/api/document"', "/pages", "/thumbnail", "/preview", "/rotation", "/crops", "/detect"]
 )
 def test_document_page_policy_builds_the_page_routes(path_text: str) -> None:
     assert path_text in read_static_file("document-page-policy.js")
 
 
-@pytest.mark.parametrize("path_builder", ["build_page_crop_path", "build_page_crop_detection_path"])
-def test_frame_editor_edits_through_the_crop_routes(path_builder: str) -> None:
-    assert path_builder in read_static_file("page-frame-editor.js")
+@pytest.mark.parametrize("path_builder", ["build_page_crops_path", "build_page_crops_detection_path"])
+def test_document_panel_edits_the_frames_through_the_crops_routes(path_builder: str) -> None:
+    assert path_builder in read_static_file("document-panel.js")
+
+
+@pytest.mark.parametrize("path_constant", ["LAST_SCAN_CROPS_PATH", "LAST_SCAN_CROPS_DETECTION_PATH"])
+def test_last_scan_panel_edits_the_frames_through_the_crops_routes(path_constant: str) -> None:
+    assert path_constant in read_static_file("last-scan-panel.js")
 
 
 def test_script_defines_byte_count_formatter() -> None:
@@ -325,13 +362,38 @@ def test_auto_crop_label_names_the_background_removal() -> None:
     assert "Cortar automaticamente e remover o fundo" in read_static_file("index.html")
 
 
-def test_auto_crop_hint_explains_the_frame_of_the_document_mode_and_the_direct_crop_of_the_quick_mode() -> None:
-    hint = re.search(r'<p id="auto-crop-hint"[^>]*>(.*?)</p>', read_static_file("index.html"), re.DOTALL)
-    assert hint is not None
-    assert " ".join(hint.group(1).split()) == (
-        "Use para fotos e folhas menores que o vidro. No modo Documento, o corte aparece como uma moldura em cada "
-        "página e você pode ajustá-la em Ampliar; no modo Rápido, ele é aplicado direto no arquivo. Se não achar uma "
-        "borda confiável, a imagem fica inteira."
+def test_the_settings_box_no_longer_explains_the_crop() -> None:
+    page = " ".join(read_static_file("index.html").split())
+    assert "Use para fotos e folhas menores que o vidro" not in page
+
+
+def test_the_crop_checkbox_is_not_described_by_a_hint() -> None:
+    page = read_static_file("index.html")
+    checkbox = re.search(r'<input id="auto-crop-checkbox"[^>]*>', page)
+    assert checkbox is not None and "aria-describedby" not in checkbox.group(0)
+
+
+def test_jpeg_quality_is_a_slider_from_50_to_100() -> None:
+    page = read_static_file("index.html")
+    assert re.search(r'<input id="jpeg-quality-input" type="range"[^>]*min="50"[^>]*max="100"[^>]*step="1"', page)
+
+
+def test_jpeg_quality_starts_at_90_in_the_page() -> None:
+    assert re.search(r'<input id="jpeg-quality-input"[^>]*\svalue="90"', read_static_file("index.html"))
+
+
+def test_jpeg_quality_has_a_label_and_shows_its_number() -> None:
+    page = read_static_file("index.html")
+    assert (
+        '<label for="jpeg-quality-input">Qualidade do JPEG</label>' in page
+        and re.search(r'<output id="jpeg-quality-value"[^>]*for="jpeg-quality-input"[^>]*>90</output>', page)
+    )
+
+
+def test_jpeg_quality_has_a_single_short_hint_tied_to_the_slider() -> None:
+    page = read_static_file("index.html")
+    assert re.search(r'aria-describedby="jpeg-quality-hint"', page) and re.search(
+        r'<p id="jpeg-quality-hint"[^>]*>Vale quando a imagem é cortada ou girada\.</p>', page
     )
 
 
@@ -343,13 +405,32 @@ def test_last_scan_rotate_button_names_its_action() -> None:
     )
 
 
-def test_last_scan_hint_says_the_file_is_rewritten() -> None:
-    assert "Girar regrava o arquivo salvo." in read_static_file("index.html")
-
-
-def test_last_scan_rotation_status_is_a_polite_live_region() -> None:
+def test_last_scan_enlarge_button_names_its_action() -> None:
     page = read_static_file("index.html")
-    assert re.search(r'<p id="last-scan-rotation-status"[^>]*role="status"[^>]*aria-live="polite"', page)
+    assert re.search(
+        r'<button id="last-scan-enlarge-button"[^>]*'
+        r'aria-label="Ampliar a última digitalização e ajustar a moldura de corte"',
+        page,
+    )
+
+
+def test_last_scan_buttons_come_in_the_documented_order() -> None:
+    page = read_static_file("index.html")
+    labels = re.findall(r'<button id="last-scan-(?:rotate|enlarge)-button"[^>]*>([^<]+)</button>', page)
+    assert labels == ["Girar ↻", "Ampliar"]
+
+
+def test_last_scan_hint_says_the_adjustments_rewrite_the_files() -> None:
+    assert "Ajustes regravam os arquivos salvos." in read_static_file("index.html")
+
+
+def test_last_scan_status_is_a_polite_live_region() -> None:
+    page = read_static_file("index.html")
+    assert re.search(r'<p id="last-scan-status"[^>]*role="status"[^>]*aria-live="polite"', page)
+
+
+def test_last_scan_lists_its_files_under_a_plural_heading() -> None:
+    assert "<dt>Arquivos</dt>" in read_static_file("index.html")
 
 
 def test_frame_dialog_is_a_labelled_modal_dialog() -> None:
@@ -357,23 +438,71 @@ def test_frame_dialog_is_a_labelled_modal_dialog() -> None:
     assert re.search(r'<dialog id="page-frame-dialog"[^>]*aria-labelledby="page-frame-title"', page)
 
 
+def test_frame_dialog_is_described_by_its_help_and_its_limits() -> None:
+    page = read_static_file("index.html")
+    assert re.search(r'<dialog id="page-frame-dialog"[^>]*aria-describedby="page-frame-help page-frame-limits"', page)
+
+
 def test_frame_dialog_status_is_a_polite_live_region() -> None:
     assert re.search(r'<p id="frame-status"[^>]*role="status"[^>]*aria-live="polite"', read_static_file("index.html"))
 
 
 def test_frame_handles_are_buttons_so_that_space_never_scans() -> None:
-    handles = re.findall(r'<(\w+) id="frame-handle-[a-z-]+"', read_static_file("index.html"))
-    assert handles == ["button"] * 8
+    handles = re.findall(
+        r'<(\w+) id="frame-(?:corner-[a-z-]+|edge-[a-z]+|move-button|rotate-handle|select-button)"',
+        read_static_file("index.html"),
+    )
+    assert handles == ["button"] * 11
 
 
-def test_frame_dialog_explains_the_keyboard() -> None:
-    assert "Com o teclado, escolha uma alça (Tab) e use as setas; Shift anda mais." in read_static_file("index.html")
+def test_frame_dialog_explains_the_keyboard_and_the_rotate_handle() -> None:
+    page = " ".join(read_static_file("index.html").split())
+    assert (
+        "Arraste os cantos, os lados ou a moldura toda. A alça de cima gira a moldura. "
+        "Com o teclado, escolha uma alça (Tab) e use as setas; Shift anda mais."
+    ) in page
+
+
+def test_frame_dialog_warns_about_photos_that_are_too_close() -> None:
+    page = " ".join(read_static_file("index.html").split())
+    assert "Duas fotos muito juntas podem virar uma só moldura: use Adicionar moldura." in page
 
 
 def test_frame_dialog_buttons_come_in_the_documented_order() -> None:
     page = read_static_file("index.html")
-    labels = re.findall(r'<button id="frame-(?:detect|clear|rotate|cancel|apply)-button"[^>]*>([^<]+)</button>', page)
-    assert labels == ["Detectar automaticamente", "Sem corte", "Girar ↻", "Cancelar", "Aplicar"]
+    labels = re.findall(
+        r'<button id="frame-(?:add|remove|turn|detect|clear|rotate|cancel|apply)-button"[^>]*>([^<]+)</button>', page
+    )
+    assert labels == [
+        "Adicionar moldura",
+        "Remover moldura",
+        "Girar moldura ↻",
+        "Detectar automaticamente",
+        "Sem corte",
+        "Girar ↻",
+        "Cancelar",
+        "Aplicar",
+    ]
+
+
+def test_frame_dialog_handles_come_in_the_documented_tab_order() -> None:
+    page = read_static_file("index.html")
+    identifiers = re.findall(
+        r'<button id="(frame-(?:corner-[a-z-]+|edge-[a-z]+|move-button|rotate-handle|select-button))"', page
+    )
+    assert identifiers == [
+        "frame-corner-top-left",
+        "frame-corner-top-right",
+        "frame-corner-bottom-right",
+        "frame-corner-bottom-left",
+        "frame-edge-top",
+        "frame-edge-right",
+        "frame-edge-bottom",
+        "frame-edge-left",
+        "frame-move-button",
+        "frame-rotate-handle",
+        "frame-select-button",
+    ]
 
 
 def test_save_document_button_has_the_accessible_name_and_the_enter_hint() -> None:

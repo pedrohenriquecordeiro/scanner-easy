@@ -37,11 +37,14 @@ SCENARIO_NAMES = (
     "enlarge_buttons_while_a_page_scans",
     "thumbnail_proportion",
     "crop_added_and_removed_later",
+    "tiles_with_two_frames_and_a_tilted_frame",
+    "rotate_a_page_with_two_frames",
     "thumbnail_that_fails_to_load",
     "thumbnail_that_stays_after_a_new_body",
 )
-SECOND_PAGE_OVERLAY_STYLE = {"left": "13%", "top": "11.5%", "width": "78.4%", "height": "80%"}
-FIRST_PAGE_OVERLAY_STYLE = {"left": "20%", "top": "10%", "width": "50%", "height": "80%"}
+SECOND_PAGE_OUTLINE = "13,11.5 91.4,11.5 91.4,91.5 13,91.5"
+FIRST_PAGE_OUTLINE = "20,10 70,10 70,90 20,90"
+SECOND_PAGE_SHADE = "M0 0H100V100H0ZM13 11.5L91.4 11.5L91.4 91.5L13 91.5Z"
 
 pytestmark = pytest.mark.skipif(
     NODE_EXECUTABLE is None, reason="Node.js is not installed, so document-panel.js cannot be exercised"
@@ -253,7 +256,7 @@ def test_a_page_without_a_crop_has_no_frame_over_its_thumbnail(scenario_results:
 
 def test_a_page_with_a_crop_has_its_frame_over_the_thumbnail(scenario_results: dict) -> None:
     overlay = scenario_results["framed_tiles"]["overlays"][1]
-    assert (overlay["hidden"], overlay["style"]) == (False, SECOND_PAGE_OVERLAY_STYLE)
+    assert (overlay["hidden"], overlay["outlines"][0]["points"]) == (False, SECOND_PAGE_OUTLINE)
 
 
 def test_the_frame_over_a_thumbnail_is_hidden_from_screen_readers(scenario_results: dict) -> None:
@@ -305,9 +308,9 @@ def test_thumbnail_frame_keeps_its_proportion_when_the_picture_reports_no_size(s
 
 def test_a_crop_that_arrives_later_shows_the_frame_on_the_same_tile(scenario_results: dict) -> None:
     result = scenario_results["crop_added_and_removed_later"]
-    assert (result["framed"]["hidden"], result["framed"]["style"], result["same_tile_kept"]) == (
+    assert (result["framed"]["hidden"], result["framed"]["outlines"][0]["points"], result["same_tile_kept"]) == (
         False,
-        FIRST_PAGE_OVERLAY_STYLE,
+        FIRST_PAGE_OUTLINE,
         True,
     )
 
@@ -343,3 +346,58 @@ def test_another_thumbnail_address_tries_the_picture_again(scenario_results: dic
 
 def test_a_thumbnail_that_failed_keeps_its_placeholder_when_the_address_is_the_same(scenario_results: dict) -> None:
     assert scenario_results["thumbnail_that_stays_after_a_new_body"]["frame_hidden"] is True
+
+
+def test_a_tilted_frame_is_drawn_as_a_polygon_over_the_thumbnail(scenario_results: dict) -> None:
+    overlay = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["tilted"]
+    assert overlay["outlines"][0]["points"] == "40,55 93,44 97,80 44,91"
+
+
+def test_the_outside_of_a_tilted_frame_is_shaded_with_a_hole_of_its_shape(scenario_results: dict) -> None:
+    overlay = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["tilted"]
+    assert overlay["shade_path"] == "M0 0H100V100H0ZM40 55L93 44L97 80L44 91Z"
+
+
+def test_a_page_with_one_frame_hides_the_outline_and_the_badge_of_the_second(scenario_results: dict) -> None:
+    overlay = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["tilted"]
+    assert (overlay["outlines"][1]["visible"], overlay["badges"][1]["hidden"]) == (False, True)
+
+
+def test_a_page_with_two_frames_draws_both_outlines(scenario_results: dict) -> None:
+    overlay = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["two_frames"]
+    assert [outline["points"] for outline in overlay["outlines"]] == [
+        "5,2 90,2 90,55 5,55",
+        "5,60 90,60 90,95 5,95",
+    ]
+
+
+def test_the_second_frame_has_its_own_colour_and_the_first_does_not(scenario_results: dict) -> None:
+    overlay = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["two_frames"]
+    assert [outline["is_second_colour"] for outline in overlay["outlines"]] == [False, True]
+
+
+def test_each_frame_has_its_number_at_its_first_corner(scenario_results: dict) -> None:
+    badges = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["two_frames"]["badges"]
+    assert [(badge["text"], badge["left"], badge["top"]) for badge in badges] == [
+        ("1", "5%", "2%"),
+        ("2", "5%", "60%"),
+    ]
+
+
+def test_a_tile_with_two_frames_says_so_in_words(scenario_results: dict) -> None:
+    count_texts = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["count_texts"]
+    assert count_texts == [
+        {"hidden": False, "text": "2 molduras"},
+        {"hidden": True, "text": ""},
+        {"hidden": True, "text": ""},
+    ]
+
+
+def test_a_tile_with_two_frames_says_how_many_pages_it_will_make(scenario_results: dict) -> None:
+    labels = scenario_results["tiles_with_two_frames_and_a_tilted_frame"]["labels"]
+    assert labels[0] == "Página 1 de 3, com 2 molduras de corte (2 páginas no PDF)"
+
+
+def test_turning_a_page_with_two_frames_says_both_frames_followed(scenario_results: dict) -> None:
+    announcement = scenario_results["rotate_a_page_with_two_frames"]["announcement"]
+    assert announcement == "Página 2 girada 90° para a direita (total: 90°). As molduras acompanharam o giro."

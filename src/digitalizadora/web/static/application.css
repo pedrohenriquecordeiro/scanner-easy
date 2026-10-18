@@ -17,6 +17,10 @@
   --color-error-background: #fde8e7;
   --color-error-border: #b3261e;
   --color-error-text: #5f1410;
+  --color-frame-first: #1d6bff;
+  --color-frame-first-text: #ffffff;
+  --color-frame-second: #ff8a00;
+  --color-frame-second-text: #1b1f24;
   --size-touch-target: 3rem;
   --size-gutter: 1rem;
   --radius-control: 0.5rem;
@@ -41,6 +45,10 @@
     --color-error-background: #3d1715;
     --color-error-border: #ff8a80;
     --color-error-text: #ffd9d6;
+    --color-frame-first: #6ea0ff;
+    --color-frame-first-text: #0a1020;
+    --color-frame-second: #ffa940;
+    --color-frame-second-text: #1b1f24;
   }
 }
 
@@ -280,6 +288,25 @@ button:disabled {
   color: var(--color-text-muted);
 }
 
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--size-touch-target);
+}
+
+.slider-value {
+  min-width: 2.5rem;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .checkbox-label {
   display: inline-flex;
   align-items: center;
@@ -340,13 +367,6 @@ button:disabled {
   background: var(--color-surface);
 }
 
-.last-scan-thumbnail {
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 0.25rem;
-}
-
 .last-scan-details {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -364,6 +384,10 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.last-scan-file-names {
+  white-space: pre-line;
+}
+
 .last-scan-actions {
   display: grid;
   grid-column: 2;
@@ -375,7 +399,13 @@ button:disabled {
   margin: 0;
 }
 
-.last-scan-rotation-status {
+.last-scan-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.last-scan-status {
   font-weight: 600;
 }
 
@@ -507,22 +537,71 @@ button:disabled {
   height: 100%;
 }
 
-/* Light border, dark lines on both sides of it and a shaded outside: readable over a white and over a dark page. */
-.page-crop-overlay,
-.frame-box {
+/* The frames over a picture: the outside shaded, one outline per frame (the first solid, the second dashed, so colour
+   is never the only sign) and its number at its first corner. A dark halo keeps them readable on white and on black. */
+.frame-overlay {
   position: absolute;
-  border: 2px solid #ffffff;
-  box-shadow:
-    inset 0 0 0 1px #1b1f24,
-    0 0 0 1px #1b1f24;
+  inset: 0;
+  pointer-events: none;
 }
 
-.page-crop-overlay {
-  box-shadow:
-    inset 0 0 0 1px #1b1f24,
-    0 0 0 1px #1b1f24,
-    0 0 0 9999px rgb(0 0 0 / 45%);
-  pointer-events: none;
+.frame-overlay-drawing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 1px #000000);
+}
+
+.frame-overlay-shade {
+  fill: rgb(0 0 0 / 45%);
+}
+
+.frame-overlay-outline {
+  fill: none;
+  stroke: var(--frame-colour);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.frame-overlay-outline.is-active {
+  stroke-width: 3.5;
+}
+
+.frame-colour-first {
+  --frame-colour: var(--color-frame-first);
+  --frame-colour-text: var(--color-frame-first-text);
+}
+
+.frame-colour-second {
+  --frame-colour: var(--color-frame-second);
+  --frame-colour-text: var(--color-frame-second-text);
+}
+
+.frame-overlay-outline.frame-colour-second {
+  stroke-dasharray: 7 4;
+}
+
+.frame-overlay-badge {
+  position: absolute;
+  min-width: 1.25rem;
+  padding: 0 0.25rem;
+  border: 1px solid #1b1f24;
+  border-radius: 0.625rem;
+  background: var(--frame-colour);
+  color: var(--frame-colour-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.125rem;
+  text-align: center;
+  /* Just inside the first corner, clear of the handle that sits on the corner itself. */
+  transform: translate(0.35rem, 0.35rem);
+}
+
+.page-crop-count {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-align: center;
 }
 
 .page-placeholder {
@@ -646,8 +725,10 @@ button:disabled {
   background: var(--color-background);
 }
 
-.frame-stage.is-loading .frame-box,
-.frame-stage.is-loading .frame-shade {
+.frame-stage.is-loading .frame-overlay-host,
+.frame-stage.is-loading .frame-handle,
+.frame-stage.is-loading .frame-move,
+.frame-stage.is-loading .frame-select {
   opacity: 0;
 }
 
@@ -661,24 +742,15 @@ button:disabled {
   outline-offset: -1px;
 }
 
-.frame-shade {
+.frame-overlay-host {
   position: absolute;
   inset: 0;
-  overflow: hidden;
   pointer-events: none;
 }
 
-.frame-cutout {
-  position: absolute;
-  box-shadow: 0 0 0 9999px rgb(0 0 0 / 50%);
-}
-
-.frame-box {
-  /* Only its handles and its interior take the pointer; the border itself is just a line. */
-  pointer-events: none;
-}
-
+/* The two buttons that cover the stage take the pointer only inside the polygon of their frame (clip-path). */
 .frame-move,
+.frame-select,
 .frame-handle {
   position: absolute;
   min-height: 0;
@@ -686,21 +758,37 @@ button:disabled {
   border: 0;
   border-radius: 0;
   background: transparent;
-  pointer-events: auto;
   touch-action: none;
 }
 
-.frame-move {
+.frame-move,
+.frame-select {
   inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.frame-move {
+  z-index: 2;
   cursor: move;
 }
 
-.frame-move:focus-visible {
-  outline-offset: -3px;
+.frame-select {
+  z-index: 1;
+  cursor: pointer;
+}
+
+.frame-move:focus-visible,
+.frame-select:focus-visible {
+  outline: 0;
+  background: rgb(255 255 255 / 22%);
 }
 
 .frame-handle {
-  z-index: 1;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
 }
 
 /* The touch area of a handle is 44 px; the knob that shows it is small. */
@@ -717,75 +805,43 @@ button:disabled {
   transform: translate(-50%, -50%);
 }
 
+.frame-edge-handle::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+}
+
+.frame-rotate-handle::after {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.frame-corner-handle {
+  cursor: crosshair;
+}
+
+.frame-edge-handle {
+  cursor: pointer;
+}
+
+.frame-rotate-handle {
+  cursor: grab;
+}
+
+.frame-handle:focus-visible {
+  outline: 0;
+}
+
 .frame-handle:focus-visible::after {
   width: 20px;
   height: 20px;
   background: var(--color-accent);
 }
 
-.frame-handle-north,
-.frame-handle-south {
-  right: 0;
-  left: 0;
-  height: 44px;
-  cursor: ns-resize;
-}
-
-.frame-handle-east,
-.frame-handle-west {
-  top: 0;
-  bottom: 0;
-  width: 44px;
-  cursor: ew-resize;
-}
-
-.frame-handle-north {
-  top: -22px;
-}
-
-.frame-handle-south {
-  bottom: -22px;
-}
-
-.frame-handle-east {
-  right: -22px;
-}
-
-.frame-handle-west {
-  left: -22px;
-}
-
-.frame-handle-north-east,
-.frame-handle-north-west,
-.frame-handle-south-east,
-.frame-handle-south-west {
-  z-index: 2;
-  width: 44px;
-  height: 44px;
-}
-
-.frame-handle-north-west {
-  top: -22px;
-  left: -22px;
-  cursor: nwse-resize;
-}
-
-.frame-handle-north-east {
-  top: -22px;
-  right: -22px;
-  cursor: nesw-resize;
-}
-
-.frame-handle-south-west {
-  bottom: -22px;
-  left: -22px;
-  cursor: nesw-resize;
-}
-
-.frame-handle-south-east {
-  right: -22px;
-  bottom: -22px;
-  cursor: nwse-resize;
+.frame-limits {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
 }
 
 .frame-status {

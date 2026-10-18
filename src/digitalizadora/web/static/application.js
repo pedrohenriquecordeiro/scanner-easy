@@ -1,10 +1,10 @@
 "use strict";
 
-// Uses IDLE_PHASE, SPACE_KEY_ACTIONS, decide_space_key_action, can_start_scan and can_rotate_last_scan from
+// Uses IDLE_PHASE, SPACE_KEY_ACTIONS, decide_space_key_action and can_start_capture from
 // scan-trigger-policy.js, the quality and duration rules from scan-quality-policy.js, ErrorBanner from error-banner.js,
-// CAPTURE_MODES, ENTER_KEY_CODE and the can_, should_ and describe_ rules from document-page-policy.js, FRAME_HANDLES
-// from page-frame-geometry.js, PageFrameEditor from page-frame-editor.js and DocumentPanel from document-panel.js;
-// index.html loads them first, in this order.
+// CAPTURE_MODES, ENTER_KEY_CODE and the can_, should_ and describe_ rules from document-page-policy.js, the addresses
+// and texts of last-scan-policy.js, PageFrameEditor from page-frame-editor.js, DocumentPanel from document-panel.js
+// and LastScanPanel from last-scan-panel.js; index.html loads them first, in this order.
 
 const REQUIRED_HEADER_NAME = "X-Requested-With";
 const REQUIRED_HEADER_VALUE = "digitalizadora";
@@ -17,8 +17,6 @@ const PHASE_MESSAGES = {
   saving: () => "Salvando…",
 };
 const SCAN_REQUEST_PATHS = Object.freeze({ single: "/api/scans", document: "/api/document/pages" });
-const LAST_SCAN_ROTATION_PATH = "/api/scans/last/rotation";
-const LAST_SCAN_ROTATED_MESSAGE = "Última digitalização girada 90° para a direita.";
 const READY_MESSAGE = "Pronto para digitalizar. Coloque a folha no vidro e aperte Espaço.";
 const LAST_SCAN_FAILED_MESSAGE = "A última digitalização falhou.";
 const SERVER_UNREACHABLE_MESSAGE = "Não consegui falar com o Digitalizadora. Ele ainda está aberto no Terminal?";
@@ -119,11 +117,7 @@ function describe_draft_storage(draft_storage) {
   return `Espaço no Mac para as páginas: ${free_space_text} — ${pages_remaining_text}`;
 }
 
-function build_thumbnail_address(version) {
-  return `/api/scans/last/thumbnail?version=${version}`;
-}
-
-function choose_thumbnail_version(state) {
+function choose_thumbnail_revision(state) {
   // A server from before the rotation of the last scan sends no revision: each scan is then a new thumbnail.
   return state.last_result_revision ?? state.scans_completed;
 }
@@ -141,7 +135,7 @@ function describe_scan_status(state) {
     return LAST_SCAN_FAILED_MESSAGE;
   }
   if (state.last_result !== null) {
-    return `Pronto! Salvo como ${state.last_result.file_name}`;
+    return describe_saved_scan_status(state.last_result);
   }
   return READY_MESSAGE;
 }
@@ -251,18 +245,23 @@ function collect_elements() {
     resolution_warning: document.getElementById("resolution-warning"),
     resolution_warning_text: document.getElementById("resolution-warning-text"),
     auto_crop_checkbox: document.getElementById("auto-crop-checkbox"),
+    jpeg_quality_input: document.getElementById("jpeg-quality-input"),
+    jpeg_quality_value: document.getElementById("jpeg-quality-value"),
     output_folder_input: document.getElementById("output-folder-input"),
     output_folder_save_button: document.getElementById("output-folder-save-button"),
     output_folder_message: document.getElementById("output-folder-message"),
     storage_line: document.getElementById("storage-line"),
     storage_warning: document.getElementById("storage-warning"),
     last_scan_panel: document.getElementById("last-scan-panel"),
+    last_scan_thumbnail_frame: document.getElementById("last-scan-thumbnail-frame"),
     last_scan_thumbnail: document.getElementById("last-scan-thumbnail"),
-    last_scan_file_name: document.getElementById("last-scan-file-name"),
+    last_scan_file_names: document.getElementById("last-scan-file-names"),
     last_scan_size: document.getElementById("last-scan-size"),
     last_scan_time: document.getElementById("last-scan-time"),
     last_scan_rotate_button: document.getElementById("last-scan-rotate-button"),
-    last_scan_rotation_status: document.getElementById("last-scan-rotation-status"),
+    last_scan_enlarge_button: document.getElementById("last-scan-enlarge-button"),
+    last_scan_hint: document.getElementById("last-scan-hint"),
+    last_scan_status: document.getElementById("last-scan-status"),
     session_counter: document.getElementById("session-counter"),
     confirmation_dialog: document.getElementById("confirmation-dialog"),
     confirmation_text: document.getElementById("confirmation-text"),
@@ -276,20 +275,26 @@ function collect_elements() {
     page_frame_title: document.getElementById("page-frame-title"),
     frame_stage: document.getElementById("frame-stage"),
     frame_image: document.getElementById("frame-image"),
-    frame_cutout: document.getElementById("frame-cutout"),
-    frame_box: document.getElementById("frame-box"),
+    frame_overlay_host: document.getElementById("frame-overlay-host"),
     frame_move_button: document.getElementById("frame-move-button"),
-    frame_handles: {
-      north: document.getElementById("frame-handle-north"),
-      north_east: document.getElementById("frame-handle-north-east"),
-      east: document.getElementById("frame-handle-east"),
-      south_east: document.getElementById("frame-handle-south-east"),
-      south: document.getElementById("frame-handle-south"),
-      south_west: document.getElementById("frame-handle-south-west"),
-      west: document.getElementById("frame-handle-west"),
-      north_west: document.getElementById("frame-handle-north-west"),
+    frame_select_button: document.getElementById("frame-select-button"),
+    frame_rotate_handle: document.getElementById("frame-rotate-handle"),
+    frame_corner_handles: {
+      top_left: document.getElementById("frame-corner-top-left"),
+      top_right: document.getElementById("frame-corner-top-right"),
+      bottom_right: document.getElementById("frame-corner-bottom-right"),
+      bottom_left: document.getElementById("frame-corner-bottom-left"),
+    },
+    frame_edge_handles: {
+      top: document.getElementById("frame-edge-top"),
+      right: document.getElementById("frame-edge-right"),
+      bottom: document.getElementById("frame-edge-bottom"),
+      left: document.getElementById("frame-edge-left"),
     },
     frame_status: document.getElementById("frame-status"),
+    frame_add_button: document.getElementById("frame-add-button"),
+    frame_remove_button: document.getElementById("frame-remove-button"),
+    frame_turn_button: document.getElementById("frame-turn-button"),
     frame_detect_button: document.getElementById("frame-detect-button"),
     frame_clear_button: document.getElementById("frame-clear-button"),
     frame_rotate_button: document.getElementById("frame-rotate-button"),
@@ -301,17 +306,9 @@ function collect_elements() {
 function build_scan_page(elements) {
   const error_banner = new ErrorBanner(elements);
   let scan_page = null;
-  let document_panel = null;
-  // The editor and the panel need each other: the panel opens the editor, the editor runs its edits through the panel.
-  const frame_editor = new PageFrameEditor(elements, {
-    attempt_edit: (edit_request) => document_panel.attempt_edit(edit_request),
-    report_failure: (failure) => document_panel.report_failure(failure),
-    can_edit: () => document_panel.can_edit(),
-    find_page: (page_identifier) => document_panel.find_page(page_identifier),
-    announce: (text) => document_panel.announce(text),
-    restore_focus: (focus_request) => document_panel.apply_focus(focus_request),
-  });
-  document_panel = new DocumentPanel(elements, {
+  // One frame editor serves both modes: whoever opens it is its owner for that session.
+  const frame_editor = new PageFrameEditor(elements);
+  const document_panel = new DocumentPanel(elements, {
     send_request,
     format_byte_count,
     error_banner,
@@ -319,7 +316,16 @@ function build_scan_page(elements) {
     focus_scan_button: () => elements.scan_button.focus(),
     refresh_page_controls: () => scan_page.render_activity(),
   });
-  scan_page = new ScanPage(elements, { document_panel, error_banner });
+  const last_scan_panel = new LastScanPanel(elements, {
+    send_request,
+    format_byte_count,
+    error_banner,
+    frame_editor,
+    focus_scan_button: () => elements.scan_button.focus(),
+    refresh_page_controls: () => scan_page.render_activity(),
+    request_state_refresh: () => scan_page.schedule_state_refresh(IMMEDIATE_REFRESH_MILLISECONDS),
+  });
+  scan_page = new ScanPage(elements, { document_panel, last_scan_panel, error_banner });
   return scan_page;
 }
 
@@ -327,13 +333,12 @@ class ScanPage {
   constructor(elements, page_parts) {
     this.elements = elements;
     this.document_panel = page_parts.document_panel;
+    this.last_scan_panel = page_parts.last_scan_panel;
     this.error_banner = page_parts.error_banner;
     this.scan_phase = IDLE_PHASE;
     this.is_start_request_pending = false;
     this.saved_settings = null;
     this.last_state = null;
-    this.shown_thumbnail_version = null;
-    this.is_last_scan_rotation_pending = false;
     this.state_timer = null;
     this.printer_timer = null;
   }
@@ -349,9 +354,6 @@ class ScanPage {
   bind_events() {
     const { scan_button, output_folder_input, output_folder_save_button, format_inputs } = this.elements;
     scan_button.addEventListener("click", () => this.start_scan());
-    this.elements.last_scan_rotate_button.addEventListener("click", (event) =>
-      this.rotate_last_scan(read_action_origin(event)),
-    );
     document.addEventListener("keydown", (event) => this.handle_key_down(event));
     document.addEventListener("keyup", (event) => this.handle_key_up(event));
     Object.values(format_inputs).forEach((input) => {
@@ -375,6 +377,7 @@ class ScanPage {
       }
     });
     this.document_panel.bind_events();
+    this.last_scan_panel.bind_events();
   }
 
   bind_quality_events() {
@@ -385,6 +388,14 @@ class ScanPage {
     color_mode_select.addEventListener("change", () => this.change_setting({ color_mode: color_mode_select.value }));
     auto_crop_checkbox.addEventListener("change", () =>
       this.change_setting_then_focus_scan_button({ auto_crop: auto_crop_checkbox.checked }),
+    );
+    const { jpeg_quality_input, jpeg_quality_value } = this.elements;
+    // The number follows the slider while it moves (a screen reader reads it); the setting is saved when it is let go.
+    jpeg_quality_input.addEventListener("input", () => {
+      jpeg_quality_value.textContent = String(parse_jpeg_quality(jpeg_quality_input.value));
+    });
+    jpeg_quality_input.addEventListener("change", () =>
+      this.change_setting({ jpeg_quality: parse_jpeg_quality(jpeg_quality_input.value) }),
     );
   }
 
@@ -420,13 +431,13 @@ class ScanPage {
     return {
       scan_phase: this.scan_phase,
       is_start_request_pending: this.is_start_request_pending,
-      is_edit_request_pending: this.document_panel.is_edit_request_pending(),
+      is_edit_request_pending:
+        this.document_panel.is_edit_request_pending() || this.last_scan_panel.is_edit_request_pending(),
     };
   }
 
   is_ready_to_scan() {
-    const scan_activity = this.read_scan_activity();
-    return this.is_document_mode() ? can_start_document_page(scan_activity) : can_start_scan(scan_activity);
+    return can_start_capture(this.read_scan_activity());
   }
 
   async start_scan() {
@@ -435,7 +446,7 @@ class ScanPage {
     }
     this.is_start_request_pending = true;
     this.error_banner.report_action_error(null);
-    this.elements.last_scan_rotation_status.textContent = "";
+    this.last_scan_panel.clear_status();
     this.render_activity();
     try {
       await send_request("POST", SCAN_REQUEST_PATHS[this.capture_mode()]);
@@ -449,38 +460,6 @@ class ScanPage {
     this.schedule_state_refresh(IMMEDIATE_REFRESH_MILLISECONDS);
   }
 
-  async rotate_last_scan(action_origin) {
-    if (!this.can_rotate_last_scan_now()) {
-      return;
-    }
-    this.is_last_scan_rotation_pending = true;
-    this.error_banner.report_action_error(null);
-    // Emptied first, so the same text written again after the answer is a change a screen reader announces.
-    this.elements.last_scan_rotation_status.textContent = "";
-    this.render_activity();
-    try {
-      await send_request("POST", LAST_SCAN_ROTATION_PATH);
-      this.elements.last_scan_rotation_status.textContent = LAST_SCAN_ROTATED_MESSAGE;
-    } catch (error) {
-      this.error_banner.report_action_error(error.message);
-    } finally {
-      this.is_last_scan_rotation_pending = false;
-    }
-    this.render_activity();
-    // The state brings the new revision of the file, which is what reloads the thumbnail.
-    this.schedule_state_refresh(IMMEDIATE_REFRESH_MILLISECONDS);
-    // A keyboard user stays on the button; after a click the next Space scans again.
-    const { last_scan_rotate_button, scan_button } = this.elements;
-    (action_origin.is_keyboard_initiated ? last_scan_rotate_button : scan_button).focus();
-  }
-
-  can_rotate_last_scan_now() {
-    return can_rotate_last_scan(
-      { scan_phase: this.scan_phase, is_start_request_pending: this.is_start_request_pending },
-      { is_rotation_pending: this.is_last_scan_rotation_pending },
-    );
-  }
-
   schedule_state_refresh(delay_milliseconds) {
     window.clearTimeout(this.state_timer);
     this.state_timer = window.setTimeout(() => this.refresh_state(), delay_milliseconds);
@@ -491,8 +470,9 @@ class ScanPage {
   }
 
   async refresh_state() {
+    const edit_epoch = this.last_scan_panel.read_edit_epoch();
     try {
-      this.apply_state(await send_request("GET", "/api/state"));
+      this.apply_state(await send_request("GET", "/api/state"), edit_epoch);
     } catch (error) {
       this.error_banner.set_connection_error(error.message);
     } finally {
@@ -500,7 +480,7 @@ class ScanPage {
     }
   }
 
-  apply_state(state) {
+  apply_state(state, edit_epoch) {
     const previous_phase = this.scan_phase;
     this.scan_phase = state.scan_phase;
     this.last_state = state;
@@ -522,7 +502,7 @@ class ScanPage {
       });
     }
     this.render_activity();
-    this.render_state_panels();
+    this.render_state_panels(edit_epoch);
     this.elements.session_counter.textContent = `Digitalizações nesta sessão: ${state.scans_completed}`;
   }
 
@@ -590,11 +570,9 @@ class ScanPage {
       input.disabled = !can_change_mode;
     });
     this.elements.return_to_document_button.disabled = !can_change_mode;
-    this.elements.last_scan_rotate_button.disabled = !this.can_rotate_last_scan_now();
-    this.document_panel.apply_scan_activity({
-      scan_phase: this.scan_phase,
-      is_start_request_pending: this.is_start_request_pending,
-    });
+    const scan_activity = { scan_phase: this.scan_phase, is_start_request_pending: this.is_start_request_pending };
+    this.last_scan_panel.apply_scan_activity(scan_activity);
+    this.document_panel.apply_scan_activity(scan_activity);
     if (was_disabled && can_scan && document.activeElement === document.body) {
       scan_button.focus();
     }
@@ -609,12 +587,22 @@ class ScanPage {
       : describe_scan_status(this.last_state);
   }
 
-  render_state_panels() {
+  render_state_panels(edit_epoch) {
     if (this.last_state === null) {
       return;
     }
     this.render_storage(this.last_state);
-    this.render_last_scan(this.last_state);
+    this.render_last_scan({ state: this.last_state, edit_epoch });
+    this.render_pending_document(this.last_state.document);
+  }
+
+  // The mode changed: what each panel shows stays as it is, only which of them is on the page changes.
+  render_mode_panels() {
+    if (this.last_state === null) {
+      return;
+    }
+    this.render_storage(this.last_state);
+    this.last_scan_panel.set_shown_in_this_mode(!this.is_document_mode());
     this.render_pending_document(this.last_state.document);
   }
 
@@ -631,20 +619,15 @@ class ScanPage {
     }
   }
 
-  render_last_scan(state) {
-    const result = state.last_result;
-    this.elements.last_scan_panel.hidden = result === null || this.is_document_mode();
-    if (result === null) {
-      return;
-    }
-    const thumbnail_version = choose_thumbnail_version(state);
-    if (this.shown_thumbnail_version !== thumbnail_version) {
-      this.elements.last_scan_thumbnail.src = build_thumbnail_address(thumbnail_version);
-      this.shown_thumbnail_version = thumbnail_version;
-    }
-    this.elements.last_scan_file_name.textContent = result.file_name;
-    this.elements.last_scan_size.textContent = format_byte_count(result.size_in_bytes);
-    this.elements.last_scan_time.textContent = format_scan_time(result.scanned_at);
+  render_last_scan(last_scan_view) {
+    const { state, edit_epoch } = last_scan_view;
+    // A render caused by the page itself (no state was just fetched) is not older than anything.
+    this.last_scan_panel.apply_server_state({
+      last_result: state.last_result,
+      last_result_revision: choose_thumbnail_revision(state),
+      edit_epoch: edit_epoch ?? this.last_scan_panel.read_edit_epoch(),
+    });
+    this.last_scan_panel.set_shown_in_this_mode(!this.is_document_mode());
   }
 
   render_pending_document(document_summary) {
@@ -663,7 +646,7 @@ class ScanPage {
       this.document_panel.hide();
     }
     this.render_activity();
-    this.render_state_panels();
+    this.render_mode_panels();
   }
 
   async load_settings_and_document() {
@@ -735,7 +718,11 @@ class ScanPage {
   }
 
   render_adjustment_controls(settings) {
-    this.elements.auto_crop_checkbox.checked = settings.auto_crop === true;
+    const { auto_crop_checkbox, jpeg_quality_input, jpeg_quality_value } = this.elements;
+    auto_crop_checkbox.checked = settings.auto_crop === true;
+    const jpeg_quality = parse_jpeg_quality(settings.jpeg_quality);
+    jpeg_quality_input.value = String(jpeg_quality);
+    jpeg_quality_value.textContent = String(jpeg_quality);
   }
 
   async send_settings(settings) {

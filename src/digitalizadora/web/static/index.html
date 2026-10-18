@@ -12,8 +12,12 @@
   <script src="/static/error-banner.js" defer></script>
   <script src="/static/document-page-policy.js" defer></script>
   <script src="/static/page-frame-geometry.js" defer></script>
+  <script src="/static/frame-dialog-policy.js" defer></script>
+  <script src="/static/last-scan-policy.js" defer></script>
+  <script src="/static/frame-overlay.js" defer></script>
   <script src="/static/page-frame-editor.js" defer></script>
   <script src="/static/document-panel.js" defer></script>
+  <script src="/static/last-scan-panel.js" defer></script>
   <script src="/static/application.js" defer></script>
 </head>
 <body>
@@ -145,14 +149,19 @@
 
       <div class="field crop-field">
         <label class="checkbox-label" for="auto-crop-checkbox">
-          <input id="auto-crop-checkbox" type="checkbox" name="auto-crop" aria-describedby="auto-crop-hint">
+          <input id="auto-crop-checkbox" type="checkbox" name="auto-crop">
           <span>Cortar automaticamente e remover o fundo</span>
         </label>
-        <p id="auto-crop-hint" class="field-hint">
-          Use para fotos e folhas menores que o vidro. No modo Documento, o corte aparece como uma moldura em cada
-          página e você pode ajustá-la em Ampliar; no modo Rápido, ele é aplicado direto no arquivo. Se não achar uma
-          borda confiável, a imagem fica inteira.
-        </p>
+      </div>
+
+      <div class="field">
+        <label for="jpeg-quality-input">Qualidade do JPEG</label>
+        <div class="slider-row">
+          <input id="jpeg-quality-input" type="range" name="jpeg-quality" min="50" max="100" step="1" value="90"
+                 aria-describedby="jpeg-quality-hint">
+          <output id="jpeg-quality-value" class="slider-value" for="jpeg-quality-input">90</output>
+        </div>
+        <p id="jpeg-quality-hint" class="field-hint">Vale quando a imagem é cortada ou girada.</p>
       </div>
 
       <div class="field">
@@ -171,20 +180,26 @@
     </section>
 
     <section id="last-scan-panel" class="last-scan-panel" aria-label="Última digitalização" hidden>
-      <img id="last-scan-thumbnail" class="last-scan-thumbnail" alt="Miniatura da última digitalização">
+      <div id="last-scan-thumbnail-frame" class="page-thumbnail-frame last-scan-thumbnail-frame">
+        <img id="last-scan-thumbnail" class="page-thumbnail last-scan-thumbnail" alt="Miniatura da última digitalização">
+      </div>
       <dl class="last-scan-details">
-        <dt>Arquivo</dt>
-        <dd id="last-scan-file-name"></dd>
+        <dt>Arquivos</dt>
+        <dd id="last-scan-file-names" class="last-scan-file-names"></dd>
         <dt>Tamanho</dt>
         <dd id="last-scan-size"></dd>
         <dt>Hora</dt>
         <dd id="last-scan-time"></dd>
       </dl>
       <div class="last-scan-actions">
-        <button id="last-scan-rotate-button" class="last-scan-rotate-button" type="button"
-                aria-label="Girar a última digitalização 90 graus para a direita">Girar ↻</button>
-        <p id="last-scan-hint" class="field-hint">Girar regrava o arquivo salvo.</p>
-        <p id="last-scan-rotation-status" class="last-scan-rotation-status" role="status" aria-live="polite"></p>
+        <div class="last-scan-buttons">
+          <button id="last-scan-rotate-button" class="last-scan-rotate-button" type="button"
+                  aria-label="Girar a última digitalização 90 graus para a direita">Girar ↻</button>
+          <button id="last-scan-enlarge-button" class="last-scan-enlarge-button" type="button"
+                  aria-label="Ampliar a última digitalização e ajustar a moldura de corte">Ampliar</button>
+        </div>
+        <p id="last-scan-hint" class="field-hint">Ajustes regravam os arquivos salvos.</p>
+        <p id="last-scan-status" class="last-scan-status" role="status" aria-live="polite"></p>
       </div>
     </section>
 
@@ -211,35 +226,43 @@
     </div>
   </dialog>
   <dialog id="page-frame-dialog" class="page-dialog frame-dialog" aria-labelledby="page-frame-title"
-          aria-describedby="page-frame-help">
+          aria-describedby="page-frame-help page-frame-limits">
     <h2 id="page-frame-title" class="dialog-text"></h2>
     <p id="page-frame-help" class="field-hint">
-      Arraste as bordas ou os cantos da moldura. Com o teclado, escolha uma alça (Tab) e use as setas; Shift anda mais.
+      Arraste os cantos, os lados ou a moldura toda. A alça de cima gira a moldura. Com o teclado, escolha uma alça (Tab) e use as setas; Shift anda mais.
+    </p>
+    <p id="page-frame-limits" class="field-hint frame-limits">
+      Duas fotos muito juntas podem virar uma só moldura: use Adicionar moldura.
     </p>
     <div class="frame-stage-row">
       <div id="frame-stage" class="frame-stage">
         <img id="frame-image" class="frame-image" alt="Página ampliada" draggable="false">
-        <div class="frame-shade" aria-hidden="true">
-          <div id="frame-cutout" class="frame-cutout"></div>
-        </div>
-        <div id="frame-box" class="frame-box">
-          <button id="frame-move-button" class="frame-move" type="button" aria-label="Mover a moldura"></button>
-          <button id="frame-handle-north" class="frame-handle frame-handle-north" type="button"></button>
-          <button id="frame-handle-north-east" class="frame-handle frame-handle-north-east" type="button"></button>
-          <button id="frame-handle-east" class="frame-handle frame-handle-east" type="button"></button>
-          <button id="frame-handle-south-east" class="frame-handle frame-handle-south-east" type="button"></button>
-          <button id="frame-handle-south" class="frame-handle frame-handle-south" type="button"></button>
-          <button id="frame-handle-south-west" class="frame-handle frame-handle-south-west" type="button"></button>
-          <button id="frame-handle-west" class="frame-handle frame-handle-west" type="button"></button>
-          <button id="frame-handle-north-west" class="frame-handle frame-handle-north-west" type="button"></button>
-        </div>
+        <div id="frame-overlay-host" class="frame-overlay-host"></div>
+        <button id="frame-corner-top-left" class="frame-handle frame-corner-handle" type="button"></button>
+        <button id="frame-corner-top-right" class="frame-handle frame-corner-handle" type="button"></button>
+        <button id="frame-corner-bottom-right" class="frame-handle frame-corner-handle" type="button"></button>
+        <button id="frame-corner-bottom-left" class="frame-handle frame-corner-handle" type="button"></button>
+        <button id="frame-edge-top" class="frame-handle frame-edge-handle" type="button"></button>
+        <button id="frame-edge-right" class="frame-handle frame-edge-handle" type="button"></button>
+        <button id="frame-edge-bottom" class="frame-handle frame-edge-handle" type="button"></button>
+        <button id="frame-edge-left" class="frame-handle frame-edge-handle" type="button"></button>
+        <button id="frame-move-button" class="frame-move" type="button" aria-label="Mover a moldura"></button>
+        <button id="frame-rotate-handle" class="frame-handle frame-rotate-handle" type="button"></button>
+        <button id="frame-select-button" class="frame-select" type="button"></button>
       </div>
     </div>
     <p id="frame-status" class="frame-status" role="status" aria-live="polite"></p>
     <div class="dialog-actions frame-actions">
+      <button id="frame-add-button" type="button">Adicionar moldura</button>
+      <button id="frame-remove-button" type="button">Remover moldura</button>
+      <button id="frame-turn-button" type="button">Girar moldura ↻</button>
+    </div>
+    <div class="dialog-actions frame-actions">
       <button id="frame-detect-button" type="button">Detectar automaticamente</button>
       <button id="frame-clear-button" type="button">Sem corte</button>
       <button id="frame-rotate-button" type="button" aria-label="Girar a página 90 graus para a direita">Girar ↻</button>
+    </div>
+    <div class="dialog-actions frame-actions">
       <button id="frame-cancel-button" type="button">Cancelar</button>
       <button id="frame-apply-button" class="finalize-button" type="button">Aplicar</button>
     </div>

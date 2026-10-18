@@ -3,8 +3,9 @@
 // Wires the Documento section of the page to the pure rules of document-page-policy.js; it decides nothing by itself.
 // build_scan_page (application.js) creates it with page_services = {send_request, format_byte_count, error_banner,
 // frame_editor, focus_scan_button, refresh_page_controls}. Uses IDLE_PHASE from scan-trigger-policy.js,
-// DEFAULT_DOTS_PER_INCH from scan-quality-policy.js, the page addresses and texts of document-page-policy.js and the
-// frame functions of page-frame-geometry.js.
+// DEFAULT_DOTS_PER_INCH from scan-quality-policy.js, the page addresses and texts of document-page-policy.js, the
+// frame functions of page-frame-geometry.js and create_frame_overlay and update_frame_overlay of frame-overlay.js.
+// It is also the "owner" of the frame editor for a page: see build_editor_owner.
 
 const LAST_PAGE_PATH = `${DOCUMENT_PAGES_PATH}/last`;
 const PAGE_ORDER_PATH = `${DOCUMENT_PATH}/page-order`;
@@ -65,6 +66,55 @@ class DocumentPanel {
     this.is_key_held = false;
     this.pending_draft_ending = null;
     this.damaged_page_identifier = null;
+    this.editor_owner = this.build_editor_owner();
+  }
+
+  // What the frame editor needs from whoever opens it (the same shape the last scan panel gives): the target to edit,
+  // the way to send an edit and the answers to its questions.
+  build_editor_owner() {
+    return {
+      find_target: (page_identifier) => this.build_editor_target(page_identifier),
+      attempt_edit: (edit_request) => this.attempt_edit(edit_request),
+      report_failure: (failure) => this.report_failure(failure),
+      can_edit: () => this.can_edit(),
+      announce: (text) => this.announce(text),
+      restore_focus: (focus_request) =>
+        this.apply_focus({
+          action: DOCUMENT_ACTIONS.FRAME_CLOSED,
+          acted_page_identifier: focus_request.target_identifier,
+          ...focus_request.action_origin,
+        }),
+    };
+  }
+
+  build_editor_target(page_identifier) {
+    const found_page = this.find_page(page_identifier);
+    if (found_page === null) {
+      return null;
+    }
+    const { page, position, page_count } = found_page;
+    return {
+      title_text: describe_frame_dialog_title({ position, page_count }),
+      image_alt_text: `Página ${position} ampliada`,
+      subject_text: PAGE_SUBJECT_TEXT,
+      gone_text: FRAME_PAGE_GONE_TEXT,
+      progress_text: null,
+      rotation_degrees: page.rotation_degrees,
+      crops: page.crops,
+      build_preview_address: (rotation_degrees) => build_page_preview_address(page_identifier, rotation_degrees),
+      requests: {
+        rotate_page: () => ({ method: "POST", path: build_page_rotation_path(page_identifier) }),
+        set_crops: (frames) => ({
+          method: "PUT",
+          path: build_page_crops_path(page_identifier),
+          body: build_crops_request_body(frames),
+        }),
+        detect_crops: () => ({ method: "POST", path: build_page_crops_detection_path(page_identifier) }),
+      },
+      describe_rotation: (rotation_degrees, frame_count) =>
+        describe_page_rotation_result({ position, rotation_degrees, crop_count: frame_count }),
+      describe_application: (frame_count) => describe_page_crop_application({ position, crop_count: frame_count }),
+    };
   }
 
   bind_events() {
@@ -218,7 +268,7 @@ class DocumentPanel {
     this.render_notices(body);
     // The page count changed, so the big button and the status line change with it.
     this.notify_activity_change();
-    this.page_services.frame_editor.handle_document_change();
+    this.page_services.frame_editor.handle_target_change(this.editor_owner);
   }
 
   end_draft() {
@@ -276,13 +326,13 @@ class DocumentPanel {
     const thumbnail = this.build_element("img", "page-thumbnail");
     thumbnail.loading = "lazy";
     thumbnail.decoding = "async";
-    const overlay = this.build_element("div", "page-crop-overlay");
-    overlay.setAttribute("aria-hidden", "true");
-    overlay.hidden = true;
-    thumbnail_frame.append(thumbnail, overlay);
+    const overlay = create_frame_overlay();
+    thumbnail_frame.append(thumbnail, overlay.container);
     const placeholder = this.build_element("span", "page-placeholder");
     placeholder.hidden = true;
     const number = this.build_element("span", "page-number");
+    const crop_count = this.build_element("span", "page-crop-count");
+    crop_count.hidden = true;
     const tile = {
       page_identifier,
       item,
@@ -291,6 +341,7 @@ class DocumentPanel {
       overlay,
       placeholder,
       number,
+      crop_count,
       position: 0,
       shown_rotation_degrees: null,
       move_left_button: this.build_tile_button("page-move-left", "◀"),
@@ -311,7 +362,7 @@ class DocumentPanel {
       tile.move_to_button,
       tile.enlarge_button,
     );
-    item.append(thumbnail_frame, placeholder, number, actions);
+    item.append(thumbnail_frame, placeholder, number, crop_count, actions);
     this.bind_tile(tile);
     return tile;
   }
@@ -376,10 +427,11 @@ class DocumentPanel {
   label_tile(tile, tile_state) {
     const { position, page_count, page } = tile_state;
     tile.position = position;
-    tile.item.setAttribute("aria-label", describe_tile_label({ position, page_count, crop: page.crop }));
+    const frames = read_frames_from_crops(page.crops);
+    tile.item.setAttribute("aria-label", describe_tile_label({ position, page_count, crop_count: frames.length }));
     tile.item.classList.toggle(DAMAGED_PAGE_CLASS, tile.page_identifier === this.damaged_page_identifier);
     this.show_thumbnail(tile, page.rotation_degrees);
-    this.show_crop_overlay(tile, page.crop);
+    this.show_crop_overlay(tile, frames);
     tile.thumbnail.alt = `Miniatura da página ${position}`;
     tile.placeholder.textContent = `Página ${position}`;
     tile.number.textContent = String(position);
@@ -402,12 +454,11 @@ class DocumentPanel {
     tile.thumbnail.src = build_page_thumbnail_address(tile.page_identifier, rotation_degrees);
   }
 
-  show_crop_overlay(tile, crop) {
-    tile.overlay.hidden = crop === null;
-    if (crop === null) {
-      return;
-    }
-    place_frame_on_element(tile.overlay, read_frame_from_crop(crop));
+  show_crop_overlay(tile, frames) {
+    update_frame_overlay(tile.overlay, frames, NO_ACTIVE_FRAME);
+    const crop_count_text = describe_crop_count(frames.length);
+    tile.crop_count.hidden = crop_count_text === null;
+    tile.crop_count.textContent = crop_count_text ?? "";
   }
 
   render_notices(body) {
@@ -651,9 +702,9 @@ class DocumentPanel {
     const body = await this.run_edit({ method: "POST", path: build_page_rotation_path(page_identifier) });
     if (body !== null) {
       const turned_page = this.find_page(page_identifier);
-      const crop = turned_page === null ? null : turned_page.page.crop;
+      const crop_count = turned_page === null ? 0 : turned_page.page.crops.length;
       const rotation_degrees = turned_page === null ? 0 : turned_page.page.rotation_degrees;
-      this.announce(describe_page_rotation_result({ position, rotation_degrees, crop }));
+      this.announce(describe_page_rotation_result({ position, rotation_degrees, crop_count }));
     }
     // A damaged page already took the focus on its × (report_failure); otherwise the Girar button of the page gets it
     // back.
@@ -668,7 +719,11 @@ class DocumentPanel {
   }
 
   enlarge_page(page_identifier, action_origin) {
-    this.page_services.frame_editor.open({ page_identifier, action_origin });
+    this.page_services.frame_editor.open({
+      owner: this.editor_owner,
+      target_identifier: page_identifier,
+      action_origin,
+    });
   }
 
   async reorder_pages(page_reorder) {
