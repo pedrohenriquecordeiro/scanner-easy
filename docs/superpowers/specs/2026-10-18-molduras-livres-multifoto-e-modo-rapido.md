@@ -721,7 +721,7 @@ O manifesto só existe quando o mestre foi guardado (`is_editable` é então sem
 3. Com `auto_crop` ligado: `detect_crops(mestre)`; uma falha da detecção (`DigitalizadoraError`) vira aviso no log e nenhuma moldura (o arquivo sai inteiro, como a página do documento). Desligado: nenhuma moldura. `framing = PageFraming().with_crops(achadas)`.
 4. `slot_repository.write_master_files(...)` (mestre e miniatura, cada um atômico). Se falhar: aviso no log, `is_editable = False`, e o resto segue.
 5. `render_outputs(BytesIO(mestre), OutputsRequest(framing, jpeg_quality, identidade))`: de 1 a 2 saídas (`EncodedScan`), JPG como está ou PDF de uma página com a densidade do mestre. Sem moldura, os bytes do scanner.
-6. Para cada saída, em ordem: `scan_output_repository.save_scans(...)` (todos os arquivos juntos, com a mesma data-base e os contadores `__1`, `__2`; ver a seção 16, `ScanFileNamingPolicy`; cada `save` recalcula o próximo número livre) e `describe_saved_scan(...)` para o tamanho e a data.
+6. Para cada saída, em ordem: `scan_output_repository.save_scans(...)` (todos os arquivos juntos, com a mesma data-base e os contadores `__1`, `__2`; ver a seção 16, `ScanFileNamingPolicy`) e `describe_saved_scan(...)` para o tamanho e a data.
 7. Com o mestre guardado: `slot_repository.commit(QuickScanSlot(last_scan, dpi, cor))` grava o manifesto e só depois apaga os arquivos da digitalização anterior. Sem o mestre guardado: `slot_repository.discard()` (o espaço velho não pode sobreviver a uma digitalização nova).
 8. Devolve `StoredScan(last_scan, miniatura)`; o `ScanService` o entrega ao tracker (`mark_completed`).
 
