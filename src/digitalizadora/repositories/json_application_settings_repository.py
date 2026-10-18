@@ -6,7 +6,7 @@ from pathlib import Path
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.color_mode import ColorMode
-from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.image_adjustment import DEFAULT_JPEG_QUALITY, ImageAdjustment, is_valid_jpeg_quality
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_quality import is_supported_dots_per_inch
@@ -19,6 +19,7 @@ DOTS_PER_INCH_KEY = "dots_per_inch"
 COLOR_MODE_KEY = "color_mode"
 SCAN_PRESET_KEY = "scan_preset"
 AUTO_CROP_KEY = "auto_crop"
+JPEG_QUALITY_KEY = "jpeg_quality"
 SCAN_QUALITY_KEY = "scan_quality"
 KNOWN_CAPTURE_MODE_VALUES = frozenset(capture_mode.value for capture_mode in CaptureMode)
 KNOWN_COLOR_MODE_VALUES = frozenset(color_mode.value for color_mode in ColorMode)
@@ -62,6 +63,18 @@ def _read_auto_crop(document: dict[str, object]) -> tuple[bool, RejectedValue | 
     if isinstance(raw_auto_crop, bool):
         return raw_auto_crop, None
     return False, RejectedValue(AUTO_CROP_KEY, repr(raw_auto_crop), "no automatic crop")
+
+
+def _read_jpeg_quality(document: dict[str, object]) -> tuple[int, RejectedValue | None]:
+    """A file from before the quality has no key: the default. An invalid value is the default too, with a warning."""
+    if JPEG_QUALITY_KEY not in document:
+        return DEFAULT_JPEG_QUALITY, None
+    raw_jpeg_quality = document[JPEG_QUALITY_KEY]
+    if is_valid_jpeg_quality(raw_jpeg_quality):
+        return raw_jpeg_quality, None
+    return DEFAULT_JPEG_QUALITY, RejectedValue(
+        JPEG_QUALITY_KEY, repr(raw_jpeg_quality), f"the default JPEG quality {DEFAULT_JPEG_QUALITY}"
+    )
 
 
 def _read_quality_pair(document: dict[str, object]) -> ScanSettings | None:
@@ -109,9 +122,10 @@ def read_application_settings(document: object) -> SettingsReading:
     scan_settings, rejected_quality = _read_scan_settings(document)
     capture_mode, rejected_capture_mode = _read_capture_mode(document)
     auto_crop, rejected_auto_crop = _read_auto_crop(document)
+    jpeg_quality, rejected_jpeg_quality = _read_jpeg_quality(document)
     rejected_values = tuple(
         rejected
-        for rejected in (rejected_quality, rejected_capture_mode, rejected_auto_crop)
+        for rejected in (rejected_quality, rejected_capture_mode, rejected_auto_crop, rejected_jpeg_quality)
         if rejected is not None
     )
     settings = ApplicationSettings(
@@ -119,7 +133,7 @@ def read_application_settings(document: object) -> SettingsReading:
         output_format=output_format,
         scan_settings=scan_settings,
         capture_mode=capture_mode,
-        adjustment=ImageAdjustment(auto_crop=auto_crop),
+        adjustment=ImageAdjustment(auto_crop=auto_crop, jpeg_quality=jpeg_quality),
     )
     return SettingsReading(settings, rejected_values)
 
@@ -158,6 +172,7 @@ class JsonApplicationSettingsRepository:
             COLOR_MODE_KEY: settings.scan_settings.color_mode.value,
             CAPTURE_MODE_KEY: settings.capture_mode.value,
             AUTO_CROP_KEY: settings.adjustment.auto_crop,
+            JPEG_QUALITY_KEY: settings.adjustment.jpeg_quality,
         }
         self._storage_file.parent.mkdir(parents=True, exist_ok=True)
         encoded_document = json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8")

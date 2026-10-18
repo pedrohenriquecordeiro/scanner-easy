@@ -36,11 +36,11 @@ def scanned_pdf(marked_jpeg: bytes) -> bytes:
 
 
 def turn_jpeg(rotator: ScanContentRotator, content: bytes) -> bytes:
-    return rotator.rotate_clockwise(content, OutputFormat.JPEG)
+    return rotator.rotate_clockwise(content, OutputFormat.JPEG, 95)
 
 
 def turn_pdf(rotator: ScanContentRotator, content: bytes) -> bytes:
-    return rotator.rotate_clockwise(content, OutputFormat.PDF)
+    return rotator.rotate_clockwise(content, OutputFormat.PDF, 95)
 
 
 def read_rotation_of_the_page(pdf_content: bytes) -> int:
@@ -151,7 +151,7 @@ def test_a_turned_pdf_still_has_a_single_page(rotator, scanned_pdf):
 @pytest.mark.parametrize("unreadable_content", [b"", b"not a file", b"\xff\xd8 not really a jpeg", b"%PDF-1.7 broken"])
 def test_content_that_cannot_be_read_raises_saved_scan_unreadable(rotator, output_format, unreadable_content):
     with pytest.raises(SavedScanUnreadableError):
-        rotator.rotate_clockwise(unreadable_content, output_format)
+        rotator.rotate_clockwise(unreadable_content, output_format, 95)
 
 
 def test_a_truncated_jpeg_raises_saved_scan_unreadable(rotator, marked_jpeg):

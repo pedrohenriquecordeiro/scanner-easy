@@ -9,7 +9,6 @@ from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderU
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import (
-    ADJUSTED_PAGE_SIZE_FACTOR,
     MINIMUM_FREE_SPACE_BYTES,
     SAFETY_MARGIN_PAGES,
     StorageGuardService,
@@ -230,16 +229,22 @@ CROPPED = ImageAdjustment(auto_crop=True)
 COLOR_AT_1200 = ScanSettings(1200, ColorMode.COLOR)
 
 
-def test_an_active_crop_doubles_the_estimated_page_size():
-    assert estimated_page_bytes(COLOR_AT_300, CROPPED) == ADJUSTED_PAGE_SIZE_FACTOR * estimated_page_bytes(COLOR_AT_300)
+def test_an_active_crop_doubles_the_estimated_page_size_at_the_default_quality():
+    assert estimated_page_bytes(COLOR_AT_300, CROPPED) == 2 * estimated_page_bytes(COLOR_AT_300)
+
+
+def test_an_active_crop_at_the_top_quality_quadruples_the_estimated_page_size():
+    top_quality = ImageAdjustment(auto_crop=True, jpeg_quality=100)
+
+    assert estimated_page_bytes(COLOR_AT_300, top_quality) == 4 * estimated_page_bytes(COLOR_AT_300)
+
+
+def test_the_quality_alone_does_not_change_the_estimated_page_size():
+    assert estimated_page_bytes(COLOR_AT_300, ImageAdjustment(jpeg_quality=100)) == estimated_page_bytes(COLOR_AT_300)
 
 
 def test_no_adjustment_keeps_the_estimated_page_size():
     assert estimated_page_bytes(COLOR_AT_300, NO_ADJUSTMENT) == estimated_page_bytes(COLOR_AT_300)
-
-
-def test_the_adjusted_factor_is_two():
-    assert ADJUSTED_PAGE_SIZE_FACTOR == 2
 
 
 def test_a_page_at_1200_dots_per_inch_is_four_times_the_page_at_600():

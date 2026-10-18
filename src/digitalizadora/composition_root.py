@@ -41,7 +41,6 @@ from digitalizadora.services.document_draft_store import DocumentDraftStore, Dra
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.document_page_crop_detector import DocumentPageCropDetector
-from digitalizadora.services.document_page_renderer import DocumentPageRenderer
 from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
@@ -50,6 +49,7 @@ from digitalizadora.services.jpeg_resolution_service import JpegResolutionServic
 from digitalizadora.services.last_scan_rotation_service import LastScanRotationService, LastScanRotators
 from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
@@ -279,7 +279,7 @@ def _build_document_draft_service(
         DraftIdentitySource(draft_session=generate_draft_session(), page_identifier_factory=generate_page_identifier),
     )
     page_capture = DocumentPageCapture(shared_services.scan_encoder, draft_store, shared_services.crop_detection)
-    pdf_assembler = DocumentPdfAssembler(DocumentPageRenderer(), PdfAssemblyService())
+    pdf_assembler = DocumentPdfAssembler(PageFramingRenderer(), PdfAssemblyService())
     finalizer = DocumentFinalizer(pdf_assembler, repositories.scan_output, shared_services.storage_guard)
     # The destination is bound once here, so DocumentDraftService never depends on DocumentPageCapture.
     page_scanner = functools.partial(scan_service.scan_document_page, page_capture=page_capture)
@@ -304,7 +304,7 @@ def _build_controllers(services: _Services, error_message_catalog: ErrorMessageC
         printer=PrinterController(services.printer_connection, error_message_catalog),
         preview=PreviewController(services.progress_tracker),
         document=DocumentController(services.document_draft, services.settings, error_message_catalog),
-        last_scan=LastScanController(services.last_scan_rotation, error_message_catalog),
+        last_scan=LastScanController(services.last_scan_rotation, services.settings, error_message_catalog),
     )
 
 

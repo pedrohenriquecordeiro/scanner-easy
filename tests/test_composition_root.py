@@ -111,6 +111,7 @@ def test_state_endpoint_reports_default_settings(
         "color_mode": "color",
         "capture_mode": "single",
         "auto_crop": False,
+        "jpeg_quality": 90,
     }
     assert (response.status_code, response.json()["settings"]) == (200, expected_settings)
 

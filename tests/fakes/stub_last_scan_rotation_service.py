@@ -9,9 +9,11 @@ class StubLastScanRotationService:
         self.failure: Exception | None = None
         self.result = build_stored_scan().result
         self.rotation_count = 0
+        self.received_jpeg_qualities: list[int] = []
 
-    async def rotate_clockwise(self) -> ScanResult:
+    async def rotate_clockwise(self, jpeg_quality: int) -> ScanResult:
         self.rotation_count += 1
+        self.received_jpeg_qualities.append(jpeg_quality)
         if self.failure is not None:
             raise self.failure
         return self.result

@@ -44,6 +44,7 @@ from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.synthetic_scans import read_jpeg_size
 
+JPEG_QUALITY = 90
 WHOLE_PAGE_CROP = rectangle(0.0, 0.0, 1.0, 1.0)
 
 SETTINGS = ScanPreset.DOCUMENT.settings
@@ -256,6 +257,7 @@ WIDE_SCANNED_PAGE = ScannedImage(
 NARROW_SCANNED_PAGE = ScannedImage(
     content=build_sample_jpeg(width_pixels=300, height_pixels=150), media_type="image/jpeg"
 )
+
 WIDE_PAGE_WIDTH_AT_300_IN_POINTS = 144.0
 NARROW_PAGE_WIDTH_AT_300_IN_POINTS = 72.0
 NARROW_PAGE_WIDTH_AT_600_IN_POINTS = 36.0
@@ -269,7 +271,7 @@ def read_page_widths(pdf_path: Path) -> list[float]:
 
 async def finalize_later(parts: DocumentServiceParts) -> DocumentFinalizationResult:
     parts.clock.advance(FINALIZATION_DELAY_SECONDS)
-    return await parts.document_draft_service.finalize()
+    return await parts.document_draft_service.finalize(JPEG_QUALITY)
 
 
 async def finalize_leaving_the_draft_marked(parts: DocumentServiceParts) -> DocumentFinalizationResult:
@@ -378,7 +380,7 @@ async def test_finalize_assembles_the_pdf_in_a_worker_thread(service, parts):
 
 async def test_finalize_without_a_draft_raises_no_open_document(service):
     with pytest.raises(NoOpenDocumentError):
-        await service.finalize()
+        await service.finalize(JPEG_QUALITY)
 
 
 async def test_finalize_of_a_draft_without_pages_raises_empty_document(parts):
@@ -387,7 +389,7 @@ async def test_finalize_of_a_draft_without_pages_raises_empty_document(parts):
     )
 
     with pytest.raises(EmptyDocumentError):
-        await build_service_with_store(parts, draft_store).finalize()
+        await build_service_with_store(parts, draft_store).finalize(JPEG_QUALITY)
 
 
 async def test_unusable_output_folder_keeps_the_draft(service, parts):
@@ -498,7 +500,7 @@ async def test_failed_finished_mark_and_cleanup_keep_the_draft_marked_finished(s
 async def test_finalize_again_with_the_mark_and_the_pdf_writes_no_other_pdf(service, parts):
     first_finalization = await finalize_leaving_the_draft_marked(parts)
 
-    await service.finalize()
+    await service.finalize(JPEG_QUALITY)
 
     assert list(parts.output_folder.iterdir()) == [first_finalization.result.output_path]
 
@@ -506,13 +508,13 @@ async def test_finalize_again_with_the_mark_and_the_pdf_writes_no_other_pdf(serv
 async def test_finalize_again_with_the_mark_and_the_pdf_returns_the_first_finalization(service, parts):
     first_finalization = await finalize_leaving_the_draft_marked(parts)
 
-    assert await service.finalize() == first_finalization
+    assert await service.finalize(JPEG_QUALITY) == first_finalization
 
 
 async def test_finalize_again_with_the_mark_and_the_pdf_deletes_the_draft(service, parts):
     await finalize_leaving_the_draft_marked(parts)
 
-    await service.finalize()
+    await service.finalize(JPEG_QUALITY)
 
     assert service.snapshot().draft is None
 
@@ -521,7 +523,7 @@ async def test_finalize_again_with_the_mark_but_without_the_pdf_writes_a_new_pdf
     first_finalization = await finalize_leaving_the_draft_marked(parts)
     first_finalization.result.output_path.unlink()
 
-    second_finalization = await service.finalize()
+    second_finalization = await service.finalize(JPEG_QUALITY)
 
     assert second_finalization.result.output_path.is_file()
 
@@ -705,7 +707,7 @@ async def test_a_rotated_page_goes_into_the_saved_pdf_with_its_new_orientation(s
     page_size = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
     await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
-    finalization = await service.finalize()
+    finalization = await service.finalize(JPEG_QUALITY)
 
     media_box = read_pdf_media_box(finalization.result.output_path)
     assert (media_box[2] > media_box[3]) is (page_size[1] > page_size[0])
@@ -716,7 +718,7 @@ async def test_a_cropped_page_goes_into_the_saved_pdf_with_the_size_of_its_frame
     page_width, page_height = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
     await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle(0.0, 0.0, 0.5, 1.0)])
 
-    finalization = await service.finalize()
+    finalization = await service.finalize(JPEG_QUALITY)
 
     media_box = read_pdf_media_box(finalization.result.output_path)
     assert media_box[2] / media_box[3] == pytest.approx(page_width / 2 / page_height, rel=0.1)

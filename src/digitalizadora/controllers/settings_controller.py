@@ -21,6 +21,7 @@ class SettingsRequestBody(BaseModel):
     dots_per_inch: StrictInt | None = None
     color_mode: str | None = None
     auto_crop: StrictBool | None = None
+    jpeg_quality: StrictInt | None = None
 
 
 class SettingsController:
@@ -49,6 +50,7 @@ class SettingsController:
             dots_per_inch=body.dots_per_inch,
             color_mode=body.color_mode,
             auto_crop=body.auto_crop,
+            jpeg_quality=body.jpeg_quality,
         )
         try:
             saved_settings = self._settings_service.update(update)

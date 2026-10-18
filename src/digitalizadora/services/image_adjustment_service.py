@@ -22,16 +22,16 @@ class ImageAdjustmentService:
             crop = self._crop_detection_service.detect_crop_to_apply(jpeg_content)
             if crop is None:
                 return jpeg_content
-            return self._crop(jpeg_content, crop)
+            return self._crop(jpeg_content, crop, adjustment.jpeg_quality)
         except MemoryError as error:
             raise ImageAdjustmentFailedError("Not enough memory to adjust the scanned image") from error
         except (OSError, Image.DecompressionBombError, ValueError) as error:
             raise ScanFailedError("The scanned image could not be decoded for the adjustment") from error
 
-    def _crop(self, jpeg_content: bytes, crop: PageCrop) -> bytes:
+    def _crop(self, jpeg_content: bytes, crop: PageCrop, jpeg_quality: int) -> bytes:
         image = Image.open(io.BytesIO(jpeg_content))
         try:
-            encoding_options = read_encoding_options(image)
+            encoding_options = read_encoding_options(image, jpeg_quality)
             region = crop.to_pixel_region(image.size)
             image = replace_with(image, lambda full_image: full_image.crop(region.as_box()))
             buffer = io.BytesIO()

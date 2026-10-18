@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.services.document_page_renderer import DocumentPageRenderer
+from digitalizadora.domain.errors import ScanFailedError
+from digitalizadora.services.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
 
 
 class RenderedPageSource:
@@ -11,10 +11,14 @@ class RenderedPageSource:
     decoded at a time and no temporary JPEG is needed.
     """
 
-    def __init__(self, page_renderer: DocumentPageRenderer, page_file: Path, framing: PageFraming) -> None:
+    def __init__(self, page_renderer: PageFramingRenderer, page_file: Path, request: FrameRenderRequest) -> None:
         self._page_renderer = page_renderer
         self._page_file = page_file
-        self._framing = framing
+        self._request = request
 
     def read(self) -> bytes:
-        return self._page_renderer.render_jpeg(self._page_file, self._framing)
+        try:
+            with self._page_file.open("rb") as master:
+                return self._page_renderer.render_jpeg(master, self._request)
+        except OSError as error:
+            raise ScanFailedError(f"The page {self._page_file.name} could not be read") from error

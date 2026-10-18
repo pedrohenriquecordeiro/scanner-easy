@@ -392,6 +392,46 @@ def test_a_crop_choice_is_saved(adjusted_service: ApplicationSettingsService) ->
     assert saved.adjustment == ImageAdjustment(auto_crop=False)
 
 
+def build_jpeg_quality_update(jpeg_quality: object) -> SettingsUpdate:
+    return SettingsUpdate(output_folder="/Volumes/External/scans", output_format="jpg", jpeg_quality=jpeg_quality)
+
+
+def test_a_jpeg_quality_is_saved(settings_service: ApplicationSettingsService) -> None:
+    saved = settings_service.update(build_jpeg_quality_update(65))
+
+    assert saved.adjustment.jpeg_quality == 65
+
+
+def test_a_jpeg_quality_keeps_the_crop_choice(adjusted_service: ApplicationSettingsService) -> None:
+    saved = adjusted_service.update(build_jpeg_quality_update(65))
+
+    assert saved.adjustment == ImageAdjustment(auto_crop=True, jpeg_quality=65)
+
+
+def test_a_crop_choice_keeps_the_saved_jpeg_quality(settings_service: ApplicationSettingsService) -> None:
+    settings_service.update(build_jpeg_quality_update(65))
+
+    saved = settings_service.update(build_adjustment_update(auto_crop=True))
+
+    assert saved.adjustment == ImageAdjustment(auto_crop=True, jpeg_quality=65)
+
+
+def test_an_update_without_a_jpeg_quality_keeps_the_default(settings_service: ApplicationSettingsService) -> None:
+    assert settings_service.update(build_update()).adjustment.jpeg_quality == 90
+
+
+@pytest.mark.parametrize("invalid_quality", [49, 101, True, 72.5, "72"])
+def test_an_invalid_jpeg_quality_is_refused_and_saves_nothing(
+    settings_service: ApplicationSettingsService,
+    settings_repository: InMemoryApplicationSettingsRepository,
+    invalid_quality: object,
+) -> None:
+    with pytest.raises(InvalidSettingsError):
+        settings_service.update(build_jpeg_quality_update(invalid_quality))
+
+    assert settings_repository.load() == INITIAL_SETTINGS
+
+
 INVALID_QUALITY_AND_ADJUSTMENT_UPDATES = [
     build_quality_update(dots_per_inch=301),
     build_quality_update(color_mode="sepia"),

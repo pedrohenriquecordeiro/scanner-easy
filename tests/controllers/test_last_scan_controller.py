@@ -1,10 +1,12 @@
 from http import HTTPStatus
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.last_scan_controller import LAST_SCAN_ERROR_STATUSES, LastScanController
+from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     ImageAdjustmentFailedError,
@@ -15,7 +17,12 @@ from digitalizadora.domain.errors import (
     SavedScanUnreadableError,
     ScanAlreadyRunningError,
 )
-from tests.controllers.controller_test_support import build_test_client
+from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.scan_preset import ScanPreset
+from digitalizadora.services.application_settings_service import ApplicationSettingsService
+from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
+from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.stored_scans import (
     STORED_SCAN_OUTPUT_PATH,
     STORED_SCAN_SCANNED_AT,
@@ -24,6 +31,12 @@ from tests.fakes.stored_scans import (
 from tests.fakes.stub_last_scan_rotation_service import StubLastScanRotationService
 
 CATALOG = ErrorMessageCatalog()
+SETTINGS = ApplicationSettings(
+    output_folder=Path("/Volumes/External/scans"),
+    output_format=OutputFormat.PDF,
+    scan_settings=ScanPreset.DOCUMENT.settings,
+    adjustment=ImageAdjustment(jpeg_quality=70),
+)
 ROTATION_PATH = "/api/scans/last/rotation"
 EXPECTED_FAILURES = [
     (NoLastScanError("none"), HTTPStatus.NOT_FOUND),
@@ -43,7 +56,10 @@ def rotation_service() -> StubLastScanRotationService:
 
 @pytest.fixture
 def client(rotation_service: StubLastScanRotationService) -> TestClient:
-    return build_test_client(LastScanController(rotation_service, CATALOG).build_router())
+    settings_service = ApplicationSettingsService(
+        InMemoryApplicationSettingsRepository(SETTINGS), StubFolderPreparer()
+    )
+    return build_test_client(LastScanController(rotation_service, settings_service, CATALOG).build_router())
 
 
 def test_rotating_the_last_scan_answers_the_turned_file(client: TestClient) -> None:
@@ -106,3 +122,11 @@ def test_the_error_statuses_cover_the_documented_codes() -> None:
 
 def test_the_rotation_is_a_post_only_route(client: TestClient) -> None:
     assert client.get(ROTATION_PATH).status_code == HTTPStatus.METHOD_NOT_ALLOWED
+
+
+def test_rotating_asks_for_the_saved_jpeg_quality(
+    client: TestClient, rotation_service: StubLastScanRotationService
+) -> None:
+    client.post(ROTATION_PATH)
+
+    assert rotation_service.received_jpeg_qualities == [70]

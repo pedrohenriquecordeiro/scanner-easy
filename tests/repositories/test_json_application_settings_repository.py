@@ -55,6 +55,7 @@ def test_save_writes_the_documented_json_shape(tmp_path):
         "color_mode": "color",
         "capture_mode": "single",
         "auto_crop": False,
+        "jpeg_quality": 90,
     }
 
 
@@ -424,6 +425,49 @@ def test_a_changed_invalid_auto_crop_is_reported_again(tmp_path, caplog):
     write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "auto_crop": "maybe"})
 
     with caplog.at_level(logging.WARNING):
+        repository.load()
+
+    assert len(caplog.records) == 1
+
+
+def test_a_saved_jpeg_quality_is_loaded(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "jpeg_quality": 65})
+
+    assert build_repository(storage_file).load().adjustment.jpeg_quality == 65
+
+
+def test_a_jpeg_quality_is_written_and_read_back(tmp_path):
+    repository = build_repository(tmp_path / "settings.json")
+    settings = dataclasses.replace(CUSTOM_SETTINGS, adjustment=ImageAdjustment(auto_crop=True, jpeg_quality=72))
+
+    repository.save(settings)
+
+    assert repository.load() == settings
+
+
+def test_a_file_from_before_the_jpeg_quality_loads_with_ninety(tmp_path):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, NEW_FORMAT_DOCUMENT)
+
+    assert build_repository(storage_file).load().adjustment.jpeg_quality == 90
+
+
+@pytest.mark.parametrize("invalid_quality", [49, 101, 0, "90", 90.5, True, None, [90]])
+def test_an_invalid_jpeg_quality_is_read_as_ninety_keeping_the_other_fields(tmp_path, invalid_quality):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "jpeg_quality": invalid_quality})
+
+    assert build_repository(storage_file).load() == SETTINGS_OF_THE_NEW_FORMAT_DOCUMENT
+
+
+def test_an_invalid_jpeg_quality_is_reported_once(tmp_path, caplog):
+    storage_file = tmp_path / "settings.json"
+    write_document(storage_file, {**NEW_FORMAT_DOCUMENT, "jpeg_quality": 300})
+    repository = build_repository(storage_file)
+
+    with caplog.at_level(logging.WARNING):
+        repository.load()
         repository.load()
 
     assert len(caplog.records) == 1

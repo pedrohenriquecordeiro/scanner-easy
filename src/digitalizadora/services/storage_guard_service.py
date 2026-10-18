@@ -4,7 +4,7 @@ from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment, rendered_size_factor
 from digitalizadora.domain.scan_quality import pixels_per_page
 from digitalizadora.domain.scan_settings import ScanSettings
 
@@ -13,8 +13,6 @@ MINIMUM_FREE_SPACE_BYTES = BYTES_PER_KIBIBYTE**3
 ESTIMATED_BYTES_PER_PIXEL_COLOR = 0.12
 ESTIMATED_BYTES_PER_PIXEL_GRAYSCALE = 0.08
 SAFETY_MARGIN_PAGES = 3
-# Conservative: re-encoding a rotated or cropped page at quality 95 can return a bigger JPEG than the scanner's.
-ADJUSTED_PAGE_SIZE_FACTOR = 2
 
 ESTIMATED_BYTES_PER_PIXEL = {
     ColorMode.COLOR: ESTIMATED_BYTES_PER_PIXEL_COLOR,
@@ -24,7 +22,9 @@ ESTIMATED_BYTES_PER_PIXEL = {
 
 def estimated_page_bytes(settings: ScanSettings, adjustment: ImageAdjustment = NO_ADJUSTMENT) -> int:
     unadjusted_bytes = round(pixels_per_page(settings.dots_per_inch) * ESTIMATED_BYTES_PER_PIXEL[settings.color_mode])
-    return unadjusted_bytes * ADJUSTED_PAGE_SIZE_FACTOR if adjustment.is_active else unadjusted_bytes
+    if not adjustment.is_active:
+        return unadjusted_bytes
+    return unadjusted_bytes * rendered_size_factor(adjustment.jpeg_quality)
 
 
 def read_free_space_in_bytes(folder: Path) -> int:

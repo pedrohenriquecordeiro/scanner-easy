@@ -35,6 +35,7 @@ from tests.fakes.in_memory_settings_repository import InMemoryApplicationSetting
 from tests.fakes.scripted_file_writer import ScriptedFileWriter
 from tests.fakes.synthetic_scans import build_marked_scan_jpeg, find_marker_corner, read_jpeg_size
 
+JPEG_QUALITY = 90
 PAGE_SIZE = (100, 200)
 SCANNED_AT = datetime(2026, 10, 18, 9, 0, 0, tzinfo=timezone(timedelta(hours=-3)))
 JPEG_NAME = "2026-10-18_00001.jpg"
@@ -124,26 +125,26 @@ def read_pdf_rotation(pdf_path: Path) -> int:
 
 
 async def test_a_jpg_is_turned_in_its_own_file(service, last_jpeg):
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     turned = last_jpeg.output_path.read_bytes()
     assert (read_jpeg_size(turned), find_marker_corner(turned)) == (PAGE_SIZE[::-1], "top-right")
 
 
 async def test_a_pdf_gets_a_quarter_turn_in_its_own_file(service, last_pdf):
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert read_pdf_rotation(last_pdf.output_path) == 90
 
 
 async def test_the_turned_file_keeps_its_name(service, last_jpeg, tmp_path):
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert [entry.name for entry in tmp_path.iterdir()] == [JPEG_NAME]
 
 
 async def test_the_answer_is_the_last_result_with_the_new_size(service, last_jpeg):
-    result = await service.rotate_clockwise()
+    result = await service.rotate_clockwise(JPEG_QUALITY)
 
     assert result == ScanResult(
         last_jpeg.output_path, OutputFormat.JPEG, SCANNED_AT, last_jpeg.output_path.stat().st_size
@@ -151,7 +152,7 @@ async def test_the_answer_is_the_last_result_with_the_new_size(service, last_jpe
 
 
 async def test_the_tracker_holds_the_turned_result(service, tracker, last_jpeg):
-    result = await service.rotate_clockwise()
+    result = await service.rotate_clockwise(JPEG_QUALITY)
 
     assert tracker.snapshot().last_result == result
 
@@ -159,33 +160,33 @@ async def test_the_tracker_holds_the_turned_result(service, tracker, last_jpeg):
 async def test_the_revision_of_the_last_result_rises(service, tracker, last_jpeg):
     revision_before = tracker.snapshot().last_result_revision
 
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert tracker.snapshot().last_result_revision == revision_before + 1
 
 
 async def test_the_thumbnail_of_the_last_scan_is_turned(service, tracker, last_jpeg):
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert read_jpeg_size(tracker.last_thumbnail_jpeg()) == (100, 50)
 
 
 async def test_a_turn_does_not_count_as_a_new_scan(service, tracker, last_jpeg):
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert tracker.snapshot().scans_completed == 1
 
 
 async def test_two_turns_in_a_row_make_a_half_turn(service, last_jpeg):
-    await service.rotate_clockwise()
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     turned = last_jpeg.output_path.read_bytes()
     assert (read_jpeg_size(turned), find_marker_corner(turned)) == (PAGE_SIZE, "bottom-right")
 
 
 async def test_two_turns_asked_at_once_are_done_one_after_the_other(service, last_jpeg):
-    await asyncio.gather(service.rotate_clockwise(), service.rotate_clockwise())
+    await asyncio.gather(service.rotate_clockwise(JPEG_QUALITY), service.rotate_clockwise(JPEG_QUALITY))
 
     turned = last_jpeg.output_path.read_bytes()
     assert (read_jpeg_size(turned), find_marker_corner(turned)) == (PAGE_SIZE, "bottom-right")
@@ -193,14 +194,14 @@ async def test_two_turns_asked_at_once_are_done_one_after_the_other(service, las
 
 async def test_without_a_scan_of_this_run_raises_no_last_scan(service):
     with pytest.raises(NoLastScanError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
 
 async def test_a_scan_in_progress_raises_scan_already_running(service, tracker, last_jpeg):
     tracker.begin_scan(REQUEST)
 
     with pytest.raises(ScanAlreadyRunningError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
 
 async def test_a_scan_in_progress_leaves_the_file_alone(service, tracker, last_jpeg):
@@ -208,7 +209,7 @@ async def test_a_scan_in_progress_leaves_the_file_alone(service, tracker, last_j
     tracker.begin_scan(REQUEST)
 
     with pytest.raises(ScanAlreadyRunningError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
     assert last_jpeg.output_path.read_bytes() == file_before
 
@@ -217,7 +218,7 @@ async def test_a_file_that_is_gone_raises_last_scan_file_missing(service, last_j
     last_jpeg.output_path.unlink()
 
     with pytest.raises(LastScanFileMissingError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
 
 async def test_a_file_that_is_gone_leaves_the_tracker_as_it_was(service, tracker, last_jpeg):
@@ -225,7 +226,7 @@ async def test_a_file_that_is_gone_leaves_the_tracker_as_it_was(service, tracker
     snapshot_before = tracker.snapshot()
 
     with pytest.raises(LastScanFileMissingError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
     assert tracker.snapshot() == snapshot_before
 
@@ -234,14 +235,14 @@ async def test_a_file_that_is_not_an_image_raises_saved_scan_unreadable(service,
     last_jpeg.output_path.write_bytes(b"not a jpeg")
 
     with pytest.raises(SavedScanUnreadableError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
 
 async def test_a_file_that_is_not_readable_is_left_as_it_is(service, last_jpeg):
     last_jpeg.output_path.write_bytes(b"not a jpeg")
 
     with pytest.raises(SavedScanUnreadableError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
     assert last_jpeg.output_path.read_bytes() == b"not a jpeg"
 
@@ -255,13 +256,13 @@ async def test_a_full_disk_leaves_the_original_file_and_the_tracker(tmp_path, tr
     service = build_service(tracker, build_repository(tmp_path, writer))
 
     with pytest.raises(InsufficientStorageError):
-        await service.rotate_clockwise()
+        await service.rotate_clockwise(JPEG_QUALITY)
 
     assert (scan_path.read_bytes(), tracker.snapshot()) == (file_before, snapshot_before)
 
 
 async def test_the_disk_work_runs_off_the_event_loop(service, repository, last_jpeg):
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert threading.get_ident() not in repository.thread_identifiers
 
@@ -277,7 +278,7 @@ async def test_a_scan_that_ends_during_the_turn_keeps_its_place_in_the_tracker(
 
     repository.after_replacement = finish_a_newer_scan
 
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert (tracker.snapshot().last_result, tracker.last_thumbnail_jpeg()) == (newer_result, b"newer-thumbnail")
 
@@ -293,12 +294,12 @@ async def test_a_scan_that_ends_during_the_turn_does_not_undo_the_turn_of_the_fi
 
     repository.after_replacement = finish_a_newer_scan
 
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert read_jpeg_size(last_jpeg.output_path.read_bytes()) == PAGE_SIZE[::-1]
 
 
 async def test_the_tracker_is_idle_after_a_turn(service, tracker, last_jpeg):
-    await service.rotate_clockwise()
+    await service.rotate_clockwise(JPEG_QUALITY)
 
     assert tracker.snapshot().phase is ScanPhase.IDLE

@@ -48,7 +48,7 @@ from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.stub_document_draft_service import StubDocumentDraftService, build_stub_snapshot
 
 CATALOG = ErrorMessageCatalog()
-ADJUSTMENT = ImageAdjustment(auto_crop=True)
+ADJUSTMENT = ImageAdjustment(auto_crop=True, jpeg_quality=70)
 SETTINGS = ApplicationSettings(
     output_folder=Path("/Volumes/External/scans"),
     output_format=OutputFormat.PDF,
@@ -356,6 +356,14 @@ def test_rename_with_an_invalid_name_answers_422(
     response = client.put("/api/document/name", json={"name": "..."})
 
     assert (response.status_code, response.json()) == build_error_answer(refusal, HTTPStatus.UNPROCESSABLE_ENTITY)
+
+
+def test_finalize_writes_the_pdf_with_the_saved_jpeg_quality(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.post("/api/document/finalize")
+
+    assert document_service.received_arguments["finalize"] == 70
 
 
 def test_finalize_answers_the_saved_pdf(client: TestClient) -> None:

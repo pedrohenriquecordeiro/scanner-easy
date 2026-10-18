@@ -25,6 +25,7 @@ from tests.fakes.document_service_parts import (
 )
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 
+JPEG_QUALITY = 90
 SETTINGS = ScanPreset.DOCUMENT.settings
 QUICK_SCAN_REQUEST = ScanRequest(settings=SETTINGS, output_format=OutputFormat.PDF)
 FIRST_PAGE_IDENTIFIER = page_identifier_at(1)
@@ -42,7 +43,7 @@ EDITS: dict[str, Callable[[DocumentDraftService], Awaitable[object]]] = {
     "detect_page_crop": lambda service: service.detect_page_crops(FIRST_PAGE_IDENTIFIER),
     "discard_last_page": lambda service: service.discard_last_page(),
     "cancel": lambda service: service.cancel(),
-    "finalize": lambda service: service.finalize(),
+    "finalize": lambda service: service.finalize(JPEG_QUALITY),
 }
 
 
@@ -85,7 +86,7 @@ async def start_held_finalization(
     """A draft of two pages whose finalization holds the lock until blocking_reader.release()."""
     await parts.document_draft_service.add_page(SETTINGS)
     await parts.document_draft_service.add_page(SETTINGS)
-    finalization_task = asyncio.create_task(parts.document_draft_service.finalize())
+    finalization_task = asyncio.create_task(parts.document_draft_service.finalize(JPEG_QUALITY))
     await asyncio.to_thread(blocking_reader.entered.wait)
     return finalization_task
 
@@ -253,6 +254,7 @@ async def test_edit_that_waited_for_the_lock_and_found_a_quick_scan_raises_scan_
 async def test_ensure_can_add_page_while_an_edit_waits_for_a_released_lock_raises_document_busy(
     held_parts, blocking_reader
 ):
+
     service = held_parts.document_draft_service
     finalization_task = await start_held_finalization(held_parts, blocking_reader)
     rename_task = asyncio.create_task(service.rename("Contrato"))

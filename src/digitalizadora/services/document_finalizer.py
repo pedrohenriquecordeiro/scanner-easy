@@ -29,11 +29,11 @@ class DocumentFinalizer:
         self._scan_output_repository = scan_output_repository
         self._storage_guard_service = storage_guard_service
 
-    def ensure_capacity(self, draft: DocumentDraft) -> None:
+    def ensure_capacity(self, draft: DocumentDraft, jpeg_quality: int) -> None:
         """The folder first: a disconnected disk is reported before any page is checked (6.6.3, step 3)."""
         self._scan_output_repository.ensure_output_folder_ready()
         self._storage_guard_service.ensure_space_for_file(
-            self._scan_output_repository.output_folder(), draft.estimated_document_size_in_bytes
+            self._scan_output_repository.output_folder(), draft.estimate_document_size_in_bytes(jpeg_quality)
         )
 
     def write_document(self, assembly_input: DocumentAssemblyInput) -> ScanResult:

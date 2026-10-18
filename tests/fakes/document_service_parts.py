@@ -24,13 +24,13 @@ from digitalizadora.services.document_draft_store import DocumentDraftStore, Dra
 from digitalizadora.services.document_finalizer import DocumentFinalizer
 from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.document_page_crop_detector import DocumentPageCropDetector
-from digitalizadora.services.document_page_renderer import DocumentPageRenderer
 from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.scan_encoder import ScanEncoder
@@ -160,7 +160,7 @@ def _build_finalizer(
         settings_repository, ScanFileNamingPolicy(), AtomicFileWriter()
     )
     return DocumentFinalizer(
-        DocumentPdfAssembler(DocumentPageRenderer(), pdf_assembly_service),
+        DocumentPdfAssembler(PageFramingRenderer(), pdf_assembly_service),
         scan_output_repository,
         StorageGuardService(free_space_reader),
     )

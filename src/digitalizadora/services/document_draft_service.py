@@ -117,8 +117,8 @@ class DocumentDraftService:
     async def cancel(self) -> None:
         await self._run_edit(self._draft_store.discard)
 
-    async def finalize(self) -> DocumentFinalizationResult:
-        return await self._run_edit(self._finalize_draft)
+    async def finalize(self, jpeg_quality: int) -> DocumentFinalizationResult:
+        return await self._run_edit(functools.partial(self._finalize_draft, jpeg_quality))
 
     async def _run_edit[EditOutcome](self, edit: Callable[[], EditOutcome]) -> EditOutcome:
         self._ensure_no_scan_in_progress()
@@ -138,7 +138,7 @@ class DocumentDraftService:
         if self._scan_service.is_scan_in_progress():
             raise ScanAlreadyRunningError("A scan is already running")
 
-    def _finalize_draft(self) -> DocumentFinalizationResult:
+    def _finalize_draft(self, jpeg_quality: int) -> DocumentFinalizationResult:
         """6.6.3, all in one worker thread."""
         draft = self._draft_store.snapshot().draft
         if draft is None:
@@ -149,18 +149,18 @@ class DocumentDraftService:
             # The PDF of an earlier finalization exists: close the draft without writing another one (R15).
             finished_document = draft.finished_document
         else:
-            finished_document = self._write_document(draft)
-        finalization = DocumentFinalizationResult(result=finished_document, page_count=draft.page_count)
+            finished_document = self._write_document(draft, jpeg_quality)
+        finalization = DocumentFinalizationResult(result=finished_document, page_count=draft.output_page_count)
         self._draft_store.close_finished_draft(finalization)
         return finalization
 
-    def _write_document(self, draft: DocumentDraft) -> ScanResult:
-        self._finalizer.ensure_capacity(draft)
+    def _write_document(self, draft: DocumentDraft, jpeg_quality: int) -> ScanResult:
+        self._finalizer.ensure_capacity(draft, jpeg_quality)
         page_files = self._draft_store.verify_page_files(draft)
         finalized_at = self._clock.now()
         self._draft_store.mark_finalization_started(finalized_at)
         try:
-            return self._finalizer.write_document(DocumentAssemblyInput(draft, page_files, finalized_at))
+            return self._finalizer.write_document(DocumentAssemblyInput(draft, page_files, finalized_at, jpeg_quality))
         except Exception:
             # The draft stays intact; the intention marker of step 5 goes away (best effort).
             self._draft_store.clear_finalization_marker()

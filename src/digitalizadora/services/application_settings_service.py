@@ -26,6 +26,7 @@ class SettingsUpdate:
     dots_per_inch: int | None = None
     color_mode: str | None = None
     auto_crop: bool | None = None
+    jpeg_quality: int | None = None
 
 
 def parse_enum_member[EnumMember: Enum](
@@ -99,6 +100,7 @@ class ApplicationSettingsService:
     def _resolve_adjustment(update: SettingsUpdate, saved: ApplicationSettings) -> ImageAdjustment:
         return ImageAdjustment(
             auto_crop=saved.adjustment.auto_crop if update.auto_crop is None else update.auto_crop,
+            jpeg_quality=saved.adjustment.jpeg_quality if update.jpeg_quality is None else update.jpeg_quality,
         )
 
 
