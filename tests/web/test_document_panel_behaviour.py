@@ -12,9 +12,7 @@ SAVED_SETTINGS = {
     "output_format": "pdf",
     "dots_per_inch": 300,
     "color_mode": "color",
-    "scan_preset": "document",
     "capture_mode": "single",
-    "rotation_degrees": 0,
     "auto_crop": False,
 }
 
@@ -34,7 +32,16 @@ SCENARIO_NAMES = (
     "finished_document_seen_from_another_tab",
     "page_added",
     "status_after_discarding_an_added_page",
+    "framed_tiles",
+    "tile_enlarge_buttons",
+    "enlarge_buttons_while_a_page_scans",
+    "thumbnail_proportion",
+    "crop_added_and_removed_later",
+    "thumbnail_that_fails_to_load",
+    "thumbnail_that_stays_after_a_new_body",
 )
+SECOND_PAGE_OVERLAY_STYLE = {"left": "13%", "top": "11.5%", "width": "78.4%", "height": "80%"}
+FIRST_PAGE_OVERLAY_STYLE = {"left": "20%", "top": "10%", "width": "50%", "height": "80%"}
 
 pytestmark = pytest.mark.skipif(
     NODE_EXECUTABLE is None, reason="Node.js is not installed, so document-panel.js cannot be exercised"
@@ -86,7 +93,13 @@ def test_tile_is_labelled_with_its_position(scenario_results: dict) -> None:
 
 
 def test_tile_thumbnail_comes_from_the_document_route(scenario_results: dict) -> None:
-    assert scenario_results["grid_tiles"]["thumbnail_source"] == f"/api/document/pages/{FIRST_PAGE}/thumbnail"
+    thumbnail_source = scenario_results["grid_tiles"]["thumbnail_source"]
+    assert thumbnail_source == f"/api/document/pages/{FIRST_PAGE}/thumbnail?rotation_degrees=0"
+
+
+def test_tile_thumbnail_sits_inside_a_frame_that_takes_its_proportion(scenario_results: dict) -> None:
+    result = scenario_results["grid_tiles"]
+    assert (result["thumbnail_frame_class"], result["thumbnail_class"]) == ("page-thumbnail-frame", "page-thumbnail")
 
 
 def test_tile_thumbnail_loads_lazily(scenario_results: dict) -> None:
@@ -117,6 +130,7 @@ def test_tile_buttons_follow_the_visual_order_for_the_tab_key(scenario_results: 
         "Excluir a página 1",
         "Girar a página 1 90 graus para a direita",
         "Mover a página 1 para outra posição",
+        "Ampliar a página 1 e ajustar a moldura de corte",
     ]
 
 
@@ -227,10 +241,105 @@ def test_status_line_drops_the_added_page_event_after_an_edit(scenario_results: 
     )
 
 
-def test_rotation_hint_is_shown_in_document_mode(scenario_results: dict) -> None:
-    assert scenario_results["idle_document_page"]["rotation_hint_hidden"] is False
-
-
 def test_tile_has_a_rotate_button_with_its_own_style_class(scenario_results: dict) -> None:
     result = scenario_results["grid_tiles"]
     assert (result["rotate_text"], result["rotate_class"]) == ("Girar ↻", "page-rotate")
+
+
+def test_a_page_without_a_crop_has_no_frame_over_its_thumbnail(scenario_results: dict) -> None:
+    overlays = scenario_results["framed_tiles"]["overlays"]
+    assert (overlays[0]["hidden"], overlays[2]["hidden"]) == (True, True)
+
+
+def test_a_page_with_a_crop_has_its_frame_over_the_thumbnail(scenario_results: dict) -> None:
+    overlay = scenario_results["framed_tiles"]["overlays"][1]
+    assert (overlay["hidden"], overlay["style"]) == (False, SECOND_PAGE_OVERLAY_STYLE)
+
+
+def test_the_frame_over_a_thumbnail_is_hidden_from_screen_readers(scenario_results: dict) -> None:
+    assert scenario_results["framed_tiles"]["overlays"][1]["aria_hidden"] == "true"
+
+
+def test_a_framed_tile_says_it_has_a_crop_frame(scenario_results: dict) -> None:
+    assert scenario_results["framed_tiles"]["labels"] == [
+        "Página 1 de 3",
+        "Página 2 de 3, com moldura de corte",
+        "Página 3 de 3",
+    ]
+
+
+def test_a_turned_page_asks_for_its_thumbnail_with_the_rotation(scenario_results: dict) -> None:
+    thumbnail_source = scenario_results["framed_tiles"]["thumbnail_source"]
+    assert thumbnail_source == f"/api/document/pages/{SECOND_PAGE}/thumbnail?rotation_degrees=90"
+
+
+def test_tile_has_an_enlarge_button_with_its_own_style_class(scenario_results: dict) -> None:
+    result = scenario_results["tile_enlarge_buttons"]
+    assert (result["text"], result["class_name"]) == ("Ampliar", "page-enlarge")
+
+
+def test_enlarge_button_names_its_page(scenario_results: dict) -> None:
+    assert scenario_results["tile_enlarge_buttons"]["labels_of_all_tiles"] == [
+        "Ampliar a página 1 e ajustar a moldura de corte",
+        "Ampliar a página 2 e ajustar a moldura de corte",
+        "Ampliar a página 3 e ajustar a moldura de corte",
+    ]
+
+
+def test_enlarge_buttons_stay_enabled_while_a_page_scans(scenario_results: dict) -> None:
+    assert scenario_results["enlarge_buttons_while_a_page_scans"]["disabled"] == [False, False, False]
+
+
+def test_thumbnail_frame_takes_the_proportion_of_the_loaded_picture(scenario_results: dict) -> None:
+    assert scenario_results["thumbnail_proportion"]["proportion_of_a_lying_page"] == "640 / 480"
+
+
+def test_thumbnail_frame_has_no_proportion_before_the_picture_loads(scenario_results: dict) -> None:
+    assert scenario_results["thumbnail_proportion"]["proportion_before_loading"] is None
+
+
+def test_thumbnail_frame_keeps_its_proportion_when_the_picture_reports_no_size(scenario_results: dict) -> None:
+    result = scenario_results["thumbnail_proportion"]
+    assert result["proportion_after_an_empty_load"] == result["proportion_of_a_lying_page"]
+
+
+def test_a_crop_that_arrives_later_shows_the_frame_on_the_same_tile(scenario_results: dict) -> None:
+    result = scenario_results["crop_added_and_removed_later"]
+    assert (result["framed"]["hidden"], result["framed"]["style"], result["same_tile_kept"]) == (
+        False,
+        FIRST_PAGE_OVERLAY_STYLE,
+        True,
+    )
+
+
+def test_a_crop_that_arrives_later_changes_the_tile_label(scenario_results: dict) -> None:
+    assert scenario_results["crop_added_and_removed_later"]["framed_label"] == "Página 1 de 3, com moldura de corte"
+
+
+def test_a_crop_that_is_removed_hides_the_frame_and_the_label_again(scenario_results: dict) -> None:
+    result = scenario_results["crop_added_and_removed_later"]
+    assert (result["hidden_again"], result["label_again"]) == (True, "Página 1 de 3")
+
+
+def test_a_crop_change_does_not_reload_the_thumbnail(scenario_results: dict) -> None:
+    thumbnail_source = scenario_results["crop_added_and_removed_later"]["thumbnail_source"]
+    assert thumbnail_source == f"/api/document/pages/{FIRST_PAGE}/thumbnail?rotation_degrees=0"
+
+
+def test_a_thumbnail_that_fails_to_load_shows_the_placeholder(scenario_results: dict) -> None:
+    assert scenario_results["thumbnail_that_fails_to_load"]["after_the_failure"] == {
+        "frame_hidden": True,
+        "placeholder_hidden": False,
+    }
+
+
+def test_another_thumbnail_address_tries_the_picture_again(scenario_results: dict) -> None:
+    result = scenario_results["thumbnail_that_fails_to_load"]
+    assert (result["frame_hidden_after_another_address"], result["placeholder_hidden_after_another_address"]) == (
+        False,
+        True,
+    )
+
+
+def test_a_thumbnail_that_failed_keeps_its_placeholder_when_the_address_is_the_same(scenario_results: dict) -> None:
+    assert scenario_results["thumbnail_that_stays_after_a_new_body"]["frame_hidden"] is True

@@ -5,14 +5,9 @@ from tests.web.panel_scenario_runner import NODE_EXECUTABLE, run_panel_scenarios
 FIRST_PAGE = "0000000000000001"
 SECOND_PAGE = "0000000000000002"
 THIRD_PAGE = "0000000000000003"
-ROTATED_PAGE = "0000000000000009"
 FINISHED_TEXT = "Pronto! Salvo como Contrato.pdf (3 páginas)"
 SCAN_ALREADY_RUNNING_MESSAGE = "Já existe uma digitalização em andamento."
 DOCUMENT_BUSY_MESSAGE = "O documento está sendo salvo ou alterado. Aguarde um instante e tente de novo."
-IMAGE_ADJUSTMENT_FAILED_MESSAGE = (
-    "Não consegui girar ou cortar a imagem com a memória livre do Mac. "
-    "Escolha uma resolução menor, desligue o corte automático e tente de novo."
-)
 INVALID_PAGE_ORDER_MESSAGE = (
     "A nova ordem das páginas não confere com o documento. A lista foi atualizada; tente de novo."
 )
@@ -44,7 +39,6 @@ SCENARIO_NAMES = (
     "rotate_while_a_page_scans",
     "rotate_while_the_request_is_pending",
     "rotate_refused_by_a_conflict",
-    "rotate_without_enough_memory",
     "rotate_a_damaged_page",
 )
 
@@ -206,19 +200,24 @@ def test_rotate_sends_the_required_header(scenario_results: dict) -> None:
     assert scenario_results["keyboard_rotate"]["request_headers"] == {"X-Requested-With": "digitalizadora"}
 
 
-def test_rotated_page_keeps_its_position_with_the_new_identifier(scenario_results: dict) -> None:
-    assert scenario_results["keyboard_rotate"]["page_identifiers"] == [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE]
+def test_rotated_page_keeps_its_identifier_and_its_position(scenario_results: dict) -> None:
+    assert scenario_results["keyboard_rotate"]["page_identifiers"] == [FIRST_PAGE, SECOND_PAGE, THIRD_PAGE]
 
 
-def test_rotated_page_shows_the_new_thumbnail(scenario_results: dict) -> None:
+def test_rotated_page_asks_for_its_thumbnail_turned(scenario_results: dict) -> None:
     thumbnail_source = scenario_results["keyboard_rotate"]["thumbnail_source"]
-    assert thumbnail_source == f"/api/document/pages/{ROTATED_PAGE}/thumbnail"
+    assert thumbnail_source == f"/api/document/pages/{SECOND_PAGE}/thumbnail?rotation_degrees=90"
+
+
+def test_the_other_pages_keep_their_thumbnail_address(scenario_results: dict) -> None:
+    thumbnail_source = scenario_results["keyboard_rotate"]["first_thumbnail_source"]
+    assert thumbnail_source == f"/api/document/pages/{FIRST_PAGE}/thumbnail?rotation_degrees=0"
 
 
 def test_rotate_by_keyboard_keeps_the_focus_on_the_rotate_button_of_the_position(scenario_results: dict) -> None:
     assert scenario_results["keyboard_rotate"]["focus"] == {
         "label": "Girar a página 2 90 graus para a direita",
-        "page_identifier": ROTATED_PAGE,
+        "page_identifier": SECOND_PAGE,
     }
 
 
@@ -266,21 +265,6 @@ def test_rotate_conflict_keeps_the_focus_on_the_rotate_button(scenario_results: 
         "label": "Girar a página 2 90 graus para a direita",
         "page_identifier": SECOND_PAGE,
     }
-
-
-def test_rotate_without_enough_memory_shows_the_catalog_message(scenario_results: dict) -> None:
-    assert scenario_results["rotate_without_enough_memory"]["banner"] == {
-        "hidden": False,
-        "text": IMAGE_ADJUSTMENT_FAILED_MESSAGE,
-    }
-
-
-def test_rotate_without_enough_memory_leaves_the_grid_alone(scenario_results: dict) -> None:
-    assert scenario_results["rotate_without_enough_memory"]["page_identifiers"] == [
-        FIRST_PAGE,
-        SECOND_PAGE,
-        THIRD_PAGE,
-    ]
 
 
 def test_rotating_a_damaged_page_marks_it(scenario_results: dict) -> None:

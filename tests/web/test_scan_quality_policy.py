@@ -28,28 +28,7 @@ WARNING_CASES = [
     pytest.param("describe_resolution_warning(undefined)", None, id="server-without-resolution"),
 ]
 
-PRESET_CASES = [
-    pytest.param("choose_preset_option({scan_preset: 'photo'})", "photo", id="named-preset"),
-    pytest.param("choose_preset_option({scan_preset: null})", "custom", id="custom-combination"),
-    pytest.param("choose_preset_option({})", "custom", id="no-preset-field"),
-    pytest.param(
-        "build_preset_changes('photo')",
-        {"scan_preset": "photo", "dots_per_inch": None, "color_mode": None},
-        id="preset-changes-clear-the-pair",
-    ),
-]
-
-ROTATION_CASES = [
-    pytest.param("parse_rotation_degrees('0')", 0, id="no-rotation"),
-    pytest.param("parse_rotation_degrees('90')", 90, id="quarter-turn-right"),
-    pytest.param("parse_rotation_degrees('180')", 180, id="half-turn"),
-    pytest.param("parse_rotation_degrees('270')", 270, id="quarter-turn-left"),
-    pytest.param("parse_rotation_degrees('45')", 0, id="unknown-angle"),
-    pytest.param("parse_rotation_degrees('')", 0, id="empty-value"),
-    pytest.param("parse_rotation_degrees('abc')", 0, id="not-a-number"),
-]
-
-ALL_CASES = DURATION_CASES + WARNING_CASES + PRESET_CASES + ROTATION_CASES
+ALL_CASES = DURATION_CASES + WARNING_CASES
 
 
 @pytest.fixture(scope="module")
@@ -64,14 +43,4 @@ def test_expected_scan_duration_text(policy_results: dict, expression: str, expe
 
 @pytest.mark.parametrize(("expression", "expected"), WARNING_CASES)
 def test_resolution_warning_text(policy_results: dict, expression: str, expected: object) -> None:
-    assert policy_results[expression] == expected
-
-
-@pytest.mark.parametrize(("expression", "expected"), PRESET_CASES)
-def test_preset_choice_rules(policy_results: dict, expression: str, expected: object) -> None:
-    assert policy_results[expression] == expected
-
-
-@pytest.mark.parametrize(("expression", "expected"), ROTATION_CASES)
-def test_rotation_choice_rules(policy_results: dict, expression: str, expected: object) -> None:
     assert policy_results[expression] == expected

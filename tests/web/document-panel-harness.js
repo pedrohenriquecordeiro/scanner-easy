@@ -2,257 +2,76 @@
 
 // Plays the Documento mode scenarios named on the command line against the real static scripts in the fake browser
 // of fake-browser.js and prints one JSON object with what the page did in each. The three test modules
-// tests/web/test_document_panel_*.py each ask for their own scenarios, so each Node run stays short.
+// tests/web/test_document_panel_*.py each ask for their own scenarios, so each Node run stays short. The fixtures
+// come from document-page-fixtures.js.
+
+const { BlockedStorage, FakeStorage, build_deferred_response, build_json_response } = require("./fake-browser.js");
+const fixtures = require("./document-page-fixtures.js");
 
 const {
-  BlockedStorage,
-  BrowserPage,
-  FakeStorage,
-  build_deferred_response,
-  build_json_response,
-} = require("./fake-browser.js");
-
-const DRAFT_SESSION = "5c0f9a2e7b1d4c38";
-const FIRST_PAGE = "0000000000000001";
-const SECOND_PAGE = "0000000000000002";
-const THIRD_PAGE = "0000000000000003";
-const FOURTH_PAGE = "0000000000000004";
-const ROTATED_PAGE = "0000000000000009";
-const THREE_PAGES = [FIRST_PAGE, SECOND_PAGE, THIRD_PAGE];
-const FOUR_PAGES = [...THREE_PAGES, FOURTH_PAGE];
-const PAGE_SIZE_IN_BYTES = 806123;
-const SCANNED_AT = "2026-10-17T10:00:00-03:00";
-const POLL_DELAYS_MILLISECONDS = [0, 500, 2000];
-const TILE_BUTTON_INDEXES = Object.freeze({ move_left: 0, move_right: 1, delete: 2, rotate: 3, move_to: 4 });
-const RECOVERY_SWITCH_STORAGE_KEY = "digitalizadora.recovery_switch_session";
-const TILE_ACTIONS_INDEX = 3;
-const RIGHT_HALF_POSITION = 90;
-
-const QUICK_SETTINGS = {
-  output_folder: "/Users/teste/Digitalizadora",
-  output_format: "pdf",
-  dots_per_inch: 300,
-  color_mode: "color",
-  scan_preset: "document",
-  capture_mode: "single",
-  rotation_degrees: 0,
-  auto_crop: false,
-};
-const DOCUMENT_SETTINGS = { ...QUICK_SETTINGS, capture_mode: "document" };
-const AVAILABLE_STORAGE = { free_space_in_bytes: 12e9, estimated_pages_remaining: 4000, output_folder_available: true };
-const DRAFT_STORAGE = { free_space_in_bytes: 12e9, estimated_pages_remaining: 4000, available: true };
-const PRINTER = { connected: true, display_name: "DeskJet 2800", scanner_state: "idle", route: "usb", error: null };
-const ACCEPTED_BODY = { accepted: true };
-const FINALIZED_BODY = {
-  file_name: "Contrato.pdf",
-  output_folder: "/Users/teste/Digitalizadora",
-  page_count: 3,
-  size_in_bytes: 2418369,
-};
-const LAST_FINISHED_DOCUMENT = { ...FINALIZED_BODY, finalized_at: "2026-10-17T10:05:00-03:00" };
-const LAST_SCAN_RESULT = {
-  file_name: "2026-10-17_00001.pdf",
-  output_folder: "/Users/teste/Digitalizadora",
-  output_format: "pdf",
-  size_in_bytes: 1234567,
-  scanned_at: "2026-10-17T09:00:00-03:00",
-};
-const RESUMED_RECOVERY = { outcome: "resumed", kept_page_count: 3, dropped_page_positions: [], set_aside_folder: null };
-const SCAN_ALREADY_RUNNING_BODY = {
-  code: "scan_already_running",
-  message: "Já existe uma digitalização em andamento.",
-};
-const DOCUMENT_BUSY_BODY = {
-  code: "document_busy",
-  message: "O documento está sendo salvo ou alterado. Aguarde um instante e tente de novo.",
-};
-const INVALID_PAGE_ORDER_BODY = {
-  code: "invalid_page_order",
-  message: "A nova ordem das páginas não confere com o documento. A lista foi atualizada; tente de novo.",
-};
-const INVALID_DOCUMENT_NAME_BODY = {
-  code: "invalid_document_name",
-  message:
-    "Nome de documento inválido: comprido demais ou só com pontos e caracteres invisíveis. " +
-    "Use um nome mais curto, com letras ou números.",
-};
-const ROTATION_PATH_KEY = `POST /api/document/pages/${SECOND_PAGE}/rotation`;
-const IMAGE_ADJUSTMENT_FAILED_BODY = {
-  code: "image_adjustment_failed",
-  message:
-    "Não consegui girar ou cortar a imagem com a memória livre do Mac. " +
-    "Escolha uma resolução menor, desligue o corte automático e tente de novo.",
-};
-const DAMAGED_PAGE_BODY = {
-  code: "damaged_document_page",
-  message:
-    "Uma página guardada do documento está danificada ou sumiu do disco do Mac. " +
-    "Ela está marcada na grade: exclua-a e digitalize-a de novo.",
-  page_identifier: SECOND_PAGE,
-};
-
-function build_page(page_identifier) {
-  return {
-    page_identifier,
-    scanned_at: SCANNED_AT,
-    dots_per_inch: 300,
-    color_mode: "color",
-    size_in_bytes: PAGE_SIZE_IN_BYTES,
-  };
-}
-
-function build_draft(page_identifiers, name) {
-  return {
-    name,
-    created_at: SCANNED_AT,
-    page_count: page_identifiers.length,
-    estimated_size_in_bytes: page_identifiers.length * PAGE_SIZE_IN_BYTES,
-    finalization_started_at: null,
-    finished_document_path: null,
-    pages: page_identifiers.map(build_page),
-  };
-}
-
-function build_document_body(body_parts) {
-  const { revision, page_identifiers, name, recovery, last_finished_document } = body_parts;
-  return {
-    draft_session: DRAFT_SESSION,
-    revision,
-    document: page_identifiers.length === 0 ? null : build_draft(page_identifiers, name ?? ""),
-    recovery: recovery ?? null,
-    last_finished_document: last_finished_document ?? null,
-  };
-}
-
-function build_state(state_parts) {
-  const { revision, page_count, scans_completed, last_result, settings } = state_parts;
-  return {
-    scan_phase: state_parts.scan_phase ?? "idle",
-    scans_completed: scans_completed ?? 0,
-    last_result: last_result ?? null,
-    last_error: null,
-    settings: settings ?? DOCUMENT_SETTINGS,
-    storage: AVAILABLE_STORAGE,
-    document: {
-      draft_session: DRAFT_SESSION,
-      revision,
-      page_count,
-      estimated_size_in_bytes: page_count * PAGE_SIZE_IN_BYTES,
-      draft_storage: DRAFT_STORAGE,
-    },
-  };
-}
-
-function respond(body) {
-  return build_json_response(200, body);
-}
-
-function build_default_responses() {
-  return {
-    "GET /api/settings": respond(DOCUMENT_SETTINGS),
-    "PUT /api/settings": respond(DOCUMENT_SETTINGS),
-    "GET /api/state": respond(build_state({ revision: 1, page_count: 3 })),
-    "GET /api/printer": respond(PRINTER),
-    "GET /api/document": respond(build_document_body({ revision: 1, page_identifiers: THREE_PAGES })),
-    "POST /api/document/pages": build_json_response(202, ACCEPTED_BODY),
-    "DELETE /api/document/pages/last": respond(
-      build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, SECOND_PAGE] }),
-    ),
-    [`DELETE /api/document/pages/${SECOND_PAGE}`]: respond(
-      build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, THIRD_PAGE] }),
-    ),
-    "PUT /api/document/name": respond(
-      build_document_body({ revision: 2, page_identifiers: THREE_PAGES, name: "Contrato" }),
-    ),
-    "POST /api/document/finalize": respond(FINALIZED_BODY),
-    "DELETE /api/document": respond(build_document_body({ revision: 2, page_identifiers: [] })),
-  };
-}
-
-function build_recovered_quick_responses() {
-  return {
-    "GET /api/settings": respond(QUICK_SETTINGS),
-    "GET /api/state": respond(build_state({ revision: 0, page_count: 3, settings: QUICK_SETTINGS })),
-    "GET /api/document": respond(
-      build_document_body({ revision: 0, page_identifiers: THREE_PAGES, recovery: RESUMED_RECOVERY }),
-    ),
-  };
-}
-
-class DocumentPageUnderTest extends BrowserPage {
-  constructor(response_overrides, storage) {
-    super({ ...build_default_responses(), ...response_overrides }, storage);
-  }
-
-  tile_at(position) {
-    return this.element("document-page-grid").children[position - 1];
-  }
-
-  tile_button(position, button_name) {
-    return this.tile_at(position).children[TILE_ACTIONS_INDEX].children[TILE_BUTTON_INDEXES[button_name]];
-  }
-
-  grid_page_identifiers() {
-    return this.element("document-page-grid").children.map((tile) => tile.dataset.pageIdentifier);
-  }
-
-  describe_focus() {
-    const focused_element = this.active_element();
-    const tile = focused_element.parent?.parent ?? null;
-    return {
-      label: focused_element.getAttribute("aria-label"),
-      page_identifier: tile === null ? null : tile.dataset.pageIdentifier ?? null,
-    };
-  }
-
-  is_focused(element_identifier) {
-    return this.active_element() === this.element(element_identifier);
-  }
-
-  banner() {
-    return { hidden: this.element("error-banner-content").hidden, text: this.element("error-banner-text").textContent };
-  }
-
-  async poll(state) {
-    this.responses["GET /api/state"] = respond(state);
-    for (const delay_milliseconds of POLL_DELAYS_MILLISECONDS) {
-      this.timers.run_pending_with_delay(delay_milliseconds);
-    }
-    await this.flush();
-  }
-
-  async type_name(name) {
-    const name_input = this.element("document-name-input");
-    name_input.focus();
-    name_input.value = name;
-    await this.flush();
-  }
-
-  async open_and_accept_the_finalize_confirmation() {
-    await this.click(this.element("save-document-button"));
-    await this.click(this.element("confirmation-accept-button"));
-  }
-
-  count_name_requests() {
-    return this.count_requests("PUT /api/document/name");
-  }
-
-  list_name_request_bodies() {
-    return this.requests.filter((request) => request.key === "PUT /api/document/name").map((request) => request.body);
-  }
-}
-
-async function load_page(response_overrides, storage) {
-  const page = new DocumentPageUnderTest(response_overrides, storage);
-  await page.load();
-  return page;
-}
+  DRAFT_SESSION,
+  FIRST_PAGE,
+  SECOND_PAGE,
+  THIRD_PAGE,
+  FOURTH_PAGE,
+  THREE_PAGES,
+  FOUR_PAGES,
+  POLL_DELAYS_MILLISECONDS,
+  TILE_BUTTON_INDEXES,
+  RECOVERY_SWITCH_STORAGE_KEY,
+  TILE_ACTIONS_INDEX,
+  RIGHT_HALF_POSITION,
+  QUICK_SETTINGS,
+  DOCUMENT_SETTINGS,
+  AVAILABLE_STORAGE,
+  DRAFT_STORAGE,
+  PRINTER,
+  ACCEPTED_BODY,
+  FINALIZED_BODY,
+  LAST_FINISHED_DOCUMENT,
+  LAST_SCAN_RESULT,
+  RESUMED_RECOVERY,
+  SCAN_ALREADY_RUNNING_BODY,
+  DOCUMENT_BUSY_BODY,
+  INVALID_PAGE_ORDER_BODY,
+  INVALID_DOCUMENT_NAME_BODY,
+  ROTATION_PATH_KEY,
+  DAMAGED_PAGE_BODY,
+  build_document_body,
+  build_state,
+  respond,
+  build_default_responses,
+  build_recovered_quick_responses,
+  load_page,
+} = fixtures;
 
 async function play_first_page_after_a_draft_end(page) {
   const name_requests_before = page.count_name_requests();
   page.responses["GET /api/document"] = respond(build_document_body({ revision: 5, page_identifiers: [FIRST_PAGE] }));
   await page.poll(build_state({ revision: 5, page_count: 1, scans_completed: 1 }));
   return page.count_name_requests() - name_requests_before;
+}
+
+const TURNED_SECOND_PAGE = { [SECOND_PAGE]: { rotation_degrees: 90, crop: null } };
+const SECOND_PAGE_CROP = { left: 0.13, top: 0.115, right: 0.914, bottom: 0.915 };
+const FRAMED_SECOND_PAGE = { [SECOND_PAGE]: { rotation_degrees: 90, crop: SECOND_PAGE_CROP } };
+const FIRST_PAGE_CROP = { left: 0.2, top: 0.1, right: 0.7, bottom: 0.9 };
+
+function describe_overlay(overlay) {
+  return {
+    hidden: overlay.hidden,
+    aria_hidden: overlay.getAttribute("aria-hidden"),
+    style: { left: overlay.style.left, top: overlay.style.top, width: overlay.style.width, height: overlay.style.height },
+  };
+}
+
+async function load_page_with_a_framed_second_page() {
+  const body = respond(build_document_body({ revision: 1, page_identifiers: THREE_PAGES, framings: FRAMED_SECOND_PAGE }));
+  return load_page({ "GET /api/document": body });
+}
+
+function respond_with_the_second_page_turned() {
+  return respond(build_document_body({ revision: 2, page_identifiers: THREE_PAGES, framings: TURNED_SECOND_PAGE }));
 }
 
 const SCENARIOS = {
@@ -266,18 +85,19 @@ const SCENARIOS = {
       summary_text: page.element("document-summary").textContent,
       storage_line_hidden: page.element("storage-line").hidden,
       draft_storage_text: page.element("draft-storage-line").textContent,
-      rotation_hint_hidden: page.element("rotation-document-hint").hidden,
     };
   },
   async grid_tiles() {
     const page = await load_page({});
     const first_tile = page.tile_at(1);
-    const thumbnail = first_tile.children[0];
+    const thumbnail = page.tile_thumbnail(1);
     return {
       page_identifiers: page.grid_page_identifiers(),
       first_tile_label: first_tile.getAttribute("aria-label"),
       thumbnail_source: thumbnail.src,
       thumbnail_loading: thumbnail.loading,
+      thumbnail_class: thumbnail.className,
+      thumbnail_frame_class: first_tile.children[0].className,
       thumbnail_text: thumbnail.alt,
       first_left_disabled: page.tile_button(1, "move_left").disabled,
       last_right_disabled: page.tile_button(3, "move_right").disabled,
@@ -289,6 +109,92 @@ const SCENARIOS = {
         button.getAttribute("aria-label"),
       ),
     };
+  },
+  async framed_tiles() {
+    const page = await load_page_with_a_framed_second_page();
+    return {
+      overlays: [1, 2, 3].map((position) => describe_overlay(page.tile_overlay(position))),
+      labels: [1, 2, 3].map((position) => page.tile_at(position).getAttribute("aria-label")),
+      thumbnail_source: page.tile_thumbnail(2).src,
+    };
+  },
+  async tile_enlarge_buttons() {
+    const page = await load_page({});
+    const enlarge_button = page.tile_button(2, "enlarge");
+    return {
+      text: enlarge_button.textContent,
+      class_name: enlarge_button.className,
+      label: enlarge_button.getAttribute("aria-label"),
+      labels_of_all_tiles: [1, 2, 3].map((position) => page.tile_button(position, "enlarge").getAttribute("aria-label")),
+    };
+  },
+  async enlarge_buttons_while_a_page_scans() {
+    const page = await load_page({});
+    await page.poll(build_state({ revision: 1, page_count: 3, scans_completed: 3, scan_phase: "scanning" }));
+    return { disabled: [1, 2, 3].map((position) => page.tile_button(position, "enlarge").disabled) };
+  },
+  async thumbnail_proportion() {
+    const page = await load_page({});
+    const frame = page.tile_at(1).children[0];
+    const proportion_before_loading = frame.style.aspectRatio ?? null;
+    const thumbnail = page.tile_thumbnail(1);
+    thumbnail.naturalWidth = 640;
+    thumbnail.naturalHeight = 480;
+    page.dispatch_simple_event(thumbnail, "load");
+    const proportion_of_a_lying_page = frame.style.aspectRatio;
+    thumbnail.naturalWidth = 0;
+    thumbnail.naturalHeight = 0;
+    page.dispatch_simple_event(thumbnail, "load");
+    return { proportion_before_loading, proportion_of_a_lying_page, proportion_after_an_empty_load: frame.style.aspectRatio };
+  },
+  async crop_added_and_removed_later() {
+    const page = await load_page({});
+    const first_tile = page.tile_at(1);
+    page.responses["GET /api/document"] = respond(
+      build_document_body({
+        revision: 2,
+        page_identifiers: THREE_PAGES,
+        framings: { [FIRST_PAGE]: { rotation_degrees: 0, crop: FIRST_PAGE_CROP } },
+      }),
+    );
+    await page.poll(build_state({ revision: 2, page_count: 3 }));
+    const framed = describe_overlay(page.tile_overlay(1));
+    const framed_label = page.tile_at(1).getAttribute("aria-label");
+    page.responses["GET /api/document"] = respond(build_document_body({ revision: 3, page_identifiers: THREE_PAGES }));
+    await page.poll(build_state({ revision: 3, page_count: 3 }));
+    return {
+      framed,
+      framed_label,
+      hidden_again: page.tile_overlay(1).hidden,
+      label_again: page.tile_at(1).getAttribute("aria-label"),
+      same_tile_kept: page.tile_at(1) === first_tile,
+      thumbnail_source: page.tile_thumbnail(1).src,
+    };
+  },
+  async thumbnail_that_fails_to_load() {
+    const page = await load_page({});
+    page.dispatch_simple_event(page.tile_thumbnail(2), "error");
+    const after_the_failure = {
+      frame_hidden: page.tile_at(2).children[0].hidden,
+      placeholder_hidden: page.tile_at(2).children[1].hidden,
+    };
+    page.responses["GET /api/document"] = respond(
+      build_document_body({ revision: 2, page_identifiers: THREE_PAGES, framings: TURNED_SECOND_PAGE }),
+    );
+    await page.poll(build_state({ revision: 2, page_count: 3 }));
+    return {
+      after_the_failure,
+      frame_hidden_after_another_address: page.tile_at(2).children[0].hidden,
+      placeholder_hidden_after_another_address: page.tile_at(2).children[1].hidden,
+    };
+  },
+  async thumbnail_that_stays_after_a_new_body() {
+    const page = await load_page({});
+    const thumbnail = page.tile_thumbnail(1);
+    page.dispatch_simple_event(thumbnail, "error");
+    page.responses["GET /api/document"] = respond(build_document_body({ revision: 2, page_identifiers: THREE_PAGES }));
+    await page.poll(build_state({ revision: 2, page_count: 3 }));
+    return { frame_hidden: page.tile_at(1).children[0].hidden, same_image_kept: page.tile_thumbnail(1) === thumbnail };
   },
   async space_in_document_mode() {
     const page = await load_page({});
@@ -361,45 +267,31 @@ const SCENARIOS = {
       finalize_requests: page.count_requests("POST /api/document/finalize"),
     };
   },
-  async enter_on_the_rotation_select() {
-    const page = await load_page({});
-    page.element("rotation-select").focus();
-    await page.press_key("Enter");
-    return {
-      dialog_shown_times: page.element("confirmation-dialog").show_count,
-      finalize_requests: page.count_requests("POST /api/document/finalize"),
-    };
-  },
   async keyboard_rotate() {
     const page = await load_page({
-      [ROTATION_PATH_KEY]: respond(
-        build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] }),
-      ),
+      [ROTATION_PATH_KEY]: respond_with_the_second_page_turned(),
     });
     await page.press_with_keyboard(page.tile_button(2, "rotate"));
     return {
       rotation_requests: page.count_requests(ROTATION_PATH_KEY),
       request_headers: page.find_request(ROTATION_PATH_KEY).headers,
       page_identifiers: page.grid_page_identifiers(),
-      thumbnail_source: page.tile_at(2).children[0].src,
+      thumbnail_source: page.tile_thumbnail(2).src,
+      first_thumbnail_source: page.tile_thumbnail(1).src,
       focus: page.describe_focus(),
       announcement: page.element("document-announcement").textContent,
     };
   },
   async pointer_rotate() {
     const page = await load_page({
-      [ROTATION_PATH_KEY]: respond(
-        build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] }),
-      ),
+      [ROTATION_PATH_KEY]: respond_with_the_second_page_turned(),
     });
     await page.click(page.tile_button(2, "rotate"));
     return { scan_button_focused: page.is_focused("scan-button") };
   },
   async space_after_clicking_rotate() {
     const page = await load_page({
-      [ROTATION_PATH_KEY]: respond(
-        build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] }),
-      ),
+      [ROTATION_PATH_KEY]: respond_with_the_second_page_turned(),
     });
     await page.click(page.tile_button(2, "rotate"));
     await page.press_key("Space");
@@ -420,9 +312,7 @@ const SCENARIOS = {
     const page = await load_page({ [ROTATION_PATH_KEY]: rotation_answer });
     await page.click(page.tile_button(2, "rotate"));
     const disabled_during = [1, 2, 3].map((position) => page.tile_button(position, "rotate").disabled);
-    rotation_answer.answer(
-      respond(build_document_body({ revision: 2, page_identifiers: [FIRST_PAGE, ROTATED_PAGE, THIRD_PAGE] })),
-    );
+    rotation_answer.answer(respond_with_the_second_page_turned());
     await page.flush();
     return { disabled_during, disabled_after: page.tile_button(2, "rotate").disabled };
   },
@@ -430,11 +320,6 @@ const SCENARIOS = {
     const page = await load_page({ [ROTATION_PATH_KEY]: build_json_response(409, SCAN_ALREADY_RUNNING_BODY) });
     await page.press_with_keyboard(page.tile_button(2, "rotate"));
     return { banner: page.banner(), page_identifiers: page.grid_page_identifiers(), focus: page.describe_focus() };
-  },
-  async rotate_without_enough_memory() {
-    const page = await load_page({ [ROTATION_PATH_KEY]: build_json_response(500, IMAGE_ADJUSTMENT_FAILED_BODY) });
-    await page.click(page.tile_button(2, "rotate"));
-    return { banner: page.banner(), page_identifiers: page.grid_page_identifiers() };
   },
   async rotate_a_damaged_page() {
     const page = await load_page({ [ROTATION_PATH_KEY]: build_json_response(409, DAMAGED_PAGE_BODY) });

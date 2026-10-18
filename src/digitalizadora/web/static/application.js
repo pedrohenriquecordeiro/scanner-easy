@@ -1,9 +1,10 @@
 "use strict";
 
-// Uses IDLE_PHASE, SPACE_KEY_ACTIONS, decide_space_key_action and can_start_scan from scan-trigger-policy.js, the
-// quality, rotation and duration rules from scan-quality-policy.js, ErrorBanner from error-banner.js, CAPTURE_MODES,
-// ENTER_KEY_CODE and the can_, should_ and describe_ rules from document-page-policy.js, and DocumentPanel from
-// document-panel.js; index.html loads them first, in this order.
+// Uses IDLE_PHASE, SPACE_KEY_ACTIONS, decide_space_key_action, can_start_scan and can_rotate_last_scan from
+// scan-trigger-policy.js, the quality and duration rules from scan-quality-policy.js, ErrorBanner from error-banner.js,
+// CAPTURE_MODES, ENTER_KEY_CODE and the can_, should_ and describe_ rules from document-page-policy.js, FRAME_HANDLES
+// from page-frame-geometry.js, PageFrameEditor from page-frame-editor.js and DocumentPanel from document-panel.js;
+// index.html loads them first, in this order.
 
 const REQUIRED_HEADER_NAME = "X-Requested-With";
 const REQUIRED_HEADER_VALUE = "digitalizadora";
@@ -16,6 +17,8 @@ const PHASE_MESSAGES = {
   saving: () => "Salvando…",
 };
 const SCAN_REQUEST_PATHS = Object.freeze({ single: "/api/scans", document: "/api/document/pages" });
+const LAST_SCAN_ROTATION_PATH = "/api/scans/last/rotation";
+const LAST_SCAN_ROTATED_MESSAGE = "Última digitalização girada 90° para a direita.";
 const READY_MESSAGE = "Pronto para digitalizar. Coloque a folha no vidro e aperte Espaço.";
 const LAST_SCAN_FAILED_MESSAGE = "A última digitalização falhou.";
 const SERVER_UNREACHABLE_MESSAGE = "Não consegui falar com o Digitalizadora. Ele ainda está aberto no Terminal?";
@@ -118,6 +121,11 @@ function describe_draft_storage(draft_storage) {
 
 function build_thumbnail_address(version) {
   return `/api/scans/last/thumbnail?version=${version}`;
+}
+
+function choose_thumbnail_version(state) {
+  // A server from before the rotation of the last scan sends no revision: each scan is then a new thumbnail.
+  return state.last_result_revision ?? state.scans_completed;
 }
 
 function format_scan_time(scanned_at) {
@@ -238,14 +246,10 @@ function collect_elements() {
       pdf: document.getElementById("output-format-pdf"),
       jpg: document.getElementById("output-format-jpg"),
     },
-    preset_select: document.getElementById("preset-select"),
-    preset_custom_option: document.getElementById("preset-custom-option"),
     resolution_select: document.getElementById("resolution-select"),
     color_mode_select: document.getElementById("color-mode-select"),
     resolution_warning: document.getElementById("resolution-warning"),
     resolution_warning_text: document.getElementById("resolution-warning-text"),
-    rotation_select: document.getElementById("rotation-select"),
-    rotation_document_hint: document.getElementById("rotation-document-hint"),
     auto_crop_checkbox: document.getElementById("auto-crop-checkbox"),
     output_folder_input: document.getElementById("output-folder-input"),
     output_folder_save_button: document.getElementById("output-folder-save-button"),
@@ -257,6 +261,8 @@ function collect_elements() {
     last_scan_file_name: document.getElementById("last-scan-file-name"),
     last_scan_size: document.getElementById("last-scan-size"),
     last_scan_time: document.getElementById("last-scan-time"),
+    last_scan_rotate_button: document.getElementById("last-scan-rotate-button"),
+    last_scan_rotation_status: document.getElementById("last-scan-rotation-status"),
     session_counter: document.getElementById("session-counter"),
     confirmation_dialog: document.getElementById("confirmation-dialog"),
     confirmation_text: document.getElementById("confirmation-text"),
@@ -266,16 +272,50 @@ function collect_elements() {
     move_page_position_input: document.getElementById("move-page-position-input"),
     move_page_accept_button: document.getElementById("move-page-accept-button"),
     move_page_reject_button: document.getElementById("move-page-reject-button"),
+    page_frame_dialog: document.getElementById("page-frame-dialog"),
+    page_frame_title: document.getElementById("page-frame-title"),
+    frame_stage: document.getElementById("frame-stage"),
+    frame_image: document.getElementById("frame-image"),
+    frame_cutout: document.getElementById("frame-cutout"),
+    frame_box: document.getElementById("frame-box"),
+    frame_move_button: document.getElementById("frame-move-button"),
+    frame_handles: {
+      north: document.getElementById("frame-handle-north"),
+      north_east: document.getElementById("frame-handle-north-east"),
+      east: document.getElementById("frame-handle-east"),
+      south_east: document.getElementById("frame-handle-south-east"),
+      south: document.getElementById("frame-handle-south"),
+      south_west: document.getElementById("frame-handle-south-west"),
+      west: document.getElementById("frame-handle-west"),
+      north_west: document.getElementById("frame-handle-north-west"),
+    },
+    frame_status: document.getElementById("frame-status"),
+    frame_detect_button: document.getElementById("frame-detect-button"),
+    frame_clear_button: document.getElementById("frame-clear-button"),
+    frame_rotate_button: document.getElementById("frame-rotate-button"),
+    frame_cancel_button: document.getElementById("frame-cancel-button"),
+    frame_apply_button: document.getElementById("frame-apply-button"),
   };
 }
 
 function build_scan_page(elements) {
   const error_banner = new ErrorBanner(elements);
   let scan_page = null;
-  const document_panel = new DocumentPanel(elements, {
+  let document_panel = null;
+  // The editor and the panel need each other: the panel opens the editor, the editor runs its edits through the panel.
+  const frame_editor = new PageFrameEditor(elements, {
+    attempt_edit: (edit_request) => document_panel.attempt_edit(edit_request),
+    report_failure: (failure) => document_panel.report_failure(failure),
+    can_edit: () => document_panel.can_edit(),
+    find_page: (page_identifier) => document_panel.find_page(page_identifier),
+    announce: (text) => document_panel.announce(text),
+    restore_focus: (focus_request) => document_panel.apply_focus(focus_request),
+  });
+  document_panel = new DocumentPanel(elements, {
     send_request,
     format_byte_count,
     error_banner,
+    frame_editor,
     focus_scan_button: () => elements.scan_button.focus(),
     refresh_page_controls: () => scan_page.render_activity(),
   });
@@ -293,6 +333,7 @@ class ScanPage {
     this.saved_settings = null;
     this.last_state = null;
     this.shown_thumbnail_version = null;
+    this.is_last_scan_rotation_pending = false;
     this.state_timer = null;
     this.printer_timer = null;
   }
@@ -308,6 +349,9 @@ class ScanPage {
   bind_events() {
     const { scan_button, output_folder_input, output_folder_save_button, format_inputs } = this.elements;
     scan_button.addEventListener("click", () => this.start_scan());
+    this.elements.last_scan_rotate_button.addEventListener("click", (event) =>
+      this.rotate_last_scan(read_action_origin(event)),
+    );
     document.addEventListener("keydown", (event) => this.handle_key_down(event));
     document.addEventListener("keyup", (event) => this.handle_key_up(event));
     Object.values(format_inputs).forEach((input) => {
@@ -334,15 +378,11 @@ class ScanPage {
   }
 
   bind_quality_events() {
-    const { preset_select, resolution_select, color_mode_select, rotation_select, auto_crop_checkbox } = this.elements;
-    preset_select.addEventListener("change", () => this.change_setting(build_preset_changes(preset_select.value)));
+    const { resolution_select, color_mode_select, auto_crop_checkbox } = this.elements;
     resolution_select.addEventListener("change", () =>
       this.change_setting({ dots_per_inch: Number(resolution_select.value) }),
     );
     color_mode_select.addEventListener("change", () => this.change_setting({ color_mode: color_mode_select.value }));
-    rotation_select.addEventListener("change", () =>
-      this.change_setting({ rotation_degrees: parse_rotation_degrees(rotation_select.value) }),
-    );
     auto_crop_checkbox.addEventListener("change", () =>
       this.change_setting_then_focus_scan_button({ auto_crop: auto_crop_checkbox.checked }),
     );
@@ -395,6 +435,7 @@ class ScanPage {
     }
     this.is_start_request_pending = true;
     this.error_banner.report_action_error(null);
+    this.elements.last_scan_rotation_status.textContent = "";
     this.render_activity();
     try {
       await send_request("POST", SCAN_REQUEST_PATHS[this.capture_mode()]);
@@ -406,6 +447,36 @@ class ScanPage {
     }
     this.render_activity();
     this.schedule_state_refresh(IMMEDIATE_REFRESH_MILLISECONDS);
+  }
+
+  async rotate_last_scan(action_origin) {
+    if (!this.can_rotate_last_scan_now()) {
+      return;
+    }
+    this.is_last_scan_rotation_pending = true;
+    this.error_banner.report_action_error(null);
+    this.render_activity();
+    try {
+      await send_request("POST", LAST_SCAN_ROTATION_PATH);
+      this.elements.last_scan_rotation_status.textContent = LAST_SCAN_ROTATED_MESSAGE;
+    } catch (error) {
+      this.error_banner.report_action_error(error.message);
+    } finally {
+      this.is_last_scan_rotation_pending = false;
+    }
+    this.render_activity();
+    // The state brings the new revision of the file, which is what reloads the thumbnail.
+    this.schedule_state_refresh(IMMEDIATE_REFRESH_MILLISECONDS);
+    // A keyboard user stays on the button; after a click the next Space scans again.
+    const { last_scan_rotate_button, scan_button } = this.elements;
+    (action_origin.is_keyboard_initiated ? last_scan_rotate_button : scan_button).focus();
+  }
+
+  can_rotate_last_scan_now() {
+    return can_rotate_last_scan(
+      { scan_phase: this.scan_phase, is_start_request_pending: this.is_start_request_pending },
+      { is_rotation_pending: this.is_last_scan_rotation_pending },
+    );
   }
 
   schedule_state_refresh(delay_milliseconds) {
@@ -517,6 +588,7 @@ class ScanPage {
       input.disabled = !can_change_mode;
     });
     this.elements.return_to_document_button.disabled = !can_change_mode;
+    this.elements.last_scan_rotate_button.disabled = !this.can_rotate_last_scan_now();
     this.document_panel.apply_scan_activity({
       scan_phase: this.scan_phase,
       is_start_request_pending: this.is_start_request_pending,
@@ -563,9 +635,10 @@ class ScanPage {
     if (result === null) {
       return;
     }
-    if (this.shown_thumbnail_version !== state.scans_completed) {
-      this.elements.last_scan_thumbnail.src = build_thumbnail_address(state.scans_completed);
-      this.shown_thumbnail_version = state.scans_completed;
+    const thumbnail_version = choose_thumbnail_version(state);
+    if (this.shown_thumbnail_version !== thumbnail_version) {
+      this.elements.last_scan_thumbnail.src = build_thumbnail_address(thumbnail_version);
+      this.shown_thumbnail_version = thumbnail_version;
     }
     this.elements.last_scan_file_name.textContent = result.file_name;
     this.elements.last_scan_size.textContent = format_byte_count(result.size_in_bytes);
@@ -582,7 +655,6 @@ class ScanPage {
     const capture_mode = this.capture_mode();
     this.elements.capture_mode_inputs[capture_mode].checked = true;
     this.elements.output_format_group.hidden = capture_mode === CAPTURE_MODES.DOCUMENT;
-    this.elements.rotation_document_hint.hidden = capture_mode !== CAPTURE_MODES.DOCUMENT;
     if (capture_mode === CAPTURE_MODES.DOCUMENT) {
       this.document_panel.show();
     } else {
@@ -647,10 +719,7 @@ class ScanPage {
   }
 
   render_quality_controls(settings) {
-    const { preset_select, preset_custom_option, resolution_select, color_mode_select } = this.elements;
-    preset_select.value = choose_preset_option(settings);
-    // "Personalizada" shows up only while the combination is not one of the presets, and it cannot be picked.
-    preset_custom_option.hidden = preset_select.value !== CUSTOM_PRESET_VALUE;
+    const { resolution_select, color_mode_select } = this.elements;
     // A server from before these settings sends neither: the lists stay as they are.
     resolution_select.value = String(settings.dots_per_inch ?? resolution_select.value);
     color_mode_select.value = settings.color_mode ?? color_mode_select.value;
@@ -664,7 +733,6 @@ class ScanPage {
   }
 
   render_adjustment_controls(settings) {
-    this.elements.rotation_select.value = String(settings.rotation_degrees ?? NO_ROTATION_DEGREES);
     this.elements.auto_crop_checkbox.checked = settings.auto_crop === true;
   }
 

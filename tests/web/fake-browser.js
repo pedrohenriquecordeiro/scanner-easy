@@ -16,6 +16,8 @@ const PAGE_SCRIPT_FILE_NAMES = [
   "scan-quality-policy.js",
   "error-banner.js",
   "document-page-policy.js",
+  "page-frame-geometry.js",
+  "page-frame-editor.js",
   "document-panel.js",
   "application.js",
 ];
@@ -69,6 +71,9 @@ function build_event(event_type, properties) {
     repeat: false,
     code: "",
     clientX: 0,
+    clientY: 0,
+    pointerId: 1,
+    shiftKey: false,
     defaultPrevented: false,
     propagation_stopped: false,
     preventDefault() {
@@ -134,6 +139,26 @@ class FakeElement extends FakeEventTarget {
     this.isContentEditable = false;
     this.is_text_selected = false;
     this.box = DEFAULT_TILE_BOX;
+    this.style = {};
+    this.naturalWidth = 0;
+    this.naturalHeight = 0;
+    this.captured_pointer_identifiers = new Set();
+  }
+
+  removeAttribute(attribute_name) {
+    delete this.attributes[attribute_name];
+  }
+
+  setPointerCapture(pointer_identifier) {
+    this.captured_pointer_identifiers.add(pointer_identifier);
+  }
+
+  releasePointerCapture(pointer_identifier) {
+    this.captured_pointer_identifiers.delete(pointer_identifier);
+  }
+
+  hasPointerCapture(pointer_identifier) {
+    return this.captured_pointer_identifiers.has(pointer_identifier);
   }
 
   setAttribute(attribute_name, attribute_value) {
@@ -421,13 +446,22 @@ class BrowserPage {
     return this.document.activeElement;
   }
 
+  is_focused(element_identifier) {
+    return this.active_element() === this.element(element_identifier);
+  }
+
   dispatch_key(event_type, key_press) {
-    const { code, target, repeat } = key_press;
-    return this.document.dispatch(target, build_event(event_type, { code, repeat: repeat === true }));
+    const { code, target, repeat, shiftKey } = key_press;
+    const key_event = build_event(event_type, { code, repeat: repeat === true, shiftKey: shiftKey === true });
+    return this.document.dispatch(target, key_event);
   }
 
   async key_down(code) {
     return this.dispatch_key_down({ code, target: this.document.activeElement, repeat: false });
+  }
+
+  async key_down_with_shift(code) {
+    return this.dispatch_key_down({ code, target: this.document.activeElement, repeat: false, shiftKey: true });
   }
 
   async repeat_key_down(code) {
@@ -499,6 +533,21 @@ class BrowserPage {
     this.document.dispatch(target_element, build_event("drop", pointer));
     this.document.dispatch(dragged_element, build_event("dragend", pointer));
     await this.flush();
+  }
+
+  dispatch_pointer(element, event_type, pointer_position) {
+    const pointer = { clientX: pointer_position.x, clientY: pointer_position.y, pointerId: 1 };
+    return this.document.dispatch(element, build_event(event_type, pointer));
+  }
+
+  async drag_pointer(element, drag_path) {
+    // What a mouse does on a handle: press, move (the handle captures the pointer) and release.
+    const { from, to } = drag_path;
+    this.dispatch_pointer(element, "pointerdown", from);
+    this.dispatch_pointer(element, "pointermove", to);
+    const release = this.dispatch_pointer(element, "pointerup", to);
+    await this.flush();
+    return release;
   }
 
   dispatch_simple_event(element, event_type) {

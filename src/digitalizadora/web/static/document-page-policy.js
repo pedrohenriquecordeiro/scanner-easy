@@ -2,7 +2,11 @@
 
 // Pure rules of the Documento mode (no DOM); document-panel.js and application.js wire them to the page.
 // Uses IDLE_PHASE, SPACE_KEY_CODE, BUTTON_TAG_NAME, KEYBOARD_RESERVED_TAG_NAMES and can_start_scan from
-// scan-trigger-policy.js and describe_expected_scan_duration from scan-quality-policy.js, which index.html loads first.
+// scan-trigger-policy.js, describe_expected_scan_duration from scan-quality-policy.js and describe_frame from
+// page-frame-geometry.js, which index.html loads first (the geometry only when a frame text is built).
+
+const DOCUMENT_PATH = "/api/document";
+const DOCUMENT_PAGES_PATH = `${DOCUMENT_PATH}/pages`;
 
 const CAPTURE_MODES = Object.freeze({ SINGLE: "single", DOCUMENT: "document" });
 const LARGE_DOCUMENT_PAGE_COUNT = 300;
@@ -29,6 +33,7 @@ const DOCUMENT_ACTIONS = Object.freeze({
   DELETE: "delete",
   DISCARD_LAST: "discard_last",
   ROTATE: "rotate",
+  FRAME_CLOSED: "frame_closed",
   DROP: "drop",
   NAME_SAVED: "name_saved",
   DIALOG_CLOSED: "dialog_closed",
@@ -40,6 +45,7 @@ const FOCUS_TARGETS = Object.freeze({
   SAME_BUTTON: "same_button",
   DELETE_BUTTON: "delete_button",
   ROTATE_BUTTON: "rotate_button",
+  ENLARGE_BUTTON: "enlarge_button",
 });
 const DRAFT_ENDINGS = Object.freeze({
   FINALIZED: "finalized",
@@ -60,6 +66,7 @@ const BACKSPACE_KEY_CODE = "Backspace";
 const ENTER_KEY_CODE = "Enter";
 const NUMPAD_ENTER_KEY_CODE = "NumpadEnter";
 const ESCAPE_KEY_CODE = "Escape";
+const PAGE_SHORTCUT_KEY_CODES_HIDDEN_FROM_DIALOGS = Object.freeze([SPACE_KEY_CODE, BACKSPACE_KEY_CODE]);
 const DOCUMENT_SHORTCUT_KEY_CODES = Object.freeze([BACKSPACE_KEY_CODE, ENTER_KEY_CODE, NUMPAD_ENTER_KEY_CODE]);
 const SCAN_BUTTON_FOCUS_ACTIONS = Object.freeze([
   DOCUMENT_ACTIONS.DISCARD_LAST,
@@ -82,6 +89,36 @@ const ACTIVE_PAGE_PHASE_TEXTS = Object.freeze({
 });
 const PAGE_REMOVAL_VERBS = Object.freeze({ discard_last: "descartada", delete: "excluída" });
 const NEXT_SHEET_TEXT = "Coloque a próxima folha e aperte Espaço; Enter salva.";
+const NO_FRAME_DETECTED_TEXT = "Não achei uma borda confiável nesta página. A moldura não mudou.";
+const FRAME_CHANGES_DISCARDED_TEXT = "Alterações da moldura descartadas.";
+const FRAME_IMAGE_FAILED_TEXT = "Não consegui carregar a imagem ampliada desta página.";
+const FRAME_PAGE_GONE_TEXT = "Essa página não está mais no documento.";
+
+function build_page_path(page_identifier) {
+  return `${DOCUMENT_PAGES_PATH}/${page_identifier}`;
+}
+
+function build_page_rotation_path(page_identifier) {
+  return `${build_page_path(page_identifier)}/rotation`;
+}
+
+function build_page_crop_path(page_identifier) {
+  return `${build_page_path(page_identifier)}/crop`;
+}
+
+function build_page_crop_detection_path(page_identifier) {
+  return `${build_page_crop_path(page_identifier)}/detect`;
+}
+
+function build_page_thumbnail_address(page_identifier, rotation_degrees) {
+  // The rotation is part of the address: the answer is a pure function of the page and the rotation, so it can be
+  // kept for good and a turned page simply asks for another address.
+  return `${build_page_path(page_identifier)}/thumbnail?rotation_degrees=${rotation_degrees}`;
+}
+
+function build_page_preview_address(page_identifier, rotation_degrees) {
+  return `${build_page_path(page_identifier)}/preview?rotation_degrees=${rotation_degrees}`;
+}
 
 function move_page(page_identifiers, page_identifier, target_index) {
   const moved_order = page_identifiers.filter((identifier) => identifier !== page_identifier);
@@ -202,15 +239,24 @@ function decide_focus_after_action(action_context) {
   if (action === DOCUMENT_ACTIONS.MOVE) {
     return { target: FOCUS_TARGETS.SAME_BUTTON, page_identifier: acted_page_identifier };
   }
+  if (action === DOCUMENT_ACTIONS.FRAME_CLOSED) {
+    return { target: FOCUS_TARGETS.ENLARGE_BUTTON, page_identifier: acted_page_identifier };
+  }
   if (page_identifiers_after.length === 0) {
     return focus_on_scan_button();
   }
+  if (action === DOCUMENT_ACTIONS.ROTATE) {
+    // A rotation only changes the page's metadata: it is still the same page, with the same buttons.
+    return { target: FOCUS_TARGETS.ROTATE_BUTTON, page_identifier: acted_page_identifier };
+  }
   const focused_position = Math.min(acted_position, page_identifiers_after.length);
   const focused_page_identifier = page_identifiers_after[focused_position - FIRST_POSITION];
-  // A rotated page takes a new identifier but keeps its position, so the focus follows the position.
-  const is_rotation = action === DOCUMENT_ACTIONS.ROTATE;
-  const focused_target = is_rotation ? FOCUS_TARGETS.ROTATE_BUTTON : FOCUS_TARGETS.DELETE_BUTTON;
-  return { target: focused_target, page_identifier: focused_page_identifier };
+  return { target: FOCUS_TARGETS.DELETE_BUTTON, page_identifier: focused_page_identifier };
+}
+
+function should_hide_key_from_page_shortcuts(key_event) {
+  // The Espaço that scans and the Backspace that discards a page must not reach the page from inside a dialog.
+  return PAGE_SHORTCUT_KEY_CODES_HIDDEN_FROM_DIALOGS.includes(key_event.code);
 }
 
 function next_document_event(previous_observation, observation, previous_event) {
@@ -317,6 +363,43 @@ function describe_page_move(position_before, position_after) {
 
 function describe_page_rotation(position) {
   return `Página ${position} girada 90° para a direita.`;
+}
+
+function describe_page_rotation_result(rotation_result) {
+  const { position, crop } = rotation_result;
+  const rotation_text = describe_page_rotation(position);
+  return crop === null ? rotation_text : `${rotation_text} A moldura acompanhou o giro.`;
+}
+
+function describe_tile_label(tile_label) {
+  const { position, page_count, crop } = tile_label;
+  const position_text = `Página ${position} de ${page_count}`;
+  return crop === null ? position_text : `${position_text}, com moldura de corte`;
+}
+
+function describe_enlarge_label(position) {
+  return `Ampliar a página ${position} e ajustar a moldura de corte`;
+}
+
+function describe_frame_dialog_title(page_position) {
+  return `Página ${page_position.position} de ${page_position.page_count}: moldura de corte`;
+}
+
+function describe_detected_frame(frame) {
+  return `Moldura detectada e salva. ${describe_frame(frame)}`;
+}
+
+function describe_frame_applied(position) {
+  return `Moldura aplicada à página ${position}.`;
+}
+
+function describe_frame_removed(position) {
+  return `Corte removido da página ${position}.`;
+}
+
+function describe_crop_application(crop_application) {
+  const { position, crop } = crop_application;
+  return crop === null ? describe_frame_removed(position) : describe_frame_applied(position);
 }
 
 function join_positions(positions) {

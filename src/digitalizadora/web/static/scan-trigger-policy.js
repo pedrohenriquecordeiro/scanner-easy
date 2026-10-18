@@ -31,3 +31,7 @@ function decide_space_key_action(key_event, scan_button) {
 function can_start_scan(scan_activity) {
   return scan_activity.scan_phase === IDLE_PHASE && !scan_activity.is_start_request_pending;
 }
+
+function can_rotate_last_scan(scan_activity, rotation_activity) {
+  return can_start_scan(scan_activity) && !rotation_activity.is_rotation_pending;
+}

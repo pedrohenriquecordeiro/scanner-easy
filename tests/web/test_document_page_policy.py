@@ -176,10 +176,9 @@ FOCUS_CASES = [
     pytest.param("decide_focus_after_action(action_context({}))", {"target": "same_button", "page_identifier": "b"},
                  id="move-by-keyboard"),
     pytest.param(
-        "decide_focus_after_action(action_context("
-        "{action: 'rotate', page_identifiers_after: ['a', 'x', 'c'], acted_page_identifier: 'b'}))",
-        {"target": "rotate_button", "page_identifier": "x"},
-        id="rotate-by-keyboard-follows-the-position",
+        "decide_focus_after_action(action_context({action: 'rotate'}))",
+        {"target": "rotate_button", "page_identifier": "b"},
+        id="rotate-by-keyboard-stays-on-the-rotated-page",
     ),
     pytest.param(
         "decide_focus_after_action(action_context({action: 'rotate', is_keyboard_initiated: false}))",

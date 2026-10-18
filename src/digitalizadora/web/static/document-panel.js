@@ -2,11 +2,10 @@
 
 // Wires the Documento section of the page to the pure rules of document-page-policy.js; it decides nothing by itself.
 // build_scan_page (application.js) creates it with page_services = {send_request, format_byte_count, error_banner,
-// focus_scan_button, refresh_page_controls}. Uses IDLE_PHASE from scan-trigger-policy.js and DEFAULT_DOTS_PER_INCH from
-// scan-quality-policy.js.
+// frame_editor, focus_scan_button, refresh_page_controls}. Uses IDLE_PHASE from scan-trigger-policy.js,
+// DEFAULT_DOTS_PER_INCH from scan-quality-policy.js, the page addresses and texts of document-page-policy.js and the
+// frame functions of page-frame-geometry.js.
 
-const DOCUMENT_PATH = "/api/document";
-const DOCUMENT_PAGES_PATH = `${DOCUMENT_PATH}/pages`;
 const LAST_PAGE_PATH = `${DOCUMENT_PAGES_PATH}/last`;
 const PAGE_ORDER_PATH = `${DOCUMENT_PATH}/page-order`;
 const DOCUMENT_NAME_PATH = `${DOCUMENT_PATH}/name`;
@@ -24,6 +23,7 @@ const KEYBOARD_ACTIVATION_DETAIL = 0;
 const KEYBOARD_ORIGIN = Object.freeze({ is_keyboard_initiated: true });
 const MOVE_LEFT_OFFSET = -1;
 const MOVE_RIGHT_OFFSET = 1;
+const POINTER_ORIGIN = Object.freeze({ is_keyboard_initiated: false });
 const DAMAGED_PAGE_CLASS = "is-damaged";
 const DROP_BEFORE_CLASS = "is-drop-before";
 const DROP_AFTER_CLASS = "is-drop-after";
@@ -31,18 +31,6 @@ const DECIMAL_RADIX = 10;
 const SAVE_ACCEPT_LABEL = "Salvar";
 const CANCEL_ACCEPT_LABEL = "Cancelar documento";
 const DOCUMENT_CANCELLED_ANNOUNCEMENT = "Documento cancelado.";
-
-function build_page_path(page_identifier) {
-  return `${DOCUMENT_PAGES_PATH}/${page_identifier}`;
-}
-
-function build_page_rotation_path(page_identifier) {
-  return `${build_page_path(page_identifier)}/rotation`;
-}
-
-function build_page_thumbnail_path(page_identifier) {
-  return `${build_page_path(page_identifier)}/thumbnail`;
-}
 
 function read_action_origin(event) {
   // A click made with Enter or Space carries detail 0; a pointer click counts its clicks.
@@ -115,6 +103,7 @@ class DocumentPanel {
     this.elements.save_document_button.addEventListener("click", (event) =>
       this.request_finalize(read_action_origin(event)),
     );
+    this.page_services.frame_editor.bind_events();
     this.bind_dialog_buttons(this.elements.confirmation_accept_button, this.elements.confirmation_reject_button);
     this.bind_dialog_buttons(this.elements.move_page_accept_button, this.elements.move_page_reject_button);
     this.elements.move_page_position_input.addEventListener("keydown", (event) => {
@@ -229,6 +218,7 @@ class DocumentPanel {
     this.render_notices(body);
     // The page count changed, so the big button and the status line change with it.
     this.notify_activity_change();
+    this.page_services.frame_editor.handle_document_change();
   }
 
   end_draft() {
@@ -268,7 +258,7 @@ class DocumentPanel {
     const page_count = pages.length;
     const tiles = pages.map((page, index) => {
       const tile = this.page_tiles.get(page.page_identifier) ?? this.build_tile(page.page_identifier);
-      this.label_tile(tile, { position: index + 1, page_count });
+      this.label_tile(tile, { position: index + 1, page_count, page });
       return tile;
     });
     this.page_tiles = new Map(tiles.map((tile) => [tile.page_identifier, tile]));
@@ -280,59 +270,77 @@ class DocumentPanel {
     item.className = "page-tile";
     item.draggable = true;
     item.dataset.pageIdentifier = page_identifier;
-    const thumbnail = document.createElement("img");
-    thumbnail.className = "page-thumbnail";
+    // The frame of the thumbnail takes the proportion of the picture, so the crop frame, drawn in percentages of it,
+    // falls exactly on the page even when the page lies down.
+    const thumbnail_frame = this.build_element("div", "page-thumbnail-frame");
+    const thumbnail = this.build_element("img", "page-thumbnail");
     thumbnail.loading = "lazy";
     thumbnail.decoding = "async";
-    thumbnail.src = build_page_thumbnail_path(page_identifier);
-    const placeholder = document.createElement("span");
-    placeholder.className = "page-placeholder";
+    const overlay = this.build_element("div", "page-crop-overlay");
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.hidden = true;
+    thumbnail_frame.append(thumbnail, overlay);
+    const placeholder = this.build_element("span", "page-placeholder");
     placeholder.hidden = true;
-    const number = document.createElement("span");
-    number.className = "page-number";
+    const number = this.build_element("span", "page-number");
     const tile = {
       page_identifier,
       item,
+      thumbnail_frame,
       thumbnail,
+      overlay,
       placeholder,
       number,
       position: 0,
+      shown_rotation_degrees: null,
       move_left_button: this.build_tile_button("page-move-left", "◀"),
       move_right_button: this.build_tile_button("page-move-right", "▶"),
       delete_button: this.build_tile_button("page-delete", "×"),
       rotate_button: this.build_tile_button("page-rotate", "Girar ↻"),
       move_to_button: this.build_tile_button("page-move-to", "Mover para…"),
+      enlarge_button: this.build_tile_button("page-enlarge", "Ampliar"),
     };
-    const actions = document.createElement("div");
-    actions.className = "page-actions";
+    const actions = this.build_element("div", "page-actions");
     // The DOM order is the Tab order, so it follows the visual order: ◀ ▶ × on the first row, then "Girar ↻" and
-    // "Mover para…".
+    // "Mover para…", then "Ampliar" across the whole width.
     actions.append(
       tile.move_left_button,
       tile.move_right_button,
       tile.delete_button,
       tile.rotate_button,
       tile.move_to_button,
+      tile.enlarge_button,
     );
-    item.append(thumbnail, placeholder, number, actions);
+    item.append(thumbnail_frame, placeholder, number, actions);
     this.bind_tile(tile);
     return tile;
   }
 
+  build_element(tag_name, class_name) {
+    const element = document.createElement(tag_name);
+    element.className = class_name;
+    return element;
+  }
+
   build_tile_button(class_name, text) {
-    const button = document.createElement("button");
+    const button = this.build_element("button", class_name);
     button.type = "button";
-    button.className = class_name;
     button.textContent = text;
     return button;
   }
 
   bind_tile(tile) {
-    const { page_identifier, item, thumbnail, placeholder } = tile;
+    const { page_identifier, item, thumbnail, thumbnail_frame, placeholder } = tile;
     thumbnail.addEventListener("error", () => {
-      thumbnail.hidden = true;
+      thumbnail_frame.hidden = true;
       placeholder.hidden = false;
     });
+    thumbnail.addEventListener("load", () => this.fit_thumbnail_frame(tile));
+    // A click on the picture is a convenience of the mouse; the keyboard has the "Ampliar" button.
+    thumbnail_frame.addEventListener("click", () => this.enlarge_page(page_identifier, POINTER_ORIGIN));
+    tile.enlarge_button.addEventListener("click", (event) =>
+      this.enlarge_page(page_identifier, read_action_origin(event)),
+    );
     tile.move_left_button.addEventListener("click", (event) =>
       this.move_page({ page_identifier, offset: MOVE_LEFT_OFFSET }, read_action_origin(event)),
     );
@@ -358,11 +366,20 @@ class DocumentPanel {
     item.addEventListener("drop", (event) => this.handle_drop(tile, event));
   }
 
-  label_tile(tile, tile_position) {
-    const { position, page_count } = tile_position;
+  fit_thumbnail_frame(tile) {
+    const { naturalWidth, naturalHeight } = tile.thumbnail;
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      tile.thumbnail_frame.style.aspectRatio = `${naturalWidth} / ${naturalHeight}`;
+    }
+  }
+
+  label_tile(tile, tile_state) {
+    const { position, page_count, page } = tile_state;
     tile.position = position;
-    tile.item.setAttribute("aria-label", `Página ${position} de ${page_count}`);
+    tile.item.setAttribute("aria-label", describe_tile_label({ position, page_count, crop: page.crop }));
     tile.item.classList.toggle(DAMAGED_PAGE_CLASS, tile.page_identifier === this.damaged_page_identifier);
+    this.show_thumbnail(tile, page.rotation_degrees);
+    this.show_crop_overlay(tile, page.crop);
     tile.thumbnail.alt = `Miniatura da página ${position}`;
     tile.placeholder.textContent = `Página ${position}`;
     tile.number.textContent = String(position);
@@ -371,6 +388,26 @@ class DocumentPanel {
     tile.move_to_button.setAttribute("aria-label", `Mover a página ${position} para outra posição`);
     tile.delete_button.setAttribute("aria-label", `Excluir a página ${position}`);
     tile.rotate_button.setAttribute("aria-label", `Girar a página ${position} 90 graus para a direita`);
+    tile.enlarge_button.setAttribute("aria-label", describe_enlarge_label(position));
+  }
+
+  show_thumbnail(tile, rotation_degrees) {
+    if (tile.shown_rotation_degrees === rotation_degrees) {
+      return;
+    }
+    tile.shown_rotation_degrees = rotation_degrees;
+    // Another address is another try: a thumbnail that failed to load may work now.
+    tile.thumbnail_frame.hidden = false;
+    tile.placeholder.hidden = true;
+    tile.thumbnail.src = build_page_thumbnail_address(tile.page_identifier, rotation_degrees);
+  }
+
+  show_crop_overlay(tile, crop) {
+    tile.overlay.hidden = crop === null;
+    if (crop === null) {
+      return;
+    }
+    place_frame_on_element(tile.overlay, read_frame_from_crop(crop));
   }
 
   render_notices(body) {
@@ -407,6 +444,7 @@ class DocumentPanel {
     for (const button of [discard_last_page_button, cancel_document_button, save_document_button]) {
       button.disabled = !can_edit || page_count === 0;
     }
+    this.page_services.frame_editor.render_controls();
   }
 
   notify_activity_change() {
@@ -436,7 +474,17 @@ class DocumentPanel {
   }
 
   is_confirmation_open() {
-    return this.elements.confirmation_dialog.open || this.elements.move_page_dialog.open;
+    const { confirmation_dialog, move_page_dialog, page_frame_dialog } = this.elements;
+    return confirmation_dialog.open || move_page_dialog.open || page_frame_dialog.open;
+  }
+
+  find_page(page_identifier) {
+    const draft = this.rendered_body === null ? null : this.rendered_body.document;
+    const index = draft === null ? -1 : draft.pages.findIndex((page) => page.page_identifier === page_identifier);
+    if (index < 0) {
+      return null;
+    }
+    return { page: draft.pages[index], position: index + FIRST_POSITION, page_count: draft.pages.length };
   }
 
   has_pages() {
@@ -473,6 +521,15 @@ class DocumentPanel {
   }
 
   async run_edit(edit_request) {
+    const { body, failure } = await this.attempt_edit(edit_request);
+    // Reported once the controls are enabled again, so the damaged page's × can take the focus.
+    if (failure !== null) {
+      this.report_failure(failure);
+    }
+    return body;
+  }
+
+  async attempt_edit(edit_request) {
     this.is_edit_pending = true;
     this.notify_activity_change();
     let body = null;
@@ -491,11 +548,7 @@ class DocumentPanel {
       this.is_edit_pending = false;
       this.notify_activity_change();
     }
-    // Reported once the controls are enabled again, so the damaged page's × can take the focus.
-    if (failure !== null) {
-      this.report_failure(failure);
-    }
-    return body;
+    return { body, failure };
   }
 
   report_failure(error) {
@@ -531,6 +584,8 @@ class DocumentPanel {
       tile.delete_button.focus();
     } else if (focus.target === FOCUS_TARGETS.ROTATE_BUTTON) {
       tile.rotate_button.focus();
+    } else if (focus.target === FOCUS_TARGETS.ENLARGE_BUTTON) {
+      tile.enlarge_button.focus();
     } else {
       // The arrow that was used, or the other one once the page reached that end of the grid.
       const used_button = action_context.offset === MOVE_LEFT_OFFSET ? tile.move_left_button : tile.move_right_button;
@@ -595,10 +650,12 @@ class DocumentPanel {
     const position = this.read_page_identifiers().indexOf(page_identifier) + 1;
     const body = await this.run_edit({ method: "POST", path: build_page_rotation_path(page_identifier) });
     if (body !== null) {
-      this.announce(describe_page_rotation(position));
+      const turned_page = this.find_page(page_identifier);
+      const crop = turned_page === null ? null : turned_page.page.crop;
+      this.announce(describe_page_rotation_result({ position, crop }));
     }
-    // A damaged page already took the focus on its × (report_failure); otherwise the Girar button of this position
-    // gets it back, whose page has a new identifier after a rotation.
+    // A damaged page already took the focus on its × (report_failure); otherwise the Girar button of the page gets it
+    // back.
     if (body !== null || this.damaged_page_identifier !== page_identifier) {
       this.apply_focus({
         action: DOCUMENT_ACTIONS.ROTATE,
@@ -607,6 +664,10 @@ class DocumentPanel {
         ...action_origin,
       });
     }
+  }
+
+  enlarge_page(page_identifier, action_origin) {
+    this.page_services.frame_editor.open({ page_identifier, action_origin });
   }
 
   async reorder_pages(page_reorder) {

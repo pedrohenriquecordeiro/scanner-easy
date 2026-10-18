@@ -22,7 +22,6 @@ SCENARIO_NAMES = (
     "escape_in_the_confirmation",
     "move_to_dialog",
     "enter_on_the_save_button",
-    "enter_on_the_rotation_select",
 )
 
 pytestmark = pytest.mark.skipif(
@@ -157,7 +156,3 @@ def test_enter_on_the_save_button_does_not_save_by_itself(scenario_results: dict
 
 def test_confirmation_accept_button_says_save(scenario_results: dict) -> None:
     assert scenario_results["enter_on_the_save_button"]["accept_label"] == "Salvar"
-
-
-def test_enter_on_the_rotation_select_opens_no_confirmation(scenario_results: dict) -> None:
-    assert scenario_results["enter_on_the_rotation_select"] == {"dialog_shown_times": 0, "finalize_requests": 0}
