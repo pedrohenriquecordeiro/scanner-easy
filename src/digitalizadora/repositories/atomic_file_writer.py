@@ -2,6 +2,7 @@ import fcntl
 import functools
 import logging
 import os
+import re
 import secrets
 from collections.abc import Callable
 from pathlib import Path
@@ -13,12 +14,23 @@ TEMPORARY_FILE_PREFIX = "."
 TEMPORARY_FILE_SUFFIX = ".part"
 TEMPORARY_FILE_PERMISSIONS = 0o644
 TEMPORARY_TOKEN_SIZE_IN_BYTES = 4
+HEXADECIMAL_DIGITS_PER_BYTE = 2
+TEMPORARY_FILE_NAME_PATTERN = re.compile(
+    rf"{re.escape(TEMPORARY_FILE_PREFIX)}.+\.[0-9]+-"
+    rf"[0-9a-f]{{{HEXADECIMAL_DIGITS_PER_BYTE * TEMPORARY_TOKEN_SIZE_IN_BYTES}}}"
+    rf"{re.escape(TEMPORARY_FILE_SUFFIX)}"
+)
 
 
 def temporary_path_for(destination: Path) -> Path:
     """Unique per write, so two writers racing for one name never share or delete each other's file."""
     unique_part = f"{os.getpid()}-{secrets.token_hex(TEMPORARY_TOKEN_SIZE_IN_BYTES)}"
     return destination.with_name(f"{TEMPORARY_FILE_PREFIX}{destination.name}.{unique_part}{TEMPORARY_FILE_SUFFIX}")
+
+
+def is_temporary_file_name(file_name: str) -> bool:
+    """The name of a file that temporary_path_for gave to a write in progress (or one a crash left behind)."""
+    return TEMPORARY_FILE_NAME_PATTERN.fullmatch(file_name) is not None
 
 
 def remove_temporary_file(temporary: Path) -> None:

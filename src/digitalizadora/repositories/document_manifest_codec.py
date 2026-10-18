@@ -10,10 +10,11 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentPage, is_page_identifier
 from digitalizadora.domain.errors import InvalidCropError, UnreadableDraftError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import CROP_CORNER_ROLES, CropCorner, PageCrop, RectangleEdges
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_framing import MAXIMUM_CROPS_PER_PAGE, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.repositories.crop_codec import decode_crop, decode_legacy_rectangle, encode_crop
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +33,6 @@ SIZE_IN_BYTES_KEY = "size_in_bytes"
 ROTATION_DEGREES_KEY = "rotation_degrees"
 CROPS_KEY = "crops"
 LEGACY_CROP_KEY = "crop"
-LEGACY_CROP_EDGE_KEYS = ("left", "top", "right", "bottom")
 FINALIZATION_STARTED_AT_KEY = "finalization_started_at"
 FINISHED_DOCUMENT_KEY = "finished_document"
 PATH_KEY = "path"
@@ -74,14 +74,7 @@ def _encode_page(page: DocumentPage) -> dict[str, Any]:
         COLOR_MODE_KEY: page.color_mode.value,
         SIZE_IN_BYTES_KEY: page.size_in_bytes,
         ROTATION_DEGREES_KEY: page.framing.rotation.value,
-        CROPS_KEY: [_encode_crop(crop) for crop in page.framing.crops],
-    }
-
-
-def _encode_crop(crop: PageCrop) -> dict[str, dict[str, float]]:
-    return {
-        corner_key: {"x": corner.x, "y": corner.y}
-        for corner_key, corner in zip(CROP_CORNER_ROLES, crop.corners, strict=True)
+        CROPS_KEY: [encode_crop(crop) for crop in page.framing.crops],
     }
 
 
@@ -214,7 +207,7 @@ def _read_tolerant_crops(fields: dict[str, Any], page_identifier: str) -> list[P
     """The list of the crops; a manifest from before the quadrilaterals has one rectangle under the old key."""
     if CROPS_KEY in fields:
         return _read_crop_list(fields[CROPS_KEY], page_identifier)
-    legacy_crop = _read_tolerant_crop(_read_legacy_rectangle, fields.get(LEGACY_CROP_KEY), page_identifier)
+    legacy_crop = _read_tolerant_crop(decode_legacy_rectangle, fields.get(LEGACY_CROP_KEY), page_identifier)
     return [] if legacy_crop is None else [legacy_crop]
 
 
@@ -230,7 +223,7 @@ def _read_crop_list(value: object, page_identifier: str) -> list[PageCrop]:
             MAXIMUM_CROPS_PER_PAGE,
         )
     items = value[:MAXIMUM_CROPS_PER_PAGE]
-    crops = (_read_tolerant_crop(_read_corner_quadrilateral, item, page_identifier) for item in items)
+    crops = (_read_tolerant_crop(decode_crop, item, page_identifier) for item in items)
     return [crop for crop in crops if crop is not None]
 
 
@@ -241,21 +234,9 @@ def _read_tolerant_crop(
         return None
     try:
         return read_crop(value)
-    except (InvalidCropError, KeyError, TypeError):
+    except InvalidCropError:
         LOGGER.warning("Page %s has an invalid crop %r in the manifest; read as no crop", page_identifier, value)
         return None
-
-
-def _read_corner_quadrilateral(value: object) -> PageCrop:
-    if not isinstance(value, dict):
-        raise InvalidCropError("The crop is not an object")
-    return PageCrop(*(CropCorner(value[corner_key]["x"], value[corner_key]["y"]) for corner_key in CROP_CORNER_ROLES))
-
-
-def _read_legacy_rectangle(value: object) -> PageCrop:
-    if not isinstance(value, dict):
-        raise InvalidCropError("The crop is not an object")
-    return PageCrop.from_rectangle(RectangleEdges(*(value[edge_key] for edge_key in LEGACY_CROP_EDGE_KEYS)))
 
 
 def _read_color_mode(fields: dict[str, Any]) -> ColorMode:

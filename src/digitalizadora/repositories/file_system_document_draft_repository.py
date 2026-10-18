@@ -2,7 +2,6 @@ import errno
 import fcntl
 import logging
 import os
-import re
 import secrets
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
@@ -20,13 +19,7 @@ from digitalizadora.domain.document_draft_reconciliation import (
 )
 from digitalizadora.domain.errors import DigitalizadoraError, DraftFolderInUseError, as_draft_storage_error
 from digitalizadora.domain.ports import Clock
-from digitalizadora.repositories.atomic_file_writer import (
-    TEMPORARY_FILE_PREFIX,
-    TEMPORARY_FILE_SUFFIX,
-    TEMPORARY_TOKEN_SIZE_IN_BYTES,
-    AtomicFileWriter,
-    flush_to_disk,
-)
+from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter, flush_to_disk, is_temporary_file_name
 from digitalizadora.repositories.document_manifest_codec import decode_manifest, encode_manifest
 from digitalizadora.repositories.output_folder_preparer import (
     WRITE_PROBE_FILE_PREFIX,
@@ -42,12 +35,6 @@ OWNER_LOCK_OPEN_MODE = "a+b"
 SET_ASIDE_FOLDER_PREFIX = "set-aside-"
 SET_ASIDE_MOMENT_FORMAT = "%Y%m%d-%H%M%S"
 SET_ASIDE_TOKEN_SIZE_IN_BYTES = 4
-HEXADECIMAL_DIGITS_PER_BYTE = 2
-TEMPORARY_FILE_NAME_PATTERN = re.compile(
-    rf"{re.escape(TEMPORARY_FILE_PREFIX)}.+\.[0-9]+-"
-    rf"[0-9a-f]{{{HEXADECIMAL_DIGITS_PER_BYTE * TEMPORARY_TOKEN_SIZE_IN_BYTES}}}"
-    rf"{re.escape(TEMPORARY_FILE_SUFFIX)}"
-)
 FILE_NAMES_THAT_ARE_NOT_FILES = frozenset({"", ".", ".."})
 
 
@@ -59,7 +46,7 @@ def _page_identifier_in(file_name: str, prefix: str) -> str | None:
 
 
 def _is_temporary_file_name(file_name: str) -> bool:
-    return file_name.startswith(WRITE_PROBE_FILE_PREFIX) or TEMPORARY_FILE_NAME_PATTERN.fullmatch(file_name) is not None
+    return file_name.startswith(WRITE_PROBE_FILE_PREFIX) or is_temporary_file_name(file_name)
 
 
 def _build_inventory(entries: Iterable[os.DirEntry]) -> DraftFileInventory:

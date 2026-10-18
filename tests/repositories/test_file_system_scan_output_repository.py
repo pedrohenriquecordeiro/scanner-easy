@@ -564,3 +564,62 @@ def test_replace_saved_scan_with_another_failure_raises_output_folder_unavailabl
 
     with pytest.raises(OutputFolderUnavailableError):
         repository.replace_saved_scan(saved_path, b"turned content")
+
+
+def test_describe_saved_scan_reports_the_size_of_the_file(tmp_path):
+    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path.write_bytes(b"scan content")
+
+    described = build_real_repository(tmp_path).describe_saved_scan(saved_path)
+
+    assert (described.file_name, described.size_in_bytes) == ("2026-10-13_00001.pdf", len(b"scan content"))
+
+
+def test_describe_saved_scan_reports_the_modification_time_in_nanoseconds(tmp_path):
+    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path.write_bytes(b"scan content")
+
+    described = build_real_repository(tmp_path).describe_saved_scan(saved_path)
+
+    assert described.modified_at_nanoseconds == saved_path.stat().st_mtime_ns
+
+
+def test_describe_saved_scan_changes_when_the_file_is_edited_later(tmp_path):
+    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path.write_bytes(b"scan content")
+    repository = build_real_repository(tmp_path)
+    before = repository.describe_saved_scan(saved_path)
+
+    saved_path.write_bytes(b"scan content edited")
+
+    assert repository.describe_saved_scan(saved_path) != before
+
+
+def test_describe_saved_scan_of_a_file_that_is_gone_is_none(tmp_path):
+    assert build_real_repository(tmp_path).describe_saved_scan(tmp_path / "2026-10-13_00001.pdf") is None
+
+
+def test_delete_saved_scan_removes_the_file(tmp_path):
+    saved_path = tmp_path / "2026-10-13_00001.pdf"
+    saved_path.write_bytes(b"scan content")
+
+    build_real_repository(tmp_path).delete_saved_scan(saved_path)
+
+    assert not saved_path.exists()
+
+
+def test_delete_saved_scan_of_a_file_that_is_gone_is_not_an_error(tmp_path):
+    build_real_repository(tmp_path).delete_saved_scan(tmp_path / "2026-10-13_00001.pdf")
+
+
+def test_delete_saved_scan_of_a_file_that_cannot_be_removed_raises_output_folder_unavailable(tmp_path):
+    folder = tmp_path / "locked"
+    folder.mkdir()
+    saved_path = folder / "2026-10-13_00001.pdf"
+    saved_path.write_bytes(b"scan content")
+    folder.chmod(READ_ONLY_FOLDER_MODE)
+    try:
+        with pytest.raises(OutputFolderUnavailableError):
+            build_real_repository(tmp_path).delete_saved_scan(saved_path)
+    finally:
+        folder.chmod(WRITABLE_FOLDER_MODE)

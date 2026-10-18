@@ -14,6 +14,7 @@ EXPECTED_PORT_NAMES = {
     "ApplicationSettingsRepository",
     "ScanOutputRepository",
     "DocumentDraftRepository",
+    "QuickScanSlotRepository",
 }
 EXPECTED_METHOD_NAMES_BY_PORT = {
     "Clock": {"now"},
@@ -29,6 +30,19 @@ EXPECTED_METHOD_NAMES_BY_PORT = {
         "save_document",
         "read_saved_scan",
         "replace_saved_scan",
+        "describe_saved_scan",
+        "delete_saved_scan",
+    },
+    "QuickScanSlotRepository": {
+        "storage_folder",
+        "ensure_storage_folder_ready",
+        "write_master_files",
+        "master_file_path",
+        "read_thumbnail",
+        "load",
+        "commit",
+        "delete_leftovers",
+        "discard",
     },
     "DocumentDraftRepository": {
         "storage_folder",

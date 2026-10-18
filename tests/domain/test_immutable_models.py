@@ -8,6 +8,7 @@ from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_crop import CropCorner, RectangleEdges
 from digitalizadora.domain.page_framing import PageFraming
@@ -35,6 +36,7 @@ RESULT = ScanResult(
     scanned_at=MOMENT,
     size_in_bytes=10,
 )
+LAST_SCAN = LastScan("0123456789abcdef", MOMENT, Path("/tmp"), OutputFormat.PDF, (SavedScanFile("a.pdf", 1, 1),))
 MODELS = [
     SETTINGS,
     REQUEST,
@@ -53,6 +55,10 @@ MODELS = [
     CropCorner(0.0, 0.0),
     RectangleEdges(0.0, 0.0, 1.0, 1.0),
     PixelCorner(0.0, 0.0),
+    SavedScanFile("a.pdf", 1, 1),
+    LAST_SCAN,
+    QuickScanSlot(LAST_SCAN, 300, ColorMode.COLOR),
+    QuickScanMasterFiles("0123456789abcdef", b"m", b"t"),
     rectangle(0.0, 0.0, 1.0, 1.0),
     PageFraming(),
     ScanProgressSnapshot(ScanPhase.IDLE, 0, None, None),
