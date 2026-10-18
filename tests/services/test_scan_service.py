@@ -23,18 +23,13 @@ from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult
-from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.domain.scanner_capabilities import ScannerCapabilities
-from digitalizadora.domain.stored_scan import StoredScan
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_service import ScanService
 from tests.fakes.fixed_clock import FixedClock
-from tests.fakes.scripted_scanner_gateway import (
-    FixedGatewayProvider,
-    ScriptedScannerGateway,
-    build_sample_capabilities,
-)
+from tests.fakes.observing_scanner_gateway import ObservingScriptedScannerGateway
+from tests.fakes.recording_scan_destinations import RecordingScanOutputService
+from tests.fakes.scripted_scanner_gateway import FixedGatewayProvider, build_sample_capabilities
 from tests.fakes.stored_scans import STORED_SCAN_OUTPUT_PATH, STORED_SCAN_SCANNED_AT
 
 STARTED_AT = STORED_SCAN_SCANNED_AT
@@ -63,68 +58,6 @@ def build_failed_snapshot(error_code: str) -> ScanProgressSnapshot:
     return ScanProgressSnapshot(
         phase=ScanPhase.IDLE, scans_completed=0, last_result=None, last_error_code=error_code
     )
-
-
-class RecordingScanOutputService:
-    """Duck-typed stand-in for ScanOutputService (same two methods)."""
-
-    def __init__(self, progress_tracker: ScanProgressTracker) -> None:
-        self._progress_tracker = progress_tracker
-        self.capacity_failure: Exception | None = None
-        self.store_failure: Exception | None = None
-        self.capacity_requests: list[ScanRequest] = []
-        self.stored_jobs: list[ScanJob] = []
-        self.phase_during_capacity_check: ScanPhase | None = None
-        self.phase_during_store: ScanPhase | None = None
-        self.capacity_thread_identifier: int | None = None
-        self.store_thread_identifier: int | None = None
-
-    def ensure_capacity(self, request: ScanRequest) -> None:
-        self.capacity_requests.append(request)
-        self.phase_during_capacity_check = self._progress_tracker.snapshot().phase
-        self.capacity_thread_identifier = threading.get_ident()
-        if self.capacity_failure is not None:
-            raise self.capacity_failure
-
-    def store(self, scanned_image: ScannedImage, job: ScanJob) -> StoredScan:
-        self.stored_jobs.append(job)
-        self.phase_during_store = self._progress_tracker.snapshot().phase
-        self.store_thread_identifier = threading.get_ident()
-        if self.store_failure is not None:
-            raise self.store_failure
-        result = ScanResult(
-            output_path=STORED_SCAN_OUTPUT_PATH,
-            output_format=job.request.output_format,
-            scanned_at=job.started_at,
-            size_in_bytes=len(scanned_image.content),
-        )
-        return StoredScan(result=result, thumbnail_jpeg=b"thumbnail")
-
-
-class ObservingScriptedScannerGateway(ScriptedScannerGateway):
-    """Scripted gateway that can hold a scan open and reports the phase it ran in."""
-
-    def __init__(
-        self,
-        capabilities: ScannerCapabilities,
-        scan_outcomes: list[ScannedImage | Exception],
-        progress_tracker: ScanProgressTracker,
-    ) -> None:
-        super().__init__(capabilities, scan_outcomes)
-        self._progress_tracker = progress_tracker
-        self.scan_started = asyncio.Event()
-        self.release_scan = asyncio.Event()
-        self.release_scan.set()
-        self.phase_during_scan: ScanPhase | None = None
-
-    def hold_scans_open(self) -> None:
-        self.release_scan.clear()
-
-    async def scan_page(self, settings: ScanSettings) -> ScannedImage:
-        self.phase_during_scan = self._progress_tracker.snapshot().phase
-        self.scan_started.set()
-        await self.release_scan.wait()
-        return await super().scan_page(settings)
 
 
 class FailingGatewayProvider:

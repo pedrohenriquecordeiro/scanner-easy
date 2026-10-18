@@ -236,3 +236,70 @@ def test_snapshot_rejects_attribute_assignment(tracker: ScanProgressTracker) -> 
 
     with pytest.raises(FrozenInstanceError):
         snapshot.scans_completed = 99
+
+
+def test_mark_page_added_returns_to_idle(tracker: ScanProgressTracker) -> None:
+    tracker.begin_scan(SCAN_REQUEST)
+    tracker.mark_scanning()
+    tracker.mark_saving()
+
+    tracker.mark_page_added()
+
+    assert tracker.snapshot().phase is ScanPhase.IDLE
+
+
+def test_mark_page_added_counts_one_more_completed_scan(tracker: ScanProgressTracker) -> None:
+    for _ in range(2):
+        tracker.begin_scan(SCAN_REQUEST)
+        tracker.mark_page_added()
+
+    assert tracker.snapshot().scans_completed == 2
+
+
+def test_mark_page_added_keeps_the_last_result_of_the_quick_mode(tracker: ScanProgressTracker) -> None:
+    stored_scan = build_stored_scan()
+    tracker.begin_scan(SCAN_REQUEST)
+    tracker.mark_completed(stored_scan)
+    tracker.begin_scan(SCAN_REQUEST)
+
+    tracker.mark_page_added()
+
+    assert tracker.snapshot().last_result == stored_scan.result
+
+
+def test_mark_page_added_keeps_the_thumbnail_of_the_quick_mode(tracker: ScanProgressTracker) -> None:
+    tracker.begin_scan(SCAN_REQUEST)
+    tracker.mark_completed(build_stored_scan())
+    tracker.begin_scan(SCAN_REQUEST)
+
+    tracker.mark_page_added()
+
+    assert tracker.last_thumbnail_jpeg() == SAMPLE_THUMBNAIL_JPEG
+
+
+def test_mark_page_added_after_a_failure_leaves_no_error_code(tracker: ScanProgressTracker) -> None:
+    tracker.begin_scan(SCAN_REQUEST)
+    tracker.mark_failed("scan_failed")
+    tracker.begin_scan(SCAN_REQUEST)
+
+    tracker.mark_page_added()
+
+    assert tracker.snapshot().last_error_code is None
+
+
+def test_begin_scan_is_accepted_again_after_a_page_was_added(tracker: ScanProgressTracker) -> None:
+    tracker.begin_scan(SCAN_REQUEST)
+    tracker.mark_page_added()
+
+    tracker.begin_scan(SCAN_REQUEST)
+
+    assert tracker.snapshot().phase is ScanPhase.PREPARING
+
+
+def test_mark_page_added_does_not_change_an_earlier_snapshot(tracker: ScanProgressTracker) -> None:
+    tracker.begin_scan(SCAN_REQUEST)
+    snapshot_before = tracker.snapshot()
+
+    tracker.mark_page_added()
+
+    assert snapshot_before.phase is ScanPhase.PREPARING

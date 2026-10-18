@@ -55,3 +55,12 @@ class ScanProgressTracker:
 
     def last_thumbnail_jpeg(self) -> bytes | None:
         return self._last_thumbnail_jpeg
+
+    def mark_page_added(self) -> None:
+        # A document page counts as a completed scan, but the quick-mode panel keeps its last file:
+        # last_result and the thumbnail stay, and begin_scan already cleared the error code.
+        self._snapshot = replace(
+            self._snapshot,
+            phase=ScanPhase.IDLE,
+            scans_completed=self._snapshot.scans_completed + 1,
+        )
