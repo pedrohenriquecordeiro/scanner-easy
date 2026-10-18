@@ -30,6 +30,11 @@ from digitalizadora.domain import errors
         (errors.DocumentAssemblyFailedError, "document_assembly_failed"),
         (errors.DocumentTooLargeError, "document_too_large"),
         (errors.ImageAdjustmentFailedError, "image_adjustment_failed"),
+        (errors.InvalidCropError, "invalid_crop"),
+        (errors.InvalidPageRotationError, "invalid_page_rotation"),
+        (errors.NoLastScanError, "no_last_scan"),
+        (errors.LastScanFileMissingError, "last_scan_file_missing"),
+        (errors.SavedScanUnreadableError, "saved_scan_unreadable"),
     ],
 )
 def test_error_class_exposes_its_code(

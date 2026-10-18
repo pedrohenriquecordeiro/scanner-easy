@@ -76,8 +76,16 @@ ERROR_MESSAGES: Mapping[str, str] = MappingProxyType(
             "Feche outros programas e tente de novo."
         ),
         "image_adjustment_failed": (
-            "Não consegui girar ou cortar a imagem com a memória livre do Mac. "
+            "Não consegui cortar a imagem com a memória livre do Mac. "
             "Escolha uma resolução menor, desligue o corte automático e tente de novo."
+        ),
+        "invalid_crop": "A moldura de corte é inválida. Ajuste e tente de novo.",
+        "invalid_page_rotation": "Rotação inválida.",
+        "no_last_scan": "Ainda não há uma digitalização para girar.",
+        "last_scan_file_missing": "O arquivo da última digitalização não está mais na pasta de saída.",
+        "saved_scan_unreadable": (
+            "Não consegui ler o arquivo da última digitalização para girá-lo. "
+            "Veja o registro em ~/Library/Logs/Digitalizadora."
         ),
     }
 )

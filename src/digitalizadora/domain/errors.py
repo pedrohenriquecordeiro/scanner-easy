@@ -103,6 +103,26 @@ class ImageAdjustmentFailedError(DigitalizadoraError):
     code = "image_adjustment_failed"
 
 
+class InvalidCropError(DigitalizadoraError):
+    code = "invalid_crop"
+
+
+class InvalidPageRotationError(DigitalizadoraError):
+    code = "invalid_page_rotation"
+
+
+class NoLastScanError(DigitalizadoraError):
+    code = "no_last_scan"
+
+
+class LastScanFileMissingError(DigitalizadoraError):
+    code = "last_scan_file_missing"
+
+
+class SavedScanUnreadableError(DigitalizadoraError):
+    code = "saved_scan_unreadable"
+
+
 def as_draft_storage_error(error: DigitalizadoraError) -> DigitalizadoraError:
     """Translates a storage error raised for the draft folder, which lives on the internal disk."""
     if isinstance(error, InsufficientStorageError) and not isinstance(error, InsufficientDraftStorageError):
