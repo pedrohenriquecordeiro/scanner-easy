@@ -471,6 +471,7 @@ def test_error_statuses_cover_the_documented_codes() -> None:
     assert {code: int(status) for code, status in DOCUMENT_ERROR_STATUSES.items()} == {
         "scan_already_running": 409,
         "document_busy": 409,
+        "last_scan_busy": 409,
         "damaged_document_page": 409,
         "no_open_document": 404,
         "page_not_found": 404,
