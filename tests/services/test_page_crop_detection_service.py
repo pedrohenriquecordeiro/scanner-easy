@@ -14,7 +14,15 @@ from digitalizadora.services import page_crop_detection_service
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.paper_edge_detection import PaperEdges
 from tests.fakes.book_on_glass import BookOnGlass, build_book_on_glass_jpeg
-from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg, photo_corners
+from tests.fakes.photo_scenes import (
+    PlacedPhoto,
+    build_lid,
+    build_photo_scene,
+    build_photo_scene_jpeg,
+    encode_jpeg,
+    paste_glass_edge_line,
+    photo_corners,
+)
 from tests.fakes.synthetic_scans import build_scan_jpeg
 
 LID_SIZE = (200, 280)
@@ -27,6 +35,7 @@ FRACTION_TOLERANCE = 0.03
 BOOK = BookOnGlass()
 REAL_SCANS_VARIABLE = "DIGITALIZADORA_REAL_SCANS_FOLDER"
 CARD_IMAGE_VARIABLE = "DIGITALIZADORA_CARD_IMAGE"
+USER_MASTER_VARIABLE = "DIGITALIZADORA_USER_MASTER_SCAN"
 GLASS_SIZE = (1275, 1754)
 
 
@@ -249,6 +258,39 @@ def test_the_crops_of_two_photos_are_close_to_the_corners_of_the_photos_with_the
     assert worst_distance(crops[1], crop_of(LOWER_PHOTO)) < CORNER_TOLERANCE_FRACTION + margin / 2
 
 
+GLASS_EDGE_LINE_THICKNESS = 12
+PHOTO_NEAR_THE_BOTTOM = PlacedPhoto(center=(690.0, 1450.0), size=(800, 540), angle_degrees=-2.0, seed=2)
+
+
+def two_photos_with_the_glass_edge_line(lower_photo: PlacedPhoto) -> bytes:
+    canvas = build_photo_scene(GLASS_SIZE, [UPPER_PHOTO, lower_photo], build_lid(GLASS_SIZE))
+    paste_glass_edge_line(canvas, GLASS_EDGE_LINE_THICKNESS)
+    return encode_jpeg(canvas)
+
+
+def test_a_photo_a_few_pixels_from_the_dark_line_of_the_glass_edge_is_still_a_second_crop(service):
+    lower_photo = PHOTO_NEAR_THE_BOTTOM
+
+    crops = service.detect_crops(two_photos_with_the_glass_edge_line(lower_photo)).crops
+
+    assert len(crops) == 2
+
+
+def test_a_photo_one_percent_from_the_bottom_of_the_glass_is_framed_with_its_own_corners(service):
+    lower_photo = PHOTO_NEAR_THE_BOTTOM
+
+    crops = service.detect_crops(two_photos_with_the_glass_edge_line(lower_photo)).crops
+
+    assert worst_distance(crops[1], crop_of(lower_photo)) < 2 * CORNER_TOLERANCE_FRACTION
+
+
+def test_the_dark_line_of_the_glass_edge_alone_is_not_a_crop(service):
+    canvas = build_lid(GLASS_SIZE)
+    paste_glass_edge_line(canvas, GLASS_EDGE_LINE_THICKNESS)
+
+    assert service.detect_crops(encode_jpeg(canvas)).crops == ()
+
+
 def test_a_tilted_photo_is_a_crop_that_is_not_a_rectangle(service):
     crops = service.detect_crops(TWO_PHOTOS_JPEG).crops
 
@@ -328,6 +370,7 @@ def test_detecting_the_crops_of_a_full_scan_is_fast(service):
 
 REAL_SCANS_FOLDER = os.environ.get(REAL_SCANS_VARIABLE)
 CARD_IMAGE = os.environ.get(CARD_IMAGE_VARIABLE)
+USER_MASTER = os.environ.get(USER_MASTER_VARIABLE)
 REAL_BOOK_EDGES = (0.13, 0.125, 0.91, 0.914)
 REAL_SCAN_NAMES = ["1-color-100.jpg", "2-gray-100.jpg", "3-color-300.jpg", "4-color-150-photo.jpg"]
 REAL_PHOTO_SCAN_NAMES = ["photos-1-color-100.jpg", "photos-2-color-300.jpg", "photos-3-gray-150.jpg"]
@@ -357,6 +400,16 @@ def test_the_real_scans_of_two_photos_give_two_crops_with_the_known_corners(serv
     assert len(crops) == 2
     assert worst_distance(crops[0], REAL_UPPER_PHOTO) < 0.04
     assert worst_distance(crops[1], REAL_LOWER_PHOTO) < 0.04
+
+
+@pytest.mark.skipif(USER_MASTER is None, reason=f"set {USER_MASTER_VARIABLE} to the scan of the two photos")
+@pytest.mark.parametrize("crop_margin_enabled", [False, True])
+def test_the_scan_of_two_photos_with_the_lower_one_at_the_glass_edge_gives_two_crops(crop_margin_enabled):
+    detector = PageCropDetectionService(lambda: crop_margin_enabled)
+
+    crops = detector.detect_crops(Path(USER_MASTER).read_bytes()).crops
+
+    assert len(crops) == 2
 
 
 @pytest.mark.skipif(CARD_IMAGE is None, reason=f"set {CARD_IMAGE_VARIABLE} to the picture of the card")

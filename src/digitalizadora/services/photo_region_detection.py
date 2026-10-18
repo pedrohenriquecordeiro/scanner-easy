@@ -29,6 +29,8 @@ MINIMUM_REGION_FILL_SHARE = 0.75
 # around a big sheet taken for the sheet itself.
 MAXIMUM_TOUCHED_SIDES = 2
 MAXIMUM_RING_FOREGROUND_SHARE = 0.25
+# The line of the edge of the glass runs across a whole side of the scan.
+MINIMUM_GLASS_EDGE_LINE_SHARE = 0.9
 
 GRAY_LEVEL_COUNT = 256
 MASK_ON = 255
@@ -122,13 +124,52 @@ def _difference_from_level(band: Image.Image, background_level: int) -> Image.Im
     return ImageChops.difference(band, Image.new("L", band.size, background_level))
 
 
+def _edge_strip_box(size: tuple[int, int], side: str, depth: int) -> tuple[int, int, int, int]:
+    """The strip of `depth` pixels along a side of the image, as a box."""
+    width, height = size
+    boxes = {
+        "top": (0, 0, width, depth),
+        "bottom": (0, height - depth, width, height),
+        "left": (0, 0, depth, height),
+        "right": (width - depth, 0, width, height),
+    }
+    return boxes[side]
+
+
+def _glass_edge_line_depth(mask: Image.Image, side: str) -> int:
+    """How many pixels from a side are a line of foreground across (almost) all of its length, 0 if none."""
+    side_length = mask.width if side in ("top", "bottom") else mask.height
+    depth = 0
+    counted_pixels = 0
+    while depth < _border_width(mask):
+        strip_pixels = mask.crop(_edge_strip_box(mask.size, side, depth + 1)).histogram()[MASK_ON]
+        if strip_pixels - counted_pixels < MINIMUM_GLASS_EDGE_LINE_SHARE * side_length:
+            break
+        counted_pixels = strip_pixels
+        depth += 1
+    return depth
+
+
+def _without_the_glass_edge_lines(mask: Image.Image) -> Image.Image:
+    """The dark line the edge of the glass leaves along a side is no photo, and a photo a few pixels from it would
+    be one piece with it. A line across the whole side and thinner than the border strip is cleared, with the reach
+    of the noise filter that swelled it."""
+    cleared = mask.copy()
+    for side in ("top", "bottom", "left", "right"):
+        line_depth = _glass_edge_line_depth(mask, side)
+        if line_depth > 0:
+            depth = min(_border_width(mask), line_depth + REGION_NOISE_FILTER_SIZE // 2)
+            cleared.paste(MASK_OFF, _edge_strip_box(mask.size, side, depth))
+    return cleared
+
+
 def _foreground_mask(differences: list[Image.Image], difference_levels: int) -> Image.Image:
     """A pixel is foreground when any colour channel differs enough, so a dark but coloured cover is not lost."""
     table = [MASK_ON if level > difference_levels else MASK_OFF for level in range(GRAY_LEVEL_COUNT)]
     mask = differences[0].point(table)
     for difference in differences[1:]:
         mask = ImageChops.lighter(mask, difference.point(table))
-    return mask.filter(ImageFilter.MedianFilter(REGION_NOISE_FILTER_SIZE))
+    return _without_the_glass_edge_lines(mask.filter(ImageFilter.MedianFilter(REGION_NOISE_FILTER_SIZE)))
 
 
 def _ramp_term(ramp: Image.Image, span: int) -> Image.Image:

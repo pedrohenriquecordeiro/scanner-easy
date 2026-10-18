@@ -13,6 +13,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 LID_COLOR = (252, 252, 252)
 LID_SHADING_LEVELS = 14
+GLASS_EDGE_COLOR = (4, 4, 4)
 MARKER_COLOR = (220, 20, 20)
 MARKER_SHARE = 0.25
 CIRCLES_PER_PHOTO = 14
@@ -96,6 +97,12 @@ def paste_photo(canvas: Image.Image, placed_photo: PlacedPhoto) -> None:
 def paste_flat_sheet(canvas: Image.Image, placed_sheet: PlacedPhoto, color: tuple[int, int, int]) -> None:
     """A sheet of one colour with the same placement as a photo: a white page on a dark lid, a polaroid border."""
     ImageDraw.Draw(canvas).polygon(list(photo_corners(placed_sheet)), fill=color)
+
+
+def paste_glass_edge_line(canvas: Image.Image, thickness: int) -> None:
+    """The dark line the edge of the glass leaves along the bottom of a scan, across the whole width."""
+    width, height = canvas.size
+    ImageDraw.Draw(canvas).rectangle((0, height - thickness, width, height), fill=GLASS_EDGE_COLOR)
 
 
 def build_photo_scene(
