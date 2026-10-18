@@ -5,7 +5,7 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services import document_page_renderer
@@ -14,8 +14,8 @@ from tests.fakes.synthetic_scans import build_marked_scan_jpeg, find_marker_corn
 
 PAGE_SIZE = (100, 200)
 DOTS_PER_INCH = 300
-TOP_RIGHT_QUADRANT = PageCrop(0.5, 0.0, 1.0, 0.5)
-TOP_LEFT_QUADRANT = PageCrop(0.0, 0.0, 0.5, 0.5)
+TOP_RIGHT_QUADRANT = RectangleCrop(0.5, 0.0, 1.0, 0.5)
+TOP_LEFT_QUADRANT = RectangleCrop(0.0, 0.0, 0.5, 0.5)
 MARKER_REDNESS_THRESHOLD = 30
 QUARTER_TURN = PageFraming(rotation=PageRotation.CLOCKWISE_90)
 
@@ -79,7 +79,7 @@ def test_a_crop_alone_keeps_what_is_inside_the_frame(page_file):
 
 
 def test_a_crop_away_from_the_marker_leaves_the_marker_out(page_file):
-    cropped = render(page_file, PageFraming(crop=PageCrop(0.5, 0.5, 1.0, 1.0)))
+    cropped = render(page_file, PageFraming(crop=RectangleCrop(0.5, 0.5, 1.0, 1.0)))
 
     assert read_redness(cropped, (8, 8)) < MARKER_REDNESS_THRESHOLD
 
@@ -94,7 +94,7 @@ def test_a_rotation_and_a_crop_together_crop_in_the_displayed_orientation(page_f
 
 def test_the_displayed_crop_that_misses_the_turned_marker_misses_it_in_the_result(page_file):
     # The marker is at the top-left of the stored page, so at the top-right once the page is turned.
-    framing = PageFraming(PageRotation.CLOCKWISE_90, PageCrop(0.0, 0.5, 0.5, 1.0))
+    framing = PageFraming(PageRotation.CLOCKWISE_90, RectangleCrop(0.0, 0.5, 0.5, 1.0))
 
     rendered = render(page_file, framing)
 

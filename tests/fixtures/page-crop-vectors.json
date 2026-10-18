@@ -1,0 +1,40 @@
+{
+ "description": "Quadrilaterals (top_left, top_right, bottom_right, bottom_left) in fractions of the displayed page. page_turned_clockwise: the page turns 90 degrees clockwise (points (x, y) -> (1 - y, x) and the roles advance). output_turned_clockwise: only the roles advance. validity: the problem the validation names (null = valid). Read by the Python and the Node tests.",
+ "vectors": [
+  {"name": "axis rectangle",
+   "quad": [[0.1, 0.2], [0.5, 0.2], [0.5, 0.9], [0.1, 0.9]],
+   "page_turned_clockwise": [[0.1, 0.1], [0.8, 0.1], [0.8, 0.5], [0.1, 0.5]],
+   "output_turned_clockwise": [[0.1, 0.9], [0.1, 0.2], [0.5, 0.2], [0.5, 0.9]]},
+  {"name": "half page",
+   "quad": [[0, 0], [0.5, 0], [0.5, 1], [0, 1]],
+   "page_turned_clockwise": [[0, 0], [1, 0], [1, 0.5], [0, 0.5]],
+   "output_turned_clockwise": [[0, 1], [0, 0], [0.5, 0], [0.5, 1]]},
+  {"name": "whole page",
+   "quad": [[0, 0], [1, 0], [1, 1], [0, 1]],
+   "page_turned_clockwise": [[0, 0], [1, 0], [1, 1], [0, 1]],
+   "output_turned_clockwise": [[0, 1], [0, 0], [1, 0], [1, 1]]},
+  {"name": "diagonal card",
+   "quad": [[0.486, 0.119], [0.983, 0.347], [0.542, 0.904], [0.045, 0.676]],
+   "page_turned_clockwise": [[0.324, 0.045], [0.881, 0.486], [0.653, 0.983], [0.096, 0.542]],
+   "output_turned_clockwise": [[0.045, 0.676], [0.486, 0.119], [0.983, 0.347], [0.542, 0.904]]},
+  {"name": "tilted photo",
+   "quad": [[0.4, 0.55], [0.93, 0.44], [0.97, 0.8], [0.44, 0.91]],
+   "page_turned_clockwise": [[0.09, 0.44], [0.45, 0.4], [0.56, 0.93], [0.2, 0.97]],
+   "output_turned_clockwise": [[0.44, 0.91], [0.4, 0.55], [0.93, 0.44], [0.97, 0.8]]},
+  {"name": "skewed quad",
+   "quad": [[0.1, 0.1], [0.8, 0.2], [0.9, 0.85], [0.2, 0.7]],
+   "page_turned_clockwise": [[0.3, 0.2], [0.9, 0.1], [0.8, 0.8], [0.15, 0.9]],
+   "output_turned_clockwise": [[0.2, 0.7], [0.1, 0.1], [0.8, 0.2], [0.9, 0.85]]}
+ ],
+ "validity": [
+  {"name": "bow tie", "quad": [[0.1, 0.1], [0.8, 0.8], [0.8, 0.1], [0.1, 0.8]], "problem": "not_clockwise_or_empty"},
+  {"name": "counterclockwise", "quad": [[0.1, 0.5], [0.5, 0.5], [0.5, 0.1], [0.1, 0.1]], "problem": "not_clockwise_or_empty"},
+  {"name": "sliver", "quad": [[0.1, 0.1], [0.9, 0.1], [0.9, 0.1005], [0.1, 0.1005]], "problem": "edge_too_short"},
+  {"name": "reflex corner", "quad": [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.5, 0.3]], "problem": "not_convex"},
+  {"name": "outside the page", "quad": [[-0.1, 0], [0.5, 0], [0.5, 0.5], [-0.1, 0.5]], "problem": "outside_the_page"},
+  {"name": "flat corner", "quad": [[0.1, 0.1], [0.5, 0.1], [0.9, 0.1002], [0.5, 0.9]], "problem": "corner_too_flat"},
+  {"name": "edge of one hundredth", "quad": [[0.1, 0.1], [0.11, 0.1], [0.11, 0.5], [0.1, 0.5]], "problem": "edge_too_short"},
+  {"name": "edge of exactly two hundredths", "quad": [[0.1, 0.1], [0.12, 0.1], [0.12, 0.5], [0.1, 0.5]], "problem": null},
+  {"name": "rotated square on the page", "quad": [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]], "problem": null}
+ ]
+}

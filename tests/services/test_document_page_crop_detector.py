@@ -8,7 +8,7 @@ from digitalizadora.domain.errors import (
     NoOpenDocumentError,
     PageNotFoundError,
 )
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.repositories.file_system_document_draft_repository import (
@@ -35,15 +35,15 @@ WHITE_PAGE = build_scan_jpeg(LID_SIZE)
 FIRST_PAGE_IDENTIFIER = page_identifier_at(1)
 UNKNOWN_PAGE_IDENTIFIER = "00000000000000ff"
 ABUNDANT_FREE_SPACE = 100 * 1024**3
-SAMPLE_CROP = PageCrop(0.1, 0.1, 0.9, 0.9)
+SAMPLE_CROP = RectangleCrop(0.1, 0.1, 0.9, 0.9)
 
 
 class StubCropDetectionService(PageCropDetectionService):
-    def __init__(self, crop: PageCrop | None = None, failure: Exception | None = None) -> None:
+    def __init__(self, crop: RectangleCrop | None = None, failure: Exception | None = None) -> None:
         self._crop = crop
         self._failure = failure
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> RectangleCrop | None:
         if self._failure is not None:
             raise self._failure
         return self._crop
@@ -113,13 +113,13 @@ def test_nothing_found_leaves_the_frame_and_the_revision_alone(drafts_folder):
 
 def test_a_frame_found_on_the_master_is_stored_in_the_displayed_orientation(drafts_folder):
     store, detector = build_detector(
-        drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=PageCrop(0.0, 0.0, 0.5, 1.0))
+        drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=RectangleCrop(0.0, 0.0, 0.5, 1.0))
     )
     store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
-    assert result.draft.pages[0].framing.crop == PageCrop(0.0, 0.0, 1.0, 0.5)
+    assert result.draft.pages[0].framing.crop == RectangleCrop(0.0, 0.0, 1.0, 0.5)
 
 
 def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
@@ -133,7 +133,7 @@ def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
 
 def test_a_found_frame_replaces_the_frame_of_before(drafts_folder):
     store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=SAMPLE_CROP))
-    store.set_page_crop(FIRST_PAGE_IDENTIFIER, PageCrop(0.3, 0.3, 0.6, 0.6))
+    store.set_page_crop(FIRST_PAGE_IDENTIFIER, RectangleCrop(0.3, 0.3, 0.6, 0.6))
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 

@@ -26,7 +26,7 @@ from digitalizadora.domain.errors import (
     UnreadableDraftError,
     as_draft_storage_error,
 )
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.ports import DocumentDraftRepository
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -192,7 +192,7 @@ class DocumentDraftStore:
         page = draft.pages[draft.position_of(page_identifier) - FIRST_PAGE_POSITION]
         return self._save_and_replace(draft.with_page_framing(page_identifier, page.framing.turned_clockwise()))
 
-    def set_page_crop(self, page_identifier: str, crop: PageCrop | None) -> DocumentDraft:
+    def set_page_crop(self, page_identifier: str, crop: RectangleCrop | None) -> DocumentDraft:
         draft = self._require_draft()
         page = draft.pages[draft.position_of(page_identifier) - FIRST_PAGE_POSITION]
         framing = page.framing.with_crop(crop)

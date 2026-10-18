@@ -52,3 +52,11 @@ class PixelRegion:
             right=min(limit_width, self.right + margin),
             bottom=min(limit_height, self.bottom + margin),
         )
+
+
+@dataclass(frozen=True)
+class PixelCorner:
+    """A point of an image in pixels, with fractions: the corner of a crop is not on the pixel grid."""
+
+    x: float
+    y: float

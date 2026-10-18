@@ -9,7 +9,7 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentPage, is_page_identifier
 from digitalizadora.domain.errors import InvalidCropError, UnreadableDraftError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
@@ -76,7 +76,7 @@ def _encode_page(page: DocumentPage) -> dict[str, Any]:
     }
 
 
-def _encode_crop(crop: PageCrop | None) -> dict[str, float] | None:
+def _encode_crop(crop: RectangleCrop | None) -> dict[str, float] | None:
     if crop is None:
         return None
     return dict(zip(CROP_EDGE_KEYS, (crop.left, crop.top, crop.right, crop.bottom), strict=True))
@@ -207,14 +207,14 @@ def _read_tolerant_rotation(fields: dict[str, Any], page_identifier: str) -> Pag
         return PageRotation.NONE
 
 
-def _read_tolerant_crop(fields: dict[str, Any], page_identifier: str) -> PageCrop | None:
+def _read_tolerant_crop(fields: dict[str, Any], page_identifier: str) -> RectangleCrop | None:
     value = fields.get(CROP_KEY)
     if value is None:
         return None
     try:
         if not isinstance(value, dict):
             raise InvalidCropError("The crop is not an object")
-        crop = PageCrop(*(value[edge_key] for edge_key in CROP_EDGE_KEYS))
+        crop = RectangleCrop(*(value[edge_key] for edge_key in CROP_EDGE_KEYS))
     except (InvalidCropError, KeyError):
         LOGGER.warning("Page %s has an invalid crop %r in the manifest; read as no crop", page_identifier, value)
         return None

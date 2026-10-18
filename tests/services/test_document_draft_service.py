@@ -25,7 +25,7 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import WHOLE_PAGE, PageCrop
+from digitalizadora.domain.page_crop import WHOLE_PAGE, RectangleCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
@@ -615,7 +615,7 @@ async def test_rotate_page_without_a_draft_raises_no_open_document(service):
         await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
 
-SAMPLE_CROP = PageCrop(0.125, 0.115, 0.9, 0.925)
+SAMPLE_CROP = RectangleCrop(0.125, 0.115, 0.9, 0.925)
 
 
 async def test_set_page_crop_stores_the_crop_in_the_page(service):
@@ -712,7 +712,7 @@ async def test_a_rotated_page_goes_into_the_saved_pdf_with_its_new_orientation(s
 async def test_a_cropped_page_goes_into_the_saved_pdf_with_the_size_of_its_frame(service, parts):
     await add_pages(service, 1)
     page_width, page_height = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
-    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, PageCrop(0.0, 0.0, 0.5, 1.0))
+    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, RectangleCrop(0.0, 0.0, 0.5, 1.0))
 
     finalization = await service.finalize()
 

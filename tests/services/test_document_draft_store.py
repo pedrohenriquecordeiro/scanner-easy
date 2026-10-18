@@ -24,7 +24,7 @@ from digitalizadora.domain.errors import (
     PageNotFoundError,
 )
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import WHOLE_PAGE, PageCrop
+from digitalizadora.domain.page_crop import WHOLE_PAGE, RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
@@ -893,8 +893,8 @@ def test_read_page_content_of_a_file_with_another_size_raises_damaged_document_p
         draft_store.read_page_content(FIRST_PAGE_IDENTIFIER)
 
 
-SAMPLE_CROP = PageCrop(0.125, 0.115, 0.9, 0.925)
-TURNED_SAMPLE_CROP = PageCrop(0.075, 0.125, 0.885, 0.9)
+SAMPLE_CROP = RectangleCrop(0.125, 0.115, 0.9, 0.925)
+TURNED_SAMPLE_CROP = RectangleCrop(0.075, 0.125, 0.885, 0.9)
 
 
 def test_turning_a_page_adds_a_quarter_turn_to_its_rotation(draft_store):

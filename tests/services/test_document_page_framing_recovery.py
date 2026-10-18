@@ -8,7 +8,7 @@ import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft_reconciliation import page_file_name, thumbnail_file_name
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -28,7 +28,7 @@ SETTINGS = ScanSettings(300, ColorMode.COLOR)
 PAGE_IDENTIFIER = page_identifier_at(1)
 PAGE_JPEG = b"first page jpeg"
 THUMBNAIL_JPEG = b"thumbnail jpeg"
-CROP = PageCrop(0.125, 0.115, 0.9, 0.925)
+CROP = RectangleCrop(0.125, 0.115, 0.9, 0.925)
 CRASH = OSError("the power went out")
 
 

@@ -12,7 +12,7 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentPage
 from digitalizadora.domain.errors import UnreadableDraftError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
@@ -23,7 +23,7 @@ from digitalizadora.repositories.document_manifest_codec import (
 )
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft
 
-FRAMED = PageFraming(PageRotation.CLOCKWISE_90, PageCrop(0.125, 0.115, 0.924, 0.925))
+FRAMED = PageFraming(PageRotation.CLOCKWISE_90, RectangleCrop(0.125, 0.115, 0.924, 0.925))
 FINALIZATION_STARTED_AT = DRAFT_CREATED_AT + timedelta(minutes=4)
 FINALIZED_AT = DRAFT_CREATED_AT + timedelta(minutes=5)
 FINISHED_DOCUMENT = ScanResult(
@@ -237,7 +237,7 @@ def test_an_invalid_rotation_keeps_the_crop_of_the_page():
 
     framing = decode_manifest(encode_document(document)).pages[0].framing
 
-    assert framing == PageFraming(PageRotation.NONE, PageCrop(0.0, 0.0, 0.5, 0.5))
+    assert framing == PageFraming(PageRotation.NONE, RectangleCrop(0.0, 0.0, 0.5, 0.5))
 
 
 def test_a_crop_of_the_whole_page_is_read_as_no_crop():

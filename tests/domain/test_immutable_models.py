@@ -9,9 +9,9 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import CropCorner, RectangleCrop, RectangleEdges
 from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.domain.pixel_region import PixelRegion
+from digitalizadora.domain.pixel_region import PixelCorner, PixelRegion
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
@@ -24,6 +24,7 @@ from digitalizadora.domain.scanner_endpoint import ScannerEndpoint
 from digitalizadora.domain.scanner_route import ScannerRoute
 from digitalizadora.domain.scanner_status import ScannerState, ScannerStatus
 from digitalizadora.domain.stored_scan import StoredScan
+from tests.fakes.page_crops import rectangle
 
 MOMENT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=timezone(timedelta(hours=-3)))
 SETTINGS = ScanSettings(dots_per_inch=300, color_mode=ColorMode.COLOR)
@@ -48,7 +49,11 @@ MODELS = [
     ApplicationSettings(Path("/tmp"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings),
     ImageAdjustment(),
     PixelRegion(0, 0, 1, 1),
-    PageCrop(0.0, 0.0, 1.0, 1.0),
+    RectangleCrop(0.0, 0.0, 1.0, 1.0),
+    CropCorner(0.0, 0.0),
+    RectangleEdges(0.0, 0.0, 1.0, 1.0),
+    PixelCorner(0.0, 0.0),
+    rectangle(0.0, 0.0, 1.0, 1.0),
     PageFraming(),
     ScanProgressSnapshot(ScanPhase.IDLE, 0, None, None),
 ]

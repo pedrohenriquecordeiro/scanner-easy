@@ -10,7 +10,7 @@ from digitalizadora.domain.document_draft import (
     RecoveryOutcome,
 )
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
@@ -97,7 +97,7 @@ def test_document_describes_the_draft_and_its_pages_in_order() -> None:
 
 def test_a_framed_page_reports_its_rotation_and_crop() -> None:
     draft = TWO_PAGE_SNAPSHOT.draft.with_page_framing(
-        page_identifier_at(2), PageFraming(PageRotation.CLOCKWISE_90, PageCrop(0.13, 0.115, 0.924, 0.925))
+        page_identifier_at(2), PageFraming(PageRotation.CLOCKWISE_90, RectangleCrop(0.13, 0.115, 0.924, 0.925))
     )
 
     page = build_document_body(replace(TWO_PAGE_SNAPSHOT, draft=draft))["document"]["pages"][1]

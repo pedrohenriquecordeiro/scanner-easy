@@ -10,7 +10,7 @@ from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, InsufficientDraftStorageError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_job import ScanJob
@@ -219,7 +219,7 @@ class FailingCropDetectionService(PageCropDetectionService):
     def __init__(self, failure: Exception) -> None:
         self._failure = failure
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> RectangleCrop | None:
         raise self._failure
 
 
@@ -254,7 +254,7 @@ class CountingCropDetectionService(PageCropDetectionService):
     def __init__(self) -> None:
         self.detection_count = 0
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> RectangleCrop | None:
         self.detection_count += 1
         return None
 

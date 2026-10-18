@@ -37,7 +37,7 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
@@ -553,7 +553,7 @@ def test_set_page_crop_passes_the_identifier_and_the_crop(
 
     assert document_service.received_arguments["set_page_crop"] == (
         SECOND_PAGE_IDENTIFIER,
-        PageCrop(0.125, 0.115, 0.9, 0.925),
+        RectangleCrop(0.125, 0.115, 0.9, 0.925),
     )
 
 
@@ -572,7 +572,7 @@ def test_set_page_crop_accepts_whole_numbers_as_edges(
 
     assert document_service.received_arguments["set_page_crop"] == (
         SECOND_PAGE_IDENTIFIER,
-        PageCrop(0.0, 0.0, 1.0, 1.0),
+        RectangleCrop(0.0, 0.0, 1.0, 1.0),
     )
 
 

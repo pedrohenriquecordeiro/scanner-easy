@@ -9,7 +9,7 @@ from digitalizadora.domain.document_draft import (
     DraftRecoveryReport,
     DraftSnapshot,
 )
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.services.document_draft_store import DraftStorageState
 
 EMPTY_PAGE_COUNT = 0
@@ -78,7 +78,7 @@ def _describe_page(page: DocumentPage) -> dict[str, Any]:
     }
 
 
-def _describe_crop(crop: PageCrop | None) -> dict[str, float] | None:
+def _describe_crop(crop: RectangleCrop | None) -> dict[str, float] | None:
     if crop is None:
         return None
     return {"left": crop.left, "top": crop.top, "right": crop.right, "bottom": crop.bottom}

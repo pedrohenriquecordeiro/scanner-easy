@@ -1,10 +1,10 @@
 import pytest
 
-from digitalizadora.domain.page_crop import WHOLE_PAGE, PageCrop
+from digitalizadora.domain.page_crop import WHOLE_PAGE, RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 
-SAMPLE_CROP = PageCrop(0.1, 0.2, 0.5, 0.9)
+SAMPLE_CROP = RectangleCrop(0.1, 0.2, 0.5, 0.9)
 ALL_ROTATIONS = list(PageRotation)
 
 
@@ -37,9 +37,9 @@ def test_turning_without_a_crop_keeps_it_empty() -> None:
 
 
 def test_turning_clockwise_turns_the_crop_with_the_page() -> None:
-    framing = PageFraming(crop=PageCrop(0.0, 0.0, 0.5, 1.0)).turned_clockwise()
+    framing = PageFraming(crop=RectangleCrop(0.0, 0.0, 0.5, 1.0)).turned_clockwise()
 
-    assert framing.crop == PageCrop(0.0, 0.0, 1.0, 0.5)
+    assert framing.crop == RectangleCrop(0.0, 0.0, 1.0, 0.5)
 
 
 def test_four_turns_bring_the_crop_back_exactly() -> None:
@@ -77,15 +77,15 @@ def test_an_unrotated_page_has_the_same_crop_on_the_master() -> None:
 
 
 def test_the_crop_of_a_page_turned_a_quarter_goes_back_a_quarter_on_the_master() -> None:
-    framing = PageFraming(rotation=PageRotation.CLOCKWISE_90, crop=PageCrop(0.0, 0.0, 1.0, 0.5))
+    framing = PageFraming(rotation=PageRotation.CLOCKWISE_90, crop=RectangleCrop(0.0, 0.0, 1.0, 0.5))
 
-    assert framing.crop_on_master() == PageCrop(0.0, 0.0, 0.5, 1.0)
+    assert framing.crop_on_master() == RectangleCrop(0.0, 0.0, 0.5, 1.0)
 
 
 def test_the_crop_of_a_half_turned_page_is_mirrored_on_the_master() -> None:
-    framing = PageFraming(rotation=PageRotation.HALF_TURN, crop=PageCrop(0.0, 0.0, 0.5, 0.25))
+    framing = PageFraming(rotation=PageRotation.HALF_TURN, crop=RectangleCrop(0.0, 0.0, 0.5, 0.25))
 
-    assert framing.crop_on_master() == PageCrop(0.5, 0.75, 1.0, 1.0)
+    assert framing.crop_on_master() == RectangleCrop(0.5, 0.75, 1.0, 1.0)
 
 
 @pytest.mark.parametrize("rotation", ALL_ROTATIONS)
@@ -98,7 +98,7 @@ def test_a_crop_from_the_master_is_the_inverse_of_the_crop_on_the_master(rotatio
 def test_a_crop_found_on_the_master_of_a_turned_page_is_shown_turned() -> None:
     framing = PageFraming(rotation=PageRotation.CLOCKWISE_90)
 
-    assert framing.crop_from_master(PageCrop(0.0, 0.0, 0.5, 1.0)) == PageCrop(0.0, 0.0, 1.0, 0.5)
+    assert framing.crop_from_master(RectangleCrop(0.0, 0.0, 0.5, 1.0)) == RectangleCrop(0.0, 0.0, 1.0, 0.5)
 
 
 def test_a_crop_found_on_an_unrotated_master_is_shown_as_it_is() -> None:

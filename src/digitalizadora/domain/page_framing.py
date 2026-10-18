@@ -1,6 +1,6 @@
 from dataclasses import dataclass, replace
 
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_rotation import DEGREES_IN_A_QUARTER_TURN, PageRotation
 
 
@@ -12,7 +12,7 @@ class PageFraming:
     """
 
     rotation: PageRotation = PageRotation.NONE
-    crop: PageCrop | None = None
+    crop: RectangleCrop | None = None
 
     @property
     def needs_rendering(self) -> bool:
@@ -22,13 +22,13 @@ class PageFraming:
         turned_crop = None if self.crop is None else self.crop.turned_clockwise()
         return PageFraming(self.rotation.turned_clockwise(), turned_crop)
 
-    def with_crop(self, crop: PageCrop | None) -> "PageFraming":
+    def with_crop(self, crop: RectangleCrop | None) -> "PageFraming":
         """A crop that covers the whole page is the same as no crop."""
         if crop is not None and crop.covers_whole_page:
             return replace(self, crop=None)
         return replace(self, crop=crop)
 
-    def crop_on_master(self) -> PageCrop | None:
+    def crop_on_master(self) -> RectangleCrop | None:
         """The crop turned back to the orientation of the JPEG the scanner delivered."""
         crop = self.crop
         if crop is None:
@@ -37,7 +37,7 @@ class PageFraming:
             crop = crop.turned_counterclockwise()
         return crop
 
-    def crop_from_master(self, master_crop: PageCrop) -> PageCrop:
+    def crop_from_master(self, master_crop: RectangleCrop) -> RectangleCrop:
         """A crop found on the stored JPEG, in the orientation the page is displayed in."""
         crop = master_crop
         for _ in range(self._quarter_turn_count()):

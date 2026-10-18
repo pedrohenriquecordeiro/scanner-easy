@@ -17,7 +17,7 @@ from digitalizadora.domain.errors import (
     InvalidCropError,
     InvalidPageRotationError,
 )
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.document_draft_service import DocumentDraftService
@@ -62,10 +62,10 @@ class PageCropRequestBody(BaseModel):
 
     crop: PageCropEdgesRequestBody | None
 
-    def to_page_crop(self) -> PageCrop | None:
+    def to_page_crop(self) -> RectangleCrop | None:
         if self.crop is None:
             return None
-        return PageCrop.rounded((self.crop.left, self.crop.top, self.crop.right, self.crop.bottom))
+        return RectangleCrop.rounded((self.crop.left, self.crop.top, self.crop.right, self.crop.bottom))
 
 
 def parse_page_rotation(rotation_degrees: int) -> PageRotation:

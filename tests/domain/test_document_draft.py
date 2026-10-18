@@ -21,7 +21,7 @@ from digitalizadora.domain.document_draft import (
 )
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
@@ -286,7 +286,7 @@ def test_generate_draft_session_returns_sixteen_lowercase_hexadecimal_digits() -
     assert re.fullmatch(r"[0-9a-f]{16}", generate_draft_session()) is not None
 
 
-FRAMING = PageFraming(rotation=PageRotation.CLOCKWISE_90, crop=PageCrop(0.1, 0.2, 0.5, 0.9))
+FRAMING = PageFraming(rotation=PageRotation.CLOCKWISE_90, crop=RectangleCrop(0.1, 0.2, 0.5, 0.9))
 
 
 def test_a_page_starts_unframed() -> None:

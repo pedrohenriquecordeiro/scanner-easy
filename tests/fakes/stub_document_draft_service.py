@@ -4,7 +4,7 @@ from pathlib import Path
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentFinalizationResult, DocumentPage, DraftSnapshot
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -99,7 +99,7 @@ class StubDocumentDraftService:
         self._record("rotate_page", page_identifier)
         return self.draft_snapshot.draft
 
-    async def set_page_crop(self, page_identifier: str, crop: PageCrop | None) -> DocumentDraft | None:
+    async def set_page_crop(self, page_identifier: str, crop: RectangleCrop | None) -> DocumentDraft | None:
         self._record("set_page_crop", (page_identifier, crop))
         return self.draft_snapshot.draft
 

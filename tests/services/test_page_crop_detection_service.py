@@ -6,7 +6,7 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, ScanFailedError
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.services import page_crop_detection_service
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.paper_edge_detection import PaperEdges
@@ -39,7 +39,7 @@ def book_on_glass() -> bytes:
     return build_book_on_glass_jpeg(BOOK)
 
 
-def edges_of(crop: PageCrop) -> tuple[float, float, float, float]:
+def edges_of(crop: RectangleCrop) -> tuple[float, float, float, float]:
     return crop.left, crop.top, crop.right, crop.bottom
 
 
