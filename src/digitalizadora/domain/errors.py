@@ -115,6 +115,14 @@ class NoLastScanError(DigitalizadoraError):
     code = "no_last_scan"
 
 
+class LastScanReplacedError(DigitalizadoraError):
+    code = "last_scan_replaced"
+
+
+class InvalidScanIdentifierError(DigitalizadoraError):
+    code = "invalid_scan_identifier"
+
+
 class LastScanFileMissingError(DigitalizadoraError):
     code = "last_scan_file_missing"
 

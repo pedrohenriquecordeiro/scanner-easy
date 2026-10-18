@@ -85,6 +85,8 @@ ERROR_MESSAGES: Mapping[str, str] = MappingProxyType(
         ),
         "invalid_page_rotation": "Rotação inválida.",
         "no_last_scan": "Ainda não há uma digitalização para ajustar.",
+        "last_scan_replaced": "Essa digitalização já foi substituída por outra mais nova.",
+        "invalid_scan_identifier": "Faltou dizer qual digitalização ampliar, ou o código dela é inválido.",
         "last_scan_file_missing": "O arquivo da última digitalização não está mais na pasta de saída.",
         "saved_scan_unreadable": (
             "Não consegui ler o original da última digitalização para ajustá-la. "

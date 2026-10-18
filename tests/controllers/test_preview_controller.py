@@ -151,7 +151,7 @@ def test_the_enlarged_view_of_another_scan_is_404(client, progress_tracker, slot
 
     response = client.get("/api/scans/last/preview?scan_identifier=0000000000000000&rotation_degrees=0")
 
-    assert (response.status_code, response.json()["code"]) == (HTTPStatus.NOT_FOUND, "no_last_scan")
+    assert (response.status_code, response.json()["code"]) == (HTTPStatus.CONFLICT, "last_scan_replaced")
 
 
 def test_the_enlarged_view_before_any_scan_is_404(client) -> None:

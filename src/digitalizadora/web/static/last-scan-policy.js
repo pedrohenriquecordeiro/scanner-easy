@@ -11,6 +11,7 @@ const LAST_SCAN_ACTIONS = Object.freeze({ ROTATE: "rotate", SET_CROPS: "set_crop
 // The answers that say the page and the server disagree about the last scan: the state is read again at once.
 const LAST_SCAN_RELOAD_ERROR_CODES = Object.freeze([
   "no_last_scan",
+  "last_scan_replaced",
   "last_scan_file_missing",
   "saved_scan_unreadable",
   "last_scan_not_editable",

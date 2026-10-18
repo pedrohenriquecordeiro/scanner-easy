@@ -555,6 +555,12 @@ def test_the_patterns_of_the_validation_codes_name_only_the_routes_with_a_body_o
     ]
 
 
+def test_a_missing_scan_identifier_on_the_last_scan_preview_has_its_own_code() -> None:
+    assert find_validation_error_code("/api/scans/last/preview", frozenset({"scan_identifier"})) == (
+        "invalid_scan_identifier"
+    )
+
+
 @pytest.mark.parametrize(
     "request_path",
     [
@@ -602,6 +608,12 @@ def test_a_last_scan_preview_with_a_rotation_that_is_not_a_number_answers_the_co
     response = client.get("/api/scans/last/preview?scan_identifier=9f3c1a2b4d5e6f70&rotation_degrees=abc")
 
     assert (response.status_code, response.json()["code"]) == (HTTPStatus.UNPROCESSABLE_ENTITY, "invalid_page_rotation")
+
+
+def test_a_last_scan_preview_without_the_scan_identifier_answers_its_own_code(client: TestClient) -> None:
+    response = client.get("/api/scans/last/preview?rotation_degrees=0")
+
+    assert response.json()["code"] == "invalid_scan_identifier"
 
 
 def test_the_last_scan_crops_are_reachable_through_the_factory(client: TestClient, parts: ApplicationParts) -> None:

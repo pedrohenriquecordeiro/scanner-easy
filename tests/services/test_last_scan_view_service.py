@@ -5,7 +5,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from digitalizadora.domain.errors import LastScanNotEditableError, NoLastScanError, SavedScanUnreadableError
+from digitalizadora.domain.errors import (
+    LastScanNotEditableError,
+    LastScanReplacedError,
+    NoLastScanError,
+    SavedScanUnreadableError,
+)
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
@@ -66,10 +71,10 @@ def test_the_enlarged_view_is_turned_by_the_rotation_asked(parts):
     assert size_of(view) == SCENE_SIZE[::-1]
 
 
-def test_the_enlarged_view_of_another_scan_raises_no_last_scan(parts):
+def test_the_enlarged_view_of_another_scan_raises_last_scan_replaced(parts):
     parts.scan(ONE_PHOTO, build_job())
 
-    with pytest.raises(NoLastScanError):
+    with pytest.raises(LastScanReplacedError):
         parts.last_scan_view_service.read_preview("ffffffffffffffff", PageRotation.NONE)
 
 

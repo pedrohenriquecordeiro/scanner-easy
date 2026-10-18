@@ -16,6 +16,7 @@ from digitalizadora.services.last_scan_edit_service import LastScanEditResult, L
 LAST_SCAN_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
     {
         "no_last_scan": HTTPStatus.NOT_FOUND,
+        "last_scan_replaced": HTTPStatus.CONFLICT,
         "scan_already_running": HTTPStatus.CONFLICT,
         "last_scan_busy": HTTPStatus.CONFLICT,
         "last_scan_file_missing": HTTPStatus.CONFLICT,
@@ -23,6 +24,7 @@ LAST_SCAN_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
         "last_scan_not_editable": HTTPStatus.CONFLICT,
         "invalid_crop": HTTPStatus.UNPROCESSABLE_ENTITY,
         "invalid_page_rotation": HTTPStatus.UNPROCESSABLE_ENTITY,
+        "invalid_scan_identifier": HTTPStatus.UNPROCESSABLE_ENTITY,
         "insufficient_last_scan_storage": HTTPStatus.INSUFFICIENT_STORAGE,
         "last_scan_storage_unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
         "insufficient_storage": HTTPStatus.INSUFFICIENT_STORAGE,

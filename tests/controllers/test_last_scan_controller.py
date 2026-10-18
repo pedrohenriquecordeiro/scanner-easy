@@ -17,6 +17,7 @@ from digitalizadora.domain.errors import (
     LastScanBusyError,
     LastScanFileMissingError,
     LastScanNotEditableError,
+    LastScanReplacedError,
     NoLastScanError,
     OutputFolderUnavailableError,
     SavedScanUnreadableError,
@@ -53,6 +54,7 @@ UPPER_CROP_BODY = {
 UPPER_CROP = quadrilateral((0.039, 0.28), (0.65, 0.019), (0.894, 0.321), (0.282, 0.582))
 EXPECTED_FAILURES = [
     (NoLastScanError("none"), HTTPStatus.NOT_FOUND),
+    (LastScanReplacedError("newer"), HTTPStatus.CONFLICT),
     (ScanAlreadyRunningError("running"), HTTPStatus.CONFLICT),
     (LastScanBusyError("busy"), HTTPStatus.CONFLICT),
     (LastScanFileMissingError("gone"), HTTPStatus.CONFLICT),
@@ -186,6 +188,7 @@ def test_an_unexpected_domain_error_answers_500(client: TestClient, edit_service
 def test_the_error_statuses_cover_the_documented_codes() -> None:
     assert {code: int(status) for code, status in LAST_SCAN_ERROR_STATUSES.items()} == {
         "no_last_scan": 404,
+        "last_scan_replaced": 409,
         "scan_already_running": 409,
         "last_scan_busy": 409,
         "last_scan_file_missing": 409,
@@ -193,6 +196,7 @@ def test_the_error_statuses_cover_the_documented_codes() -> None:
         "last_scan_not_editable": 409,
         "invalid_crop": 422,
         "invalid_page_rotation": 422,
+        "invalid_scan_identifier": 422,
         "insufficient_last_scan_storage": 507,
         "last_scan_storage_unavailable": 503,
         "insufficient_storage": 507,

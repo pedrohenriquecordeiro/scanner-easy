@@ -137,6 +137,9 @@ TEXT_CASES = [
         "LAST_SCAN_RELOAD_ERROR_CODES.includes('no_last_scan')", True, id="a-missing-scan-reloads-the-state"
     ),
     pytest.param(
+        "LAST_SCAN_RELOAD_ERROR_CODES.includes('last_scan_replaced')", True, id="a-replaced-scan-reloads-the-state"
+    ),
+    pytest.param(
         "LAST_SCAN_RELOAD_ERROR_CODES.includes('invalid_crop')", False, id="an-invalid-crop-does-not-reload"
     ),
 ]

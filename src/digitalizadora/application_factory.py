@@ -30,6 +30,7 @@ from digitalizadora.domain.errors import (
     InvalidDocumentNameError,
     InvalidPageOrderError,
     InvalidPageRotationError,
+    InvalidScanIdentifierError,
     InvalidSettingsError,
 )
 
@@ -43,6 +44,11 @@ VALIDATION_ERROR_CODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"/api/document/pages/[^/]+/(thumbnail|preview)"), InvalidPageRotationError.code),
     (re.compile(r"/api/scans/last/crops"), InvalidCropError.code),
     (re.compile(r"/api/scans/last/preview"), InvalidPageRotationError.code),
+)
+
+# A query field that is missing or malformed on one of these routes has a code of its own, before the code of the route.
+VALIDATION_ERROR_CODE_OF_FIELDS: tuple[tuple[re.Pattern[str], str, str], ...] = (
+    (re.compile(r"/api/scans/last/preview"), "scan_identifier", InvalidScanIdentifierError.code),
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +73,10 @@ class WebInterfaceConfiguration:
     shutdown_callbacks: tuple[Callable[[], Awaitable[None]], ...] = ()
 
 
-def find_validation_error_code(request_path: str) -> str:
+def find_validation_error_code(request_path: str, invalid_field_names: frozenset[str] = frozenset()) -> str:
+    for path_pattern, field_name, error_code in VALIDATION_ERROR_CODE_OF_FIELDS:
+        if path_pattern.fullmatch(request_path) and field_name in invalid_field_names:
+            return error_code
     for path_pattern, error_code in VALIDATION_ERROR_CODE_PATTERNS:
         if path_pattern.fullmatch(request_path):
             return error_code
@@ -88,7 +97,8 @@ class ErrorResponses:
     async def respond_to_invalid_body(
         self, request: Request, error: RequestValidationError
     ) -> JSONResponse:
-        error_code = find_validation_error_code(request.url.path)
+        invalid_field_names = frozenset(str(detail["loc"][-1]) for detail in error.errors())
+        error_code = find_validation_error_code(request.url.path, invalid_field_names)
         return JSONResponse(
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
             content=build_error_body(self._error_message_catalog, error_code),

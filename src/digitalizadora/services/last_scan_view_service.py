@@ -1,5 +1,6 @@
 from digitalizadora.domain.errors import (
     LastScanNotEditableError,
+    LastScanReplacedError,
     NoLastScanError,
     SavedScanUnreadableError,
     ScanFailedError,
@@ -40,8 +41,10 @@ class LastScanViewService:
 
     def read_preview(self, scan_identifier: str, rotation: PageRotation) -> bytes:
         last_scan = self._progress_tracker.snapshot().last_scan
-        if last_scan is None or last_scan.scan_identifier != scan_identifier:
-            raise NoLastScanError(f"{scan_identifier} is not the last scan")
+        if last_scan is None:
+            raise NoLastScanError("There is no last scan")
+        if last_scan.scan_identifier != scan_identifier:
+            raise LastScanReplacedError(f"{scan_identifier} is not the last scan")
         if not last_scan.is_editable:
             raise LastScanNotEditableError("The master of the last scan was not kept")
         try:

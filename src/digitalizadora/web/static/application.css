@@ -724,12 +724,15 @@ button:disabled {
 .frame-stage-row {
   display: flex;
   justify-content: center;
+  /* Stretching would clamp the stage to a shorter row than the picture and shift every handle off the photo. */
+  align-items: flex-start;
   /* Room for the handles at the edges of the page, which stick out half of their size. */
   padding: 1.5rem;
 }
 
 .frame-stage {
   position: relative;
+  flex: none;
   display: inline-block;
   max-width: 100%;
   line-height: 0;
