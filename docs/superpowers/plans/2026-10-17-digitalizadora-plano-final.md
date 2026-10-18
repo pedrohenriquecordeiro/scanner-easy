@@ -1,6 +1,6 @@
 # Digitalizadora — Gate 0 + MVP: plano de implementação
 
-> **Status:** Revisado e integrado em 2026-10-17; aguardando sua autorização para implementar.
+> **Status:** implementado em 2026-10-17 (T1 a T22; 2073 testes passando, 5 de hardware passando com a impressora real); resta o checklist manual `docs/acceptance-checklist.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
