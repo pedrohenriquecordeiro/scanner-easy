@@ -214,7 +214,7 @@ def test_rotating_in_the_dialog_waits_for_the_new_image(scenario_results: dict) 
 
 def test_rotating_in_the_dialog_says_the_frame_followed(scenario_results: dict) -> None:
     status = scenario_results["rotate_in_the_dialog"]["right_after"]["status"]
-    assert status == "Página 2 girada 90° para a direita. A moldura acompanhou o giro."
+    assert status == "Página 2 girada 90° para a direita (total: 90°). A moldura acompanhou o giro."
 
 
 def test_rotating_in_the_dialog_sends_the_required_header(scenario_results: dict) -> None:
@@ -237,7 +237,8 @@ def test_a_draft_turns_with_the_page_and_can_still_be_applied(scenario_results: 
 
 def test_rotating_a_page_without_a_frame_does_not_talk_about_a_frame(scenario_results: dict) -> None:
     dialog = scenario_results["rotate_a_page_without_a_frame_in_the_dialog"]
-    assert (dialog["status"], dialog["frame_box"]) == ("Página 1 girada 90° para a direita.", WHOLE_PAGE_FRAME)
+    expected_status = "Página 1 girada 90° para a direita (total: 90°)."
+    assert (dialog["status"], dialog["frame_box"]) == (expected_status, WHOLE_PAGE_FRAME)
 
 
 def test_the_edit_buttons_are_disabled_while_a_rotation_runs(scenario_results: dict) -> None:

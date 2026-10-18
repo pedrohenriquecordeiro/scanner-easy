@@ -24,6 +24,9 @@ SCENARIO_NAMES = (
     "drag_is_measured_from_where_it_began",
     "drag_past_the_page",
     "cancelled_drag",
+    "drag_with_the_secondary_button",
+    "drag_with_the_middle_button_on_the_move_area",
+    "context_menu_on_the_stage",
     "move_without_pressing",
     "arrow_on_the_left_edge",
     "shift_arrow_on_the_left_edge",
@@ -220,6 +223,19 @@ def test_a_cancelled_pointer_ends_the_drag_and_lets_go(scenario_results: dict) -
 def test_the_status_follows_a_cancelled_drag_too(scenario_results: dict) -> None:
     status = scenario_results["cancelled_drag"]["dialog"]["status"]
     assert status == "Moldura: esquerda 23%, topo 12%, direita 91%, base 92%."
+
+
+def test_the_secondary_button_does_not_start_a_drag(scenario_results: dict) -> None:
+    result = scenario_results["drag_with_the_secondary_button"]
+    assert (result["captured"], result["dialog"]["frame_box"]) == (False, SECOND_PAGE_FRAME)
+
+
+def test_the_middle_button_does_not_move_the_frame(scenario_results: dict) -> None:
+    assert scenario_results["drag_with_the_middle_button_on_the_move_area"]["frame_box"] == SECOND_PAGE_FRAME
+
+
+def test_the_context_menu_of_the_stage_is_suppressed(scenario_results: dict) -> None:
+    assert scenario_results["context_menu_on_the_stage"]["prevented"] is True
 
 
 def test_a_pointer_that_never_pressed_a_handle_moves_nothing(scenario_results: dict) -> None:

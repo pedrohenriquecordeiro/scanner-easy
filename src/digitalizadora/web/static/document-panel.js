@@ -652,7 +652,8 @@ class DocumentPanel {
     if (body !== null) {
       const turned_page = this.find_page(page_identifier);
       const crop = turned_page === null ? null : turned_page.page.crop;
-      this.announce(describe_page_rotation_result({ position, crop }));
+      const rotation_degrees = turned_page === null ? 0 : turned_page.page.rotation_degrees;
+      this.announce(describe_page_rotation_result({ position, rotation_degrees, crop }));
     }
     // A damaged page already took the focus on its × (report_failure); otherwise the Girar button of the page gets it
     // back.

@@ -455,6 +455,8 @@ class ScanPage {
     }
     this.is_last_scan_rotation_pending = true;
     this.error_banner.report_action_error(null);
+    // Emptied first, so the same text written again after the answer is a change a screen reader announces.
+    this.elements.last_scan_rotation_status.textContent = "";
     this.render_activity();
     try {
       await send_request("POST", LAST_SCAN_ROTATION_PATH);

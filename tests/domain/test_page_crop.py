@@ -66,6 +66,17 @@ def test_an_edge_that_is_not_a_number_is_refused(not_a_number) -> None:
         PageCrop(0.0, 0.0, not_a_number, 1.0)
 
 
+@pytest.mark.parametrize("huge_integer", [10**400, -(10**400)])
+def test_an_integer_too_large_for_a_float_is_refused(huge_integer) -> None:
+    with pytest.raises(InvalidCropError):
+        PageCrop(0.0, 0.0, huge_integer, 1.0)
+
+
+def test_rounded_refuses_an_integer_too_large_for_a_float() -> None:
+    with pytest.raises(InvalidCropError):
+        PageCrop.rounded((0.0, 0.0, 10**400, 1.0))
+
+
 def test_rounded_keeps_six_digits() -> None:
     assert PageCrop.rounded((0.1234567891, 0.2, 0.5, 0.9)).left == 0.123457
 

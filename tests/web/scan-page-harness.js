@@ -349,6 +349,35 @@ const SCENARIOS = {
       scan_button_focused: page.is_focused("scan-button"),
     };
   },
+  async rotate_last_scan_again() {
+    const page = await load_page({
+      ...respond_with_finished_state(FIRST_REVISION),
+      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
+    });
+    await page.click(page.element("last-scan-rotate-button"));
+    const status_after_the_first = page.read_last_scan_panel().rotation_status;
+    const second_answer = build_deferred_response();
+    page.responses[LAST_SCAN_ROTATION_KEY] = second_answer;
+    await page.click(page.element("last-scan-rotate-button"));
+    const status_while_the_second_is_pending = page.read_last_scan_panel().rotation_status;
+    second_answer.answer(build_json_response(200, { last_result: FINISHED_SCAN_RESULT }));
+    await page.flush();
+    return {
+      status_after_the_first,
+      status_while_the_second_is_pending,
+      status_after_the_second: page.read_last_scan_panel().rotation_status,
+    };
+  },
+  async rotate_last_scan_that_fails_after_a_success() {
+    const page = await load_page({
+      ...respond_with_finished_state(FIRST_REVISION),
+      [LAST_SCAN_ROTATION_KEY]: build_json_response(200, { last_result: FINISHED_SCAN_RESULT }),
+    });
+    await page.click(page.element("last-scan-rotate-button"));
+    page.responses[LAST_SCAN_ROTATION_KEY] = build_json_response(404, NO_LAST_SCAN_BODY);
+    await page.click(page.element("last-scan-rotate-button"));
+    return { rotation_status: page.read_last_scan_panel().rotation_status };
+  },
   async rotate_last_scan_by_keyboard() {
     const page = await load_page({
       ...respond_with_finished_state(FIRST_REVISION),

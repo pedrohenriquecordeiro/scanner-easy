@@ -4,7 +4,7 @@
 // real static scripts in the fake browser and prints one JSON object with what the page did in each.
 // tests/web/test_page_frame_editor_behaviour.py asserts on it. The fixtures come from document-page-fixtures.js.
 
-const { build_deferred_response, build_json_response } = require("./fake-browser.js");
+const { build_deferred_response, build_event, build_json_response } = require("./fake-browser.js");
 const {
   FIRST_PAGE,
   SECOND_PAGE,
@@ -227,6 +227,27 @@ const SCENARIOS = {
     page.dispatch_pointer(west_handle, "pointercancel", { x: 300, y: 200 });
     page.dispatch_pointer(west_handle, "pointermove", { x: 450, y: 200 });
     return { released: !west_handle.hasPointerCapture(1), dialog: read_dialog(page) };
+  },
+  async drag_with_the_secondary_button() {
+    const page = await open_framed_second_page({});
+    const west_handle = page.element("frame-handle-west");
+    page.dispatch_pointer(west_handle, "pointerdown", { ...CENTER_OF_THE_STAGE, button: 2 });
+    const captured = west_handle.hasPointerCapture(1);
+    page.dispatch_pointer(west_handle, "pointermove", { x: 300, y: 200 });
+    return { captured, dialog: read_dialog(page) };
+  },
+  async drag_with_the_middle_button_on_the_move_area() {
+    const page = await open_framed_second_page({});
+    const move_button = page.element("frame-move-button");
+    page.dispatch_pointer(move_button, "pointerdown", { ...CENTER_OF_THE_STAGE, button: 1 });
+    page.dispatch_pointer(move_button, "pointermove", { x: 300, y: 260 });
+    return read_dialog(page);
+  },
+  async context_menu_on_the_stage() {
+    const page = await open_framed_second_page({});
+    const menu_request = build_event("contextmenu", {});
+    page.document.dispatch(page.element("frame-stage"), menu_request);
+    return { prevented: menu_request.defaultPrevented };
   },
   async move_without_pressing() {
     const page = await open_framed_second_page({});

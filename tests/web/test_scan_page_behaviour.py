@@ -297,6 +297,19 @@ def test_rotating_the_last_scan_says_so(scenario_results: dict) -> None:
     assert scenario_results["rotate_last_scan_by_pointer"]["status_right_after"] == ROTATED_MESSAGE
 
 
+def test_rotating_the_last_scan_again_empties_the_status_until_the_answer(scenario_results: dict) -> None:
+    result = scenario_results["rotate_last_scan_again"]
+    assert (
+        result["status_after_the_first"],
+        result["status_while_the_second_is_pending"],
+        result["status_after_the_second"],
+    ) == (ROTATED_MESSAGE, "", ROTATED_MESSAGE)
+
+
+def test_a_failed_rotation_does_not_leave_the_old_success_text(scenario_results: dict) -> None:
+    assert scenario_results["rotate_last_scan_that_fails_after_a_success"]["rotation_status"] == ""
+
+
 def test_rotating_the_last_scan_reloads_the_thumbnail_with_the_new_revision(scenario_results: dict) -> None:
     result = scenario_results["rotate_last_scan_by_pointer"]
     assert result["thumbnail_after_the_next_state"] == "/api/scans/last/thumbnail?version=2"

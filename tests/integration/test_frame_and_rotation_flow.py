@@ -368,6 +368,7 @@ def test_a_frame_of_the_whole_page_removes_the_frame(configuration: ApplicationC
         {"left": 0, "top": 0, "right": 1.2, "bottom": 1},
         {"left": 0, "top": 0, "right": 0.01, "bottom": 1},
         {"left": 0, "top": 0, "right": 1},
+        {"left": 10**400, "top": 0, "right": 1, "bottom": 1},
         "whole",
     ],
 )

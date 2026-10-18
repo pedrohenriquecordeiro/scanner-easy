@@ -350,7 +350,12 @@ REMOVAL_AND_MOVE_CASES = [
     pytest.param("describe_page_removal({action: 'delete', position: 1, remaining_page_count: 0})",
                  "Página 1 excluída. O documento foi encerrado.", id="document-ended"),
     pytest.param("describe_page_move(3, 2)", "Página 3 movida para a posição 2", id="moved"),
-    pytest.param("describe_page_rotation(3)", "Página 3 girada 90° para a direita.", id="rotated"),
+    pytest.param("describe_page_rotation({position: 3, rotation_degrees: 90})",
+                 "Página 3 girada 90° para a direita (total: 90°).", id="rotated"),
+    pytest.param("describe_page_rotation({position: 3, rotation_degrees: 270})",
+                 "Página 3 girada 90° para a direita (total: 270°).", id="rotated-three-times"),
+    pytest.param("describe_page_rotation({position: 3, rotation_degrees: 0})",
+                 "Página 3 girada 90° para a direita (de volta à posição original).", id="rotated-full-circle"),
 ]
 
 RECOVERY_CASES = [

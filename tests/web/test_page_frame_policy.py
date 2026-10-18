@@ -54,13 +54,13 @@ LABEL_CASES = [
 
 ANNOUNCEMENT_CASES = [
     pytest.param(
-        "describe_page_rotation_result({position: 2, crop: null})",
-        "Página 2 girada 90° para a direita.",
+        "describe_page_rotation_result({position: 2, rotation_degrees: 90, crop: null})",
+        "Página 2 girada 90° para a direita (total: 90°).",
         id="rotation-without-a-frame",
     ),
     pytest.param(
-        f"describe_page_rotation_result({{position: 2, crop: {FRAME_CROP}}})",
-        "Página 2 girada 90° para a direita. A moldura acompanhou o giro.",
+        f"describe_page_rotation_result({{position: 2, rotation_degrees: 180, crop: {FRAME_CROP}}})",
+        "Página 2 girada 90° para a direita (total: 180°). A moldura acompanhou o giro.",
         id="rotation-with-a-frame",
     ),
     pytest.param(

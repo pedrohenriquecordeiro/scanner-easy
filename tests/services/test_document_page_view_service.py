@@ -90,7 +90,7 @@ def test_the_preview_is_the_page_as_it_is_displayed(view_service):
 
 
 def test_the_preview_is_limited_to_the_enlarged_view_size(drafts_folder):
-    seed_draft_folder(drafts_folder, [build_marked_scan_jpeg((2400, 3200))])
+    seed_draft_folder(drafts_folder, [build_marked_scan_jpeg((1700, 1200))])
     view_service = DocumentPageViewService(build_store(drafts_folder), PageImageViewService())
 
     preview = view_service.read_preview(FIRST_PAGE_IDENTIFIER, PageRotation.NONE)

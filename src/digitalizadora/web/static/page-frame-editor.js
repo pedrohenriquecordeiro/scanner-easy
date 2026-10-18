@@ -10,6 +10,7 @@
 // handle_document_change, so the draft turns with the page and the buttons follow the document.
 
 const MOVE_GRIP_NAME = "move";
+const PRIMARY_POINTER_BUTTON = 0; // also what touch and pen report
 const CLOSE_OUTCOMES = Object.freeze({ CANCELLED: "cancelled", APPLIED: "applied", PAGE_GONE: "page_gone" });
 const DIALOG_KEY_EVENT_TYPES_HIDDEN_FROM_THE_PAGE = ["keydown", "keyup"];
 const LOADING_STAGE_CLASS = "is-loading";
@@ -36,6 +37,7 @@ class PageFrameEditor {
       handle_button.setAttribute("aria-label", read_handle_label(handle));
       this.bind_grip(handle_button, handle);
     }
+    this.elements.frame_stage.addEventListener("contextmenu", (menu_event) => menu_event.preventDefault());
     frame_image.addEventListener("load", () => this.mark_image_ready());
     frame_image.addEventListener("error", () => this.show_status(FRAME_IMAGE_FAILED_TEXT));
     this.elements.frame_detect_button.addEventListener("click", () => this.detect_frame());
@@ -193,7 +195,7 @@ class PageFrameEditor {
 
   start_drag(drag_start) {
     const { grip_element, grip_name, pointer_event } = drag_start;
-    if (this.session === null) {
+    if (this.session === null || pointer_event.button !== PRIMARY_POINTER_BUTTON) {
       return;
     }
     grip_element.setPointerCapture(pointer_event.pointerId);
@@ -300,8 +302,9 @@ class PageFrameEditor {
     if (body === null || this.session === null) {
       return;
     }
-    const crop = build_crop_request_body(this.session.saved_frame).crop;
-    this.show_status(describe_page_rotation_result({ position: this.session.position, crop }));
+    const { position, rotation_degrees, saved_frame } = this.session;
+    const crop = build_crop_request_body(saved_frame).crop;
+    this.show_status(describe_page_rotation_result({ position, rotation_degrees, crop }));
   }
 
   async apply_frame() {

@@ -212,6 +212,7 @@ INVALID_CROPS = [
     pytest.param({"left": -0.1, "top": 0, "right": 1, "bottom": 1}, id="outside-the-page"),
     pytest.param({"left": 0, "top": 0, "right": 1}, id="edge-missing"),
     pytest.param({"left": "0", "top": 0, "right": 1, "bottom": 1}, id="edge-as-text"),
+    pytest.param({"left": 0, "top": 0, "right": 1, "bottom": 10**400}, id="integer-too-large-for-a-float"),
     pytest.param([0, 0, 1, 1], id="not-an-object"),
     pytest.param("whole", id="text"),
 ]

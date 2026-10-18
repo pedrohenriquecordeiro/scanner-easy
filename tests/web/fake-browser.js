@@ -73,6 +73,7 @@ function build_event(event_type, properties) {
     clientX: 0,
     clientY: 0,
     pointerId: 1,
+    button: 0,
     shiftKey: false,
     defaultPrevented: false,
     propagation_stopped: false,
@@ -536,7 +537,12 @@ class BrowserPage {
   }
 
   dispatch_pointer(element, event_type, pointer_position) {
-    const pointer = { clientX: pointer_position.x, clientY: pointer_position.y, pointerId: 1 };
+    const pointer = {
+      clientX: pointer_position.x,
+      clientY: pointer_position.y,
+      pointerId: 1,
+      button: pointer_position.button ?? 0,
+    };
     return this.document.dispatch(element, build_event(event_type, pointer));
   }
 

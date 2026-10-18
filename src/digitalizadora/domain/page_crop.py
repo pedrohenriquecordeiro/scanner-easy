@@ -15,6 +15,15 @@ def _is_real_number(value: object) -> bool:
     return isinstance(value, Real) and not isinstance(value, bool)
 
 
+def _is_finite_number(value: object) -> bool:
+    if not _is_real_number(value):
+        return False
+    try:
+        return math.isfinite(value)  # type: ignore[arg-type]
+    except OverflowError:
+        return False
+
+
 @dataclass(frozen=True)
 class PageCrop:
     """A rectangle in fractions (0..1) of the page as it is displayed, after the page rotation."""
@@ -26,7 +35,7 @@ class PageCrop:
 
     def __post_init__(self) -> None:
         edges = (self.left, self.top, self.right, self.bottom)
-        if not all(_is_real_number(edge) and math.isfinite(edge) for edge in edges):
+        if not all(_is_finite_number(edge) for edge in edges):
             raise InvalidCropError(f"The crop edges must be finite numbers, got {edges!r}")
         if not all(0.0 <= edge <= 1.0 for edge in edges):
             raise InvalidCropError(f"The crop edges must be between 0 and 1, got {edges!r}")
@@ -38,7 +47,7 @@ class PageCrop:
     @classmethod
     def rounded(cls, edges: tuple[float, float, float, float]) -> "PageCrop":
         """Rounds each edge first, so that four quarter turns return exactly to the start."""
-        if not all(_is_real_number(edge) and math.isfinite(edge) for edge in edges):
+        if not all(_is_finite_number(edge) for edge in edges):
             raise InvalidCropError(f"The crop edges must be finite numbers, got {edges!r}")
         left, top, right, bottom = (round(edge, CROP_PRECISION_DIGITS) for edge in edges)
         return cls(left, top, right, bottom)

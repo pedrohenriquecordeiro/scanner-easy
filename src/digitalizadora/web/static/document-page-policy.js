@@ -361,13 +361,16 @@ function describe_page_move(position_before, position_after) {
   return `Página ${position_before} movida para a posição ${position_after}`;
 }
 
-function describe_page_rotation(position) {
-  return `Página ${position} girada 90° para a direita.`;
+// The total is in the text so that turning the same page again changes what a screen reader reads.
+function describe_page_rotation(page_rotation) {
+  const { position, rotation_degrees } = page_rotation;
+  const total_text = rotation_degrees === 0 ? "de volta à posição original" : `total: ${rotation_degrees}°`;
+  return `Página ${position} girada 90° para a direita (${total_text}).`;
 }
 
 function describe_page_rotation_result(rotation_result) {
-  const { position, crop } = rotation_result;
-  const rotation_text = describe_page_rotation(position);
+  const { position, rotation_degrees, crop } = rotation_result;
+  const rotation_text = describe_page_rotation({ position, rotation_degrees });
   return crop === null ? rotation_text : `${rotation_text} A moldura acompanhou o giro.`;
 }
 

@@ -222,7 +222,7 @@ def test_rotate_by_keyboard_keeps_the_focus_on_the_rotate_button_of_the_position
 
 
 def test_rotate_is_announced(scenario_results: dict) -> None:
-    assert scenario_results["keyboard_rotate"]["announcement"] == "Página 2 girada 90° para a direita."
+    assert scenario_results["keyboard_rotate"]["announcement"] == "Página 2 girada 90° para a direita (total: 90°)."
 
 
 def test_rotate_by_pointer_focuses_the_scan_button(scenario_results: dict) -> None:
