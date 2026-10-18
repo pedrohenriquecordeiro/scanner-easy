@@ -91,7 +91,9 @@ body {
 }
 
 .page-content {
-  display: grid;
+  /* A column and not a grid: the status line sticks to the bottom of the window only inside a flex container. */
+  display: flex;
+  flex-direction: column;
   gap: 1.25rem;
   max-width: 44rem;
   margin: 0 auto;
@@ -217,9 +219,17 @@ button:disabled {
 }
 
 .status-line {
+  /* Under the settings box; when that box pushes it below the fold it stays at the bottom edge of the window. */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   min-height: 1.5rem;
   margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-background);
   font-weight: 600;
+  overflow-wrap: anywhere;
   text-align: center;
 }
 

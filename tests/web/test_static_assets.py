@@ -533,6 +533,17 @@ def test_the_two_save_buttons_keep_distinct_identifiers_and_labels() -> None:
     assert (page.count('id="output-folder-save-button"'), page.count('id="save-document-button"')) == (1, 1)
 
 
+def test_status_line_sits_between_the_settings_box_and_the_last_scan_panel() -> None:
+    page = read_static_file("index.html")
+    assert page.index('aria-label="Ajustes"') < page.index('id="status-line"') < page.index('id="last-scan-panel"')
+
+
+def test_status_line_is_no_longer_inside_the_scan_section() -> None:
+    page = read_static_file("index.html")
+    scan_section = page[page.index('class="scan-section"') : page.index('id="document-pending-notice"')]
+    assert 'id="status-line"' not in scan_section
+
+
 def test_status_line_stays_a_polite_status_region() -> None:
     assert re.search(r'<p id="status-line"[^>]*role="status"[^>]*aria-live="polite"', read_static_file("index.html"))
 
@@ -544,6 +555,12 @@ def test_settings_confirmation_is_a_polite_status_region() -> None:
 
 def test_folder_error_message_is_an_alert() -> None:
     assert re.search(r'<p id="output-folder-message"[^>]*role="alert"', read_static_file("index.html"))
+
+
+def test_status_line_keeps_in_sight_at_the_bottom_of_the_window_and_wraps_long_names() -> None:
+    stylesheet = " ".join(read_static_file("application.css").split())
+    assert "position: sticky; bottom: 0;" in stylesheet.split(".status-line {")[1].split("}")[0]
+    assert "overflow-wrap: anywhere;" in stylesheet.split(".status-line {")[1].split("}")[0]
 
 
 def test_buttons_have_a_pressed_style() -> None:
