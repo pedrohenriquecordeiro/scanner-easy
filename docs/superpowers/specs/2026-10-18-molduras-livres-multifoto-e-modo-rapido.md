@@ -1,6 +1,6 @@
 # Molduras livres, até 2 fotos por digitalização e o modo Rápido com moldura: design
 
-**Data:** 2026-10-18 · **Status:** decisões tomadas e medidas feitas (seções 2 e 3), contratos fechados (seções 4 a 8), tarefas T51 a T68 na seção 11, prontas para virar plano · **Substitui** do [Moldura de corte por página](2026-10-18-moldura-de-corte-por-pagina.md): D1 (a moldura é um retângulo, uma por página), D4 e D9 (o modo Rápido corta de forma destrutiva e só com o detector estrito), D8 (girar o arquivo salvo no próprio arquivo), D12 (oito alças de retângulo), a seção 6.1 (giro de um retângulo), 6.3 (os dois detectores e onde cada um roda) e 6.9 (módulo de geometria). **Complementa** [Documento de várias páginas](2026-10-17-documento-de-varias-paginas.md) e [Ajustes: girar, resoluções, corte](2026-10-17-ajustes-rotacao-resolucoes-corte.md) (a decisão A2, "recodificar a 95", é substituída pela qualidade configurável, D23) · **Baseline:** 3263 testes passando (17 pulados), `ruff` limpo, 28 commits locais (nada enviado ao GitHub).
+**Data:** 2026-10-18 · **Status:** servidor implementado (T51 a T60, seção 13); interface (T61 a T66) e aceitação (T67, T68) ainda por fazer. Decisões tomadas e medidas feitas (seções 2 e 3), contratos fechados (seções 4 a 8), tarefas T51 a T68 na seção 11 · **Substitui** do [Moldura de corte por página](2026-10-18-moldura-de-corte-por-pagina.md): D1 (a moldura é um retângulo, uma por página), D4 e D9 (o modo Rápido corta de forma destrutiva e só com o detector estrito), D8 (girar o arquivo salvo no próprio arquivo), D12 (oito alças de retângulo), a seção 6.1 (giro de um retângulo), 6.3 (os dois detectores e onde cada um roda) e 6.9 (módulo de geometria). **Complementa** [Documento de várias páginas](2026-10-17-documento-de-varias-paginas.md) e [Ajustes: girar, resoluções, corte](2026-10-17-ajustes-rotacao-resolucoes-corte.md) (a decisão A2, "recodificar a 95", é substituída pela qualidade configurável, D23) · **Baseline:** 3263 testes passando (17 pulados), `ruff` limpo, 28 commits locais (nada enviado ao GitHub).
 
 ## 1. O que você pediu (md.md, linhas 39 a 56) e o que as medições mudaram
 
@@ -1040,3 +1040,59 @@ Com as duas fotos da cena de aceitação no vidro e depois o livro, num aplicati
 - **Aplicar a 1200 dpi pode levar alguns segundos** (pior caso medido: 3,7 s de `transform` mais a codificação); a tela já desabilita os botões durante qualquer edição e mostra "Regravando…".
 - **Edição em duas abas do mesmo aparelho** ao mesmo tempo: a última gravação vale e a outra aba relê o estado (revisão).
 - **O editor fica mais complexo** (dez alças, duas molduras, SVG). A cobertura vem dos testes de geometria no Node (puros) e da conferência no Chrome sem janela (T67); o risco restante é de ergonomia no toque, onde a alça de girar a moldura pode ficar apertada em telas pequenas (a área de toque tem 44 px).
+
+## 13. Notas da implementação do servidor (T51 a T60)
+
+O servidor está feito e testado com o simulador; a interface (T61 a T66) não foi tocada. Baseline anterior: 3263 testes; agora **3736 passam** (17 pulados) e `ruff` está limpo. Nada foi enviado ao GitHub e a impressora real não foi usada.
+
+### 13.1 O que saiu como o desenho dizia
+
+Quadrilátero (`PageCrop`, `CropCorner`, `RectangleEdges`, `find_quadrilateral_problem` com os mesmos nomes de problema dos vetores), `PageFraming.crops` em ordem de leitura, manifesto com `crops` e leitura do `crop` antigo (uma moldura retangular), `PageFramingRenderer` com `transform(QUAD)` lendo direto do mestre, um PDF por moldura, `jpeg_quality` de ponta a ponta (422 `invalid_settings`, arquivo antigo carrega com 90), detector de regiões em Pillow puro (`photo_region_detection.py`) com o por lado de reserva, espaço da última digitalização (`quick-scan/`, manifesto como ponto de confirmação), `LastScanEditService` (girar, `crops`, detectar, recuperação na partida), `LastScanViewService`, rotas novas, textos novos, simulador com `photos_one` e `photos_two`. Os vetores compartilhados estão em `tests/fixtures/page-crop-vectors.json` (o JavaScript os lê na T61; o arquivo antigo de retângulos fica até lá).
+
+### 13.2 Desvios e escolhas pequenas (todos dentro dos contratos)
+
+- **`PageFraming.with_crops` recusa mais de 2 molduras** (`InvalidCropError`) em vez de "manter as 2 primeiras": quem recebe uma lista longa (API, 422) ou a corta com aviso (manifesto) sabe o que está fazendo; o domínio não adivinha. Molduras que cobrem a página inteira são descartadas **antes** da conta.
+- **`detect_photo_regions` devolve as regiões da maior para a menor**, e quem põe em ordem de leitura é o `PageCropDetectionService`, com `put_in_reading_order` do domínio (uma só implementação da regra D15, a mesma que o `PageFraming` usa). O `PhotoRegions.ignored_count` conta **todas** as regiões plausíveis além das 2 primeiras (o protótipo parava ao achar 2).
+- **`FrameRenderRequest` e `PageFramingRenderer` entraram junto com a qualidade (T53)**, não na T55: sem o pedido único o `RenderedPageSource` passaria de 3 parâmetros. A T55 ficou só com o `QUAD` e o PDF de várias páginas, no mesmo commit.
+- **`ScanOutputParts.scan_identifier_factory`** (injeção do gerador do identificador) e **`LastScanEditParts.thumbnail_service`** (refazer a miniatura do mestre quando ela falta na recuperação) são campos a mais nos agrupamentos de dependências; os construtores continuam com 3 parâmetros ou menos.
+- **`UnreadableQuickScanError` herda de `SavedScanUnreadableError`** e por isso usa o código `saved_scan_unreadable` (um espaço ilegível é guardado de lado e nunca chega à API como erro próprio).
+- **`describe_last_scan` (módulo `last_scan_body.py`) leva `file_name` e `size_in_bytes` provisórios**, como a seção 11 previa, até a T65; o corpo do documento leva `crop` provisório e a rota `PUT …/crop` segue como apelido até a T64.
+- **A resposta de `POST /api/scans/last/rotation`, `PUT …/crops` e `POST …/crops/detect` não leva a revisão**; a página a lê do estado (`last_result_revision`), como no desenho.
+- **`ScanService.is_scan_in_progress()` ficou** ao lado de `ensure_scan_can_start()`: as edições do documento continuam só proibidas durante uma digitalização (`scan_already_running`) e não por uma edição do último arquivo.
+- **Mensagens de aviso da detecção** (mais de 2 fotos, sem achado) continuam por conta da tela: o servidor devolve `crops_detected` e `ignored_region_count`.
+
+### 13.3 O que mudou de comportamento sem estar no desenho
+
+- **O piso de área de 10% para 3% faz uma folha branca sobre a tampa branca com um bloco colorido grande (um logotipo de 3% ou mais da página) ser enquadrada pelo bloco.** O desenho aceita o caso da polaroide (branco sobre branco acha só a parte colorida); com o modo Rápido agora aplicando o palpite, vale a atenção: a moldura aparece no painel e **Ampliar** a corrige, e o mestre está guardado, mas quem digitaliza folha de texto com logotipo grande deve deixar **Cortar automaticamente** desligado. Os testes que usavam uma página branca com um bloco vermelho de 4% para "sem folha" passaram a usar uma página branca lisa.
+- **Uma capa azul-marinho com uma figura clara sobre tampa escura** (cena de teste antiga) antes não era achada porque o anel em volta dava 25,3% de primeiro plano (limite 25%) por causa do halo do JPEG; no detector novo o anel é um polígono sem o contorno e a capa **inteira** é enquadrada. É o comportamento desejado ("não cortar até a figura"), e o teste agora confere isso.
+- **O corte do modo Rápido deixou de ser destrutivo e de depender de um detector cauteloso:** com **Cortar automaticamente** ligado, cada moldura achada é um arquivo; desligado, o arquivo é a imagem inteira, e o mestre fica sempre no espaço.
+
+### 13.4 Números medidos (servidor real em `HOME` temporário, simulador em outra porta, sem a impressora)
+
+Detecção, tempo por digitalização (o mesmo detector roda no Documento e no Rápido): as três `photos-*.jpg` reais dão **duas regiões em 14 a 21 ms**, com os cantos da tabela 3.2 mais a margem de 1%; os quatro livros ficam com a moldura retangular do detector por lado em **6 a 12 ms**; o cartão de 3.png (a uns 31°) dá uma região em 12 ms. Os testes marcados com `DIGITALIZADORA_REAL_SCANS_FOLDER` e `DIGITALIZADORA_CARD_IMAGE` (a imagem de pessoas nunca entra no repositório; sem a variável os testes pulam) passam com essas imagens.
+
+1200 dpi, cor, mestre de 10200 × 14032 (143 MP, 2,5 MB), **pico de memória do processo inteiro** (linha de base do servidor: 72 MB):
+
+| Ação (Aplicar, mesma rota do modo Rápido) | Saída | Tempo | Pico |
+|---|---|---|---|
+| Quadrilátero de 90% da página, a 4° | 9237 × 12607 (116 MP) | **3,44 s** | **1071 MB** |
+| Quadrilátero de 60% a 25° | 7398 × 7859 (58 MP) | 1,97 s | 857 MB |
+| Girar a página (com moldura de 60%) | 7859 × 7398 | 2,06 s | 848 MB |
+| Detectar automaticamente (um arquivo) | | 1,36 s | 738 MB |
+| Duas molduras (40% a 10° e 30% a −7°) | dois arquivos | 0,66 s | 645 MB |
+
+Em cinza: 1,63 s e **318 MB** (90% a 4°), 0,81 s e 332 MB (60% a 25°), 0,92 s ao girar, 0,53 s ao detectar, 0,26 s para as duas molduras. Uma digitalização com uma foto a 1200 dpi (simulador, cena `photos_one`): 1,0 a 2,2 s de ponta a ponta, 741 MB de pico; Salvar de um documento de uma página com uma moldura torta: 1,19 s e 762 MB. Tudo bate com a seção 3.1 (734 MB e 3,7 s no pior caso).
+
+Qualidade (75 dpi, duas fotos, mesma cena): a 60 os dois arquivos saem com 9737 a 11782 bytes e a 95 com 29948 a 38176; a 1200 dpi, uma foto: 648 KB a 60 e 1,64 MB a 95. Regravar um arquivo (Aplicar, Girar) lê a qualidade **salva** na hora, como D23.
+
+### 13.5 Como rodar os testes que dependem de arquivos de fora
+
+```
+DIGITALIZADORA_REAL_SCANS_FOLDER=<pasta com 1-color-100.jpg … photos-3-gray-150.jpg> \
+DIGITALIZADORA_CARD_IMAGE=<caminho do cartão a uns 30°> \
+.venv/bin/python -m pytest -q tests/services/test_page_crop_detection_service.py
+```
+
+### 13.6 Pontos que seguem abertos para a interface
+
+A rota provisória e o `crop` do corpo saem na T64; `file_name` e `size_in_bytes` de `last_result` saem na T65; a leitura do arquivo `page-crop-rotation-vectors.json` pelos testes do Node vira a de `page-crop-vectors.json` na T61.
