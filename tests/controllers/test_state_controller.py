@@ -123,6 +123,24 @@ def test_state_describes_the_last_result(
     }
 
 
+def test_state_reports_the_revision_of_the_last_result(
+    client: TestClient, state_service: StubApplicationStateService
+) -> None:
+    state_service.snapshot = ScanProgressSnapshot(
+        phase=ScanPhase.IDLE,
+        scans_completed=7,
+        last_result=LAST_RESULT,
+        last_error_code=None,
+        last_result_revision=9,
+    )
+
+    assert client.get("/api/state").json()["last_result_revision"] == 9
+
+
+def test_state_reports_revision_zero_before_any_scan(client: TestClient) -> None:
+    assert client.get("/api/state").json()["last_result_revision"] == 0
+
+
 @pytest.mark.parametrize("error_code", ["insufficient_storage", "local_network_blocked"])
 def test_state_describes_the_last_error_with_the_catalog_message(
     client: TestClient, state_service: StubApplicationStateService, error_code: str
@@ -188,6 +206,7 @@ def test_state_has_exactly_the_documented_keys(client: TestClient) -> None:
         "scan_phase",
         "scans_completed",
         "last_result",
+        "last_result_revision",
         "last_error",
         "settings",
         "storage",

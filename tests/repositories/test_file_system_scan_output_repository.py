@@ -21,6 +21,7 @@ from digitalizadora.repositories.file_system_scan_output_repository import (
     FileSystemScanOutputRepository,
 )
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
+from tests.fakes.scripted_file_writer import ScriptedFileWriter
 
 TIME_ZONE = timezone(timedelta(hours=-3))
 SCANNED_AT = datetime(2026, 10, 13, 15, 30, 12, tzinfo=TIME_ZONE)
@@ -506,3 +507,60 @@ def test_output_folder_below_a_file_refuses_the_document(tmp_path):
 
     with pytest.raises(OutputFolderUnavailableError):
         build_real_repository(blocking_file / "nested").save_document(build_document_pdf(DOCUMENT_NAME))
+
+
+def test_read_saved_scan_returns_the_content_of_the_file(tmp_path):
+    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+
+    assert build_real_repository(tmp_path).read_saved_scan(saved_path) == b"scan content"
+
+
+def test_read_saved_scan_of_a_file_that_is_gone_is_none(tmp_path):
+    assert build_real_repository(tmp_path).read_saved_scan(tmp_path / "2026-10-13_00001.pdf") is None
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads every file")
+def test_read_saved_scan_of_a_file_that_cannot_be_read_raises_output_folder_unavailable(tmp_path):
+    unreadable_file = tmp_path / "2026-10-13_00001.pdf"
+    unreadable_file.write_bytes(b"x")
+    unreadable_file.chmod(0)
+
+    with pytest.raises(OutputFolderUnavailableError):
+        build_real_repository(tmp_path).read_saved_scan(unreadable_file)
+
+
+def test_replace_saved_scan_swaps_the_content_under_the_same_name(tmp_path):
+    repository = build_real_repository(tmp_path)
+    saved_path = repository.save(build_encoded_scan())
+
+    repository.replace_saved_scan(saved_path, b"turned content")
+
+    assert (saved_path.read_bytes(), saved_path.name) == (b"turned content", "2026-10-13_00001.pdf")
+
+
+def test_replace_saved_scan_leaves_no_temporary_file(tmp_path):
+    repository = build_real_repository(tmp_path)
+    saved_path = repository.save(build_encoded_scan())
+
+    repository.replace_saved_scan(saved_path, b"turned content")
+
+    assert [entry.name for entry in tmp_path.iterdir()] == ["2026-10-13_00001.pdf"]
+
+
+def test_replace_saved_scan_on_a_full_disk_keeps_the_original_file(tmp_path):
+    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+    full_disk = OSError(errno.ENOSPC, "No space left on device")
+    repository = build_repository(tmp_path, ScriptedFileWriter({saved_path.name: full_disk}))
+
+    with pytest.raises(InsufficientStorageError):
+        repository.replace_saved_scan(saved_path, b"turned content")
+
+    assert saved_path.read_bytes() == b"scan content"
+
+
+def test_replace_saved_scan_with_another_failure_raises_output_folder_unavailable(tmp_path):
+    saved_path = build_real_repository(tmp_path).save(build_encoded_scan())
+    repository = build_repository(tmp_path, ScriptedFileWriter({saved_path.name: OSError(errno.EIO, "I/O error")}))
+
+    with pytest.raises(OutputFolderUnavailableError):
+        repository.replace_saved_scan(saved_path, b"turned content")

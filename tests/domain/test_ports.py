@@ -22,7 +22,14 @@ EXPECTED_METHOD_NAMES_BY_PORT = {
     "ScannerDiscovery": {"discover"},
     "ScannerEndpointRepository": {"load", "save", "clear"},
     "ApplicationSettingsRepository": {"load", "save"},
-    "ScanOutputRepository": {"output_folder", "ensure_output_folder_ready", "save", "save_document"},
+    "ScanOutputRepository": {
+        "output_folder",
+        "ensure_output_folder_ready",
+        "save",
+        "save_document",
+        "read_saved_scan",
+        "replace_saved_scan",
+    },
     "DocumentDraftRepository": {
         "storage_folder",
         "claim_exclusive_access",

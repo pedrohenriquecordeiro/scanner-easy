@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from digitalizadora.controllers.document_body import build_document_summary_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
+from digitalizadora.controllers.scan_result_body import describe_scan_result
 from digitalizadora.controllers.settings_body import build_settings_body
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.services.application_state_service import (
@@ -40,6 +41,7 @@ class StateController:
             "scan_phase": state.snapshot.phase.value,
             "scans_completed": state.snapshot.scans_completed,
             "last_result": self._describe_last_result(state.snapshot.last_result),
+            "last_result_revision": state.snapshot.last_result_revision,
             "last_error": self._describe_last_error(state),
             "settings": build_settings_body(state.settings),
             "storage": self._describe_storage(state.storage),
@@ -53,15 +55,7 @@ class StateController:
 
     @staticmethod
     def _describe_last_result(last_result: ScanResult | None) -> dict[str, Any] | None:
-        if last_result is None:
-            return None
-        return {
-            "file_name": last_result.output_path.name,
-            "output_folder": str(last_result.output_path.parent),
-            "output_format": last_result.output_format.value,
-            "size_in_bytes": last_result.size_in_bytes,
-            "scanned_at": last_result.scanned_at.isoformat(),
-        }
+        return None if last_result is None else describe_scan_result(last_result)
 
     @staticmethod
     def _describe_storage(storage: StorageState) -> dict[str, Any]:

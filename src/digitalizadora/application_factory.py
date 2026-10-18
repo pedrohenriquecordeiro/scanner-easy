@@ -18,6 +18,7 @@ from digitalizadora.controllers.error_message_catalog import (
     ErrorMessageCatalog,
     build_error_body,
 )
+from digitalizadora.controllers.last_scan_controller import LastScanController
 from digitalizadora.controllers.local_request_guard import LocalRequestGuard
 from digitalizadora.controllers.preview_controller import PreviewController
 from digitalizadora.controllers.printer_controller import PrinterController
@@ -53,6 +54,7 @@ class ApplicationControllers:
     printer: PrinterController
     preview: PreviewController
     document: DocumentController
+    last_scan: LastScanController
 
 
 @dataclass(frozen=True)
@@ -137,6 +139,7 @@ def create_application(
         controllers.printer,
         controllers.preview,
         controllers.document,
+        controllers.last_scan,
     ):
         application.include_router(controller.build_router())
 

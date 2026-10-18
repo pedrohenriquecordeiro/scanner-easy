@@ -5,6 +5,7 @@ from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
+from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.stored_scan import StoredScan
 
 INITIAL_SNAPSHOT = ScanProgressSnapshot(
@@ -45,6 +46,18 @@ class ScanProgressTracker:
             phase=ScanPhase.IDLE,
             scans_completed=self._snapshot.scans_completed + 1,
             last_result=stored_scan.result,
+            last_result_revision=self._snapshot.last_result_revision + 1,
+        )
+
+    def replace_last_scan(self, expected_result: ScanResult, replacement: StoredScan) -> None:
+        """Swaps the last scan for its turned version, unless a newer scan took its place meanwhile."""
+        if self._snapshot.last_result != expected_result:
+            return
+        self._last_thumbnail_jpeg = replacement.thumbnail_jpeg
+        self._snapshot = replace(
+            self._snapshot,
+            last_result=replacement.result,
+            last_result_revision=self._snapshot.last_result_revision + 1,
         )
 
     def mark_failed(self, error_code: str) -> None:

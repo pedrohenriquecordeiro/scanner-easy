@@ -144,6 +144,7 @@ async def test_a_successful_scan_ends_idle_with_its_result_and_no_error(
         scans_completed=1,
         last_result=EXPECTED_RESULT,
         last_error_code=None,
+        last_result_revision=1,
     )
 
 
@@ -340,7 +341,7 @@ async def test_a_new_scan_succeeds_after_a_failure(
     result = await scan_service.scan_one_file(SCAN_REQUEST)
 
     assert progress_tracker.snapshot() == ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=1, last_result=result, last_error_code=None
+        phase=ScanPhase.IDLE, scans_completed=1, last_result=result, last_error_code=None, last_result_revision=1
     )
 
 
@@ -389,7 +390,7 @@ async def test_first_scan_completes_after_a_rejected_second_call(
     result = await first_scan
 
     assert progress_tracker.snapshot() == ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=1, last_result=result, last_error_code=None
+        phase=ScanPhase.IDLE, scans_completed=1, last_result=result, last_error_code=None, last_result_revision=1
     )
 
 

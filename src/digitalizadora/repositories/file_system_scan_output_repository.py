@@ -61,6 +61,22 @@ class FileSystemScanOutputRepository:
             size_in_bytes=size_in_bytes,
         )
 
+    def read_saved_scan(self, scan_path: Path) -> bytes | None:
+        """The content of a file the application saved, or None when it is gone."""
+        try:
+            return scan_path.read_bytes()
+        except FileNotFoundError:
+            return None
+        except OSError as error:
+            raise translate_storage_error(error, f"Cannot read {scan_path}") from error
+
+    def replace_saved_scan(self, scan_path: Path, content: bytes) -> None:
+        """Swaps the content under the same name: the old file stays whole until the new one is complete."""
+        try:
+            self._file_writer.replace_file(scan_path, content)
+        except OSError as error:
+            raise translate_storage_error(error, f"Cannot replace {scan_path}") from error
+
     def _document_file_names(self, folder: Path, document_pdf: DocumentPdfToSave) -> Iterator[str]:
         if not document_pdf.document_name:
             return self._sequence_file_names(folder, document_pdf.created_at, OutputFormat.PDF)

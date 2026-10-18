@@ -17,6 +17,7 @@ from digitalizadora.application_factory import (
 )
 from digitalizadora.controllers.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
+from digitalizadora.controllers.last_scan_controller import LastScanController
 from digitalizadora.controllers.preview_controller import PreviewController
 from digitalizadora.controllers.printer_controller import PrinterController
 from digitalizadora.controllers.scan_controller import ScanController
@@ -52,6 +53,7 @@ from tests.fakes.stub_document_draft_service import (
     StubDocumentDraftService,
     build_stub_snapshot,
 )
+from tests.fakes.stub_last_scan_rotation_service import StubLastScanRotationService
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1:8765", "localhost:8765"})
 INDEX_HTML = "<!doctype html><title>Digitalizadora</title>"
@@ -96,6 +98,7 @@ class ApplicationParts:
     printer_service: StubPrinterConnectionService
     progress_tracker: ScanProgressTracker
     document_service: StubDocumentDraftService
+    last_scan_rotation_service: StubLastScanRotationService
 
 
 def build_application_parts() -> ApplicationParts:
@@ -105,6 +108,7 @@ def build_application_parts() -> ApplicationParts:
     scan_service = StubScanService()
     printer_service = StubPrinterConnectionService(CONNECTED_STATE)
     document_service = StubDocumentDraftService(build_stub_snapshot(2))
+    last_scan_rotation_service = StubLastScanRotationService()
     storage_guard_service = StorageGuardService(lambda folder: FREE_SPACE_IN_BYTES)
     controllers = ApplicationControllers(
         scan=ScanController(scan_service, settings_service, CATALOG),
@@ -117,8 +121,11 @@ def build_application_parts() -> ApplicationParts:
         printer=PrinterController(printer_service, CATALOG),
         preview=PreviewController(progress_tracker),
         document=DocumentController(document_service, settings_service, CATALOG),
+        last_scan=LastScanController(last_scan_rotation_service, CATALOG),
     )
-    return ApplicationParts(controllers, scan_service, printer_service, progress_tracker, document_service)
+    return ApplicationParts(
+        controllers, scan_service, printer_service, progress_tracker, document_service, last_scan_rotation_service
+    )
 
 
 def build_application(
@@ -532,3 +539,17 @@ def test_the_patterns_of_the_validation_codes_name_only_the_document_routes() ->
 )
 def test_a_path_that_is_not_one_of_the_routes_keeps_the_settings_code(request_path: str) -> None:
     assert find_validation_error_code(request_path) == "invalid_settings"
+
+
+def test_the_last_scan_rotation_is_reachable_through_the_factory(client: TestClient, parts: ApplicationParts) -> None:
+    response = client.post("/api/scans/last/rotation", headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, parts.last_scan_rotation_service.rotation_count) == (HTTPStatus.OK, 1)
+
+
+def test_the_last_scan_rotation_without_the_required_header_is_rejected(
+    client: TestClient, parts: ApplicationParts
+) -> None:
+    response = client.post("/api/scans/last/rotation")
+
+    assert (response.status_code, parts.last_scan_rotation_service.rotation_count) == (HTTPStatus.FORBIDDEN, 0)

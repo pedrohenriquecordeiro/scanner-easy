@@ -10,6 +10,7 @@ from digitalizadora.application_factory import ApplicationControllers, WebInterf
 from digitalizadora.configuration import ApplicationConfiguration
 from digitalizadora.controllers.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
+from digitalizadora.controllers.last_scan_controller import LastScanController
 from digitalizadora.controllers.preview_controller import PreviewController
 from digitalizadora.controllers.printer_controller import PrinterController
 from digitalizadora.controllers.scan_controller import ScanController
@@ -46,11 +47,13 @@ from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
 from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.image_pixel_limit import raise_decompression_limit_to_scanner_size
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
+from digitalizadora.services.last_scan_rotation_service import LastScanRotationService, LastScanRotators
 from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
+from digitalizadora.services.scan_content_rotator import ScanContentRotator
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.scan_output_service import ScanOutputService
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
@@ -123,6 +126,7 @@ class _Services:
     printer_connection: PrinterConnectionService
     progress_tracker: ScanProgressTracker
     document_draft: DocumentDraftService
+    last_scan_rotation: LastScanRotationService
 
 
 def build_scanner_http_client(scanner_transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
@@ -258,6 +262,11 @@ def _build_services(
         printer_connection=printer_connection_service,
         progress_tracker=progress_tracker,
         document_draft=_build_document_draft_service(repositories, shared_services, scan_service),
+        last_scan_rotation=LastScanRotationService(
+            progress_tracker,
+            repositories.scan_output,
+            LastScanRotators(ScanContentRotator(), shared_services.image_view),
+        ),
     )
 
 
@@ -295,6 +304,7 @@ def _build_controllers(services: _Services, error_message_catalog: ErrorMessageC
         printer=PrinterController(services.printer_connection, error_message_catalog),
         preview=PreviewController(services.progress_tracker),
         document=DocumentController(services.document_draft, services.settings, error_message_catalog),
+        last_scan=LastScanController(services.last_scan_rotation, error_message_catalog),
     )
 
 
