@@ -1,9 +1,12 @@
+from dataclasses import dataclass
+from datetime import datetime
+
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import ScanFailedError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.services.master_jpeg_service import MasterJpegService
+from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.pdf_assembly_service import (
     DEFAULT_PDF_TITLE_TEMPLATE,
     PdfAssemblyService,
@@ -14,36 +17,53 @@ from digitalizadora.services.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIX
 EXPECTED_MEDIA_TYPE = "image/jpeg"
 
 
+@dataclass(frozen=True)
+class EncodedMaster:
+    """The master of a scan: the scanner JPEG with the density of the request, and a small thumbnail of it."""
+
+    jpeg_content: bytes
+    thumbnail_jpeg: bytes
+
+
+@dataclass(frozen=True)
+class OutputIdentity:
+    """What an output file is made with besides its image: when it was scanned, how dense and in which format."""
+
+    created_at: datetime
+    dots_per_inch: int
+    output_format: OutputFormat
+
+
 class ScanEncoder:
     def __init__(
         self,
-        master_jpeg_service: MasterJpegService,
+        jpeg_resolution_service: JpegResolutionService,
         pdf_assembly_service: PdfAssemblyService,
         thumbnail_service: ThumbnailService,
     ) -> None:
-        self._master_jpeg_service = master_jpeg_service
+        self._jpeg_resolution_service = jpeg_resolution_service
         self._pdf_assembly_service = pdf_assembly_service
         self._thumbnail_service = thumbnail_service
 
-    def encode(self, scanned_image: ScannedImage, job: ScanJob) -> EncodedScan:
+    def encode_master(self, scanned_image: ScannedImage, job: ScanJob) -> EncodedMaster:
+        """The scanner image, untouched but for the density; the thumbnail is of the master as it comes."""
         if scanned_image.media_type != EXPECTED_MEDIA_TYPE:
             raise ScanFailedError(f"Expected {EXPECTED_MEDIA_TYPE} from the scanner, got {scanned_image.media_type}")
-        request = job.request
-        master_jpeg = self._master_jpeg_service.build_master_jpeg(scanned_image.content, request)
+        master_jpeg = self._jpeg_resolution_service.with_resolution(
+            scanned_image.content, job.request.settings.dots_per_inch
+        )
         thumbnail_jpeg = self._thumbnail_service.build_thumbnail(master_jpeg, THUMBNAIL_MAXIMUM_EDGE_PIXELS)
-        return EncodedScan(
-            content=self._build_final_content(master_jpeg, job),
-            output_format=request.output_format,
-            created_at=job.started_at,
-            thumbnail_jpeg=thumbnail_jpeg,
-        )
+        return EncodedMaster(jpeg_content=master_jpeg, thumbnail_jpeg=thumbnail_jpeg)
 
-    def _build_final_content(self, master_jpeg: bytes, job: ScanJob) -> bytes:
-        if job.request.output_format is not OutputFormat.PDF:
-            return master_jpeg
+    def wrap_output(self, output_jpeg: bytes, identity: OutputIdentity) -> EncodedScan:
+        """A JPG as it is; a PDF with the page at the fixed density, so it has the physical size of the image."""
+        if identity.output_format is not OutputFormat.PDF:
+            return EncodedScan(output_jpeg, identity.output_format, identity.created_at)
         specification = PdfDocumentSpecification(
-            dots_per_inch=job.request.settings.dots_per_inch,
-            title=DEFAULT_PDF_TITLE_TEMPLATE.format(moment=job.started_at),
-            created_at=job.started_at,
+            dots_per_inch=identity.dots_per_inch,
+            title=DEFAULT_PDF_TITLE_TEMPLATE.format(moment=identity.created_at),
+            created_at=identity.created_at,
         )
-        return self._pdf_assembly_service.build_pdf([master_jpeg], specification)
+        return EncodedScan(
+            self._pdf_assembly_service.build_pdf([output_jpeg], specification), OutputFormat.PDF, identity.created_at
+        )

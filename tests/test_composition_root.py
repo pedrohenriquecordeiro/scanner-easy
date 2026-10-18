@@ -26,6 +26,7 @@ from digitalizadora.repositories.file_system_document_draft_repository import OW
 from digitalizadora.repositories.json_scanner_endpoint_repository import JsonScannerEndpointRepository
 from digitalizadora.services.image_pixel_limit import MAXIMUM_SCANNER_IMAGE_PIXELS
 from tests.fakes.configuration_builder import TEST_PORT, build_application_configuration
+from tests.fakes.quick_scan_parts import ONE_PHOTO, QuickScanFolders, build_job, build_quick_scan_parts_in
 
 SCANNER_ADDRESS = "http://scanner.test/eSCL"
 LOOPBACK_BASE_ADDRESS = f"http://127.0.0.1:{TEST_PORT}"
@@ -340,3 +341,46 @@ def test_an_old_settings_file_with_only_a_preset_is_served_with_the_quality_of_t
         settings = client.get("/api/settings").json()
 
     assert (settings["dots_per_inch"], settings["color_mode"]) == (600, "color")
+
+
+def test_the_last_quick_scan_of_a_previous_run_comes_back_when_the_container_is_built(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    folders = QuickScanFolders(configuration.default_output_folder, configuration.data_directory / "quick-scan")
+    previous_run = build_quick_scan_parts_in(folders)
+    previous_run.scan(ONE_PHOTO, build_job())
+
+    with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
+        last_result = client.get("/api/state").json()["last_result"]
+
+    assert (last_result["file_names"], last_result["is_editable"]) == (["2026-10-13_00001.jpg"], True)
+
+
+def test_the_thumbnail_of_the_restored_scan_is_served(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    folders = QuickScanFolders(configuration.default_output_folder, configuration.data_directory / "quick-scan")
+    build_quick_scan_parts_in(folders).scan(ONE_PHOTO, build_job())
+
+    with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
+        response = client.get("/api/scans/last/thumbnail")
+
+    assert (response.status_code, response.headers["content-type"]) == (200, "image/jpeg")
+
+
+def test_a_container_without_a_slot_starts_with_no_last_result(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
+        assert client.get("/api/state").json()["last_result"] is None
+
+
+def test_a_broken_slot_does_not_stop_the_container(
+    configuration: ApplicationConfiguration, overrides: ContainerOverrides
+) -> None:
+    slot_folder = configuration.data_directory / "quick-scan"
+    slot_folder.mkdir(parents=True)
+    (slot_folder / "manifest.json").write_bytes(b"{broken")
+
+    with build_client(build_container(configuration, overrides), LOOPBACK_BASE_ADDRESS) as client:
+        assert client.get("/api/state").json()["last_result"] is None

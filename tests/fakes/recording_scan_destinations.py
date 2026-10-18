@@ -1,14 +1,15 @@
 import threading
+from dataclasses import replace
 
 from digitalizadora.domain.document_draft import DocumentPage
+from digitalizadora.domain.last_scan import SavedScanFile
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_progress import ScanPhase
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scanned_image import ScannedImage
 from digitalizadora.domain.stored_scan import StoredScan
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
-from tests.fakes.stored_scans import STORED_SCAN_OUTPUT_PATH
+from tests.fakes.stored_scans import STORED_SCAN_OUTPUT_PATH, build_last_scan
 
 
 class RecordingScanOutputService:
@@ -34,13 +35,11 @@ class RecordingScanOutputService:
 
     def store(self, scanned_image: ScannedImage, job: ScanJob) -> StoredScan:
         self._record_store(job)
-        result = ScanResult(
-            output_path=STORED_SCAN_OUTPUT_PATH,
-            output_format=job.request.output_format,
-            scanned_at=job.started_at,
-            size_in_bytes=len(scanned_image.content),
+        saved_file = SavedScanFile(STORED_SCAN_OUTPUT_PATH.name, len(scanned_image.content), 1)
+        last_scan = replace(
+            build_last_scan((saved_file,)), output_format=job.request.output_format, scanned_at=job.started_at
         )
-        return StoredScan(result=result, thumbnail_jpeg=b"thumbnail")
+        return StoredScan(last_scan=last_scan, thumbnail_jpeg=b"thumbnail")
 
     def _record_store(self, job: ScanJob) -> None:
         self.stored_jobs.append(job)

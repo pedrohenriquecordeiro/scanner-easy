@@ -6,7 +6,6 @@ import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentPage
-from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, InsufficientDraftStorageError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
@@ -20,12 +19,10 @@ from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.file_system_document_draft_repository import FileSystemDocumentDraftRepository
 from digitalizadora.services.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.document_page_capture import DocumentPageCapture
-from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.page_crop_detection_service import DetectedCrops, PageCropDetectionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
-from digitalizadora.services.scan_encoder import ScanEncoder
+from digitalizadora.services.scan_encoder import EncodedMaster, ScanEncoder
 from digitalizadora.services.storage_guard_service import (
     MINIMUM_FREE_SPACE_BYTES,
     SAFETY_MARGIN_PAGES,
@@ -64,13 +61,12 @@ def free_space_reader() -> RecordingFreeSpaceReader:
 
 @pytest.fixture
 def scan_encoder() -> ScanEncoder:
-    master_jpeg_service = MasterJpegService(ImageAdjustmentService(PageCropDetectionService()), JpegResolutionService())
-    return ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService())
+    return ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService())
 
 
 @pytest.fixture
-def expected_encoded_scan(scan_encoder: ScanEncoder) -> EncodedScan:
-    return scan_encoder.encode(SCANNED_IMAGE, PAGE_JOB)
+def expected_encoded_scan(scan_encoder: ScanEncoder) -> EncodedMaster:
+    return scan_encoder.encode_master(SCANNED_IMAGE, PAGE_JOB)
 
 
 @pytest.fixture
@@ -118,7 +114,7 @@ def test_store_returns_the_page_with_the_job_time_and_settings(page_capture, exp
         scanned_at=STARTED_AT,
         dots_per_inch=200,
         color_mode=ColorMode.GRAYSCALE,
-        size_in_bytes=len(expected_encoded_scan.content),
+        size_in_bytes=len(expected_encoded_scan.jpeg_content),
     )
 
 
@@ -132,7 +128,7 @@ def test_store_keeps_the_encoded_jpeg_as_the_page_file(page_capture, drafts_fold
     page_capture.store(SCANNED_IMAGE, PAGE_JOB)
 
     page_file = drafts_folder / "current" / f"page-{FIRST_PAGE_IDENTIFIER}.jpg"
-    assert page_file.read_bytes() == expected_encoded_scan.content
+    assert page_file.read_bytes() == expected_encoded_scan.jpeg_content
 
 
 def test_store_keeps_the_encoded_thumbnail(page_capture, draft_store, expected_encoded_scan):
@@ -212,7 +208,7 @@ def test_the_stored_page_is_the_unadjusted_master_whatever_the_request_asks(
 ):
     page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
 
-    unadjusted_master = scan_encoder.encode(SHEET_ON_DARK_LID, PAGE_JOB).content
+    unadjusted_master = scan_encoder.encode_master(SHEET_ON_DARK_LID, PAGE_JOB).jpeg_content
     page_file = drafts_folder / "current" / f"page-{FIRST_PAGE_IDENTIFIER}.jpg"
     assert page_file.read_bytes() == unadjusted_master
 

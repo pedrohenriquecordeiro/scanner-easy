@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.last_scan import LastScan
 
 
 class ScanPhase(str, Enum):
@@ -15,7 +15,7 @@ class ScanPhase(str, Enum):
 class ScanProgressSnapshot:
     phase: ScanPhase
     scans_completed: int
-    last_result: ScanResult | None
+    last_scan: LastScan | None
     last_error_code: str | None
-    # Rises when a quick scan ends and when its file is turned: the page reloads the thumbnail by it.
+    # Rises when a quick scan ends and whenever an edit changes it: the page reloads the thumbnail by it.
     last_result_revision: int = 0

@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
-from digitalizadora.domain.errors import DigitalizadoraError, ScanAlreadyRunningError
+from digitalizadora.domain.errors import DigitalizadoraError
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.scan_service import ScanService
@@ -30,10 +30,12 @@ class ScanController:
         return router
 
     async def start_scan(self, background_tasks: BackgroundTasks) -> JSONResponse:
-        if self._scan_service.is_scan_in_progress():
+        try:
+            self._scan_service.ensure_scan_can_start()
+        except DigitalizadoraError as error:
             return JSONResponse(
                 status_code=HTTPStatus.CONFLICT,
-                content=build_error_body(self._error_message_catalog, ScanAlreadyRunningError.code),
+                content=build_error_body(self._error_message_catalog, error.code),
             )
         scan_request = self._settings_service.current().to_scan_request()
         background_tasks.add_task(self._run_scan, scan_request)

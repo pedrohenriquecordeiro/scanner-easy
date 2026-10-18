@@ -28,7 +28,6 @@ EXPECTED_METHOD_NAMES_BY_PORT = {
         "ensure_output_folder_ready",
         "save",
         "save_document",
-        "read_saved_scan",
         "replace_saved_scan",
         "describe_saved_scan",
         "delete_saved_scan",

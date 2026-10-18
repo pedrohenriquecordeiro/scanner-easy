@@ -6,8 +6,9 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field, StrictFloat, StrictInt
+from pydantic import BaseModel, StrictFloat, StrictInt
 
+from digitalizadora.controllers.crop_request_body import PageCropsRequestBody
 from digitalizadora.controllers.document_body import build_document_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.domain.application_settings import ApplicationSettings
@@ -17,8 +18,7 @@ from digitalizadora.domain.errors import (
     InvalidCropError,
     InvalidPageRotationError,
 )
-from digitalizadora.domain.page_crop import CROP_PRECISION_DIGITS, CropCorner, PageCrop, RectangleEdges
-from digitalizadora.domain.page_framing import MAXIMUM_CROPS_PER_PAGE
+from digitalizadora.domain.page_crop import CROP_PRECISION_DIGITS, PageCrop, RectangleEdges
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.document_draft_service import DocumentDraftService
@@ -50,42 +50,6 @@ DOCUMENT_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
 THUMBNAIL_CACHE_HEADERS: Mapping[str, str] = MappingProxyType(
     {"Cache-Control": "private, max-age=31536000, immutable"}
 )
-
-
-class CropCornerRequestBody(BaseModel):
-    x: StrictInt | StrictFloat
-    y: StrictInt | StrictFloat
-
-    def to_crop_corner(self) -> CropCorner:
-        return CropCorner(self.x, self.y)
-
-
-class PageCropRequestBody(BaseModel):
-    """One crop: four corners in fractions of the page as it is displayed, clockwise from the top left."""
-
-    top_left: CropCornerRequestBody
-    top_right: CropCornerRequestBody
-    bottom_right: CropCornerRequestBody
-    bottom_left: CropCornerRequestBody
-
-    def to_page_crop(self) -> PageCrop:
-        return PageCrop.rounded(
-            [
-                self.top_left.to_crop_corner(),
-                self.top_right.to_crop_corner(),
-                self.bottom_right.to_crop_corner(),
-                self.bottom_left.to_crop_corner(),
-            ]
-        )
-
-
-class PageCropsRequestBody(BaseModel):
-    """{"crops": []} removes the crops of the page."""
-
-    crops: list[PageCropRequestBody] = Field(max_length=MAXIMUM_CROPS_PER_PAGE)
-
-    def to_page_crops(self) -> list[PageCrop]:
-        return [crop.to_page_crop() for crop in self.crops]
 
 
 class ProvisionalCropEdgesRequestBody(BaseModel):

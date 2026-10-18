@@ -3,8 +3,9 @@ from datetime import timedelta
 
 import pytest
 
-from digitalizadora.domain.errors import ScanAlreadyRunningError
+from digitalizadora.domain.errors import LastScanBusyError, ScanAlreadyRunningError
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
@@ -20,7 +21,7 @@ from tests.fakes.stored_scans import (
 STARTED_AT = STORED_SCAN_SCANNED_AT
 SCAN_REQUEST = ScanRequest(settings=ScanPreset.DOCUMENT.settings, output_format=OutputFormat.PDF)
 EMPTY_SNAPSHOT = ScanProgressSnapshot(
-    phase=ScanPhase.IDLE, scans_completed=0, last_result=None, last_error_code=None
+    phase=ScanPhase.IDLE, scans_completed=0, last_scan=None, last_error_code=None
 )
 
 
@@ -100,13 +101,13 @@ def test_mark_completed_increments_scans_completed(tracker: ScanProgressTracker)
     assert tracker.snapshot().scans_completed == 2
 
 
-def test_mark_completed_stores_the_last_result(tracker: ScanProgressTracker) -> None:
+def test_mark_completed_stores_the_last_scan(tracker: ScanProgressTracker) -> None:
     stored_scan = build_stored_scan()
     tracker.begin_scan(SCAN_REQUEST)
 
     tracker.mark_completed(stored_scan)
 
-    assert tracker.snapshot().last_result == stored_scan.result
+    assert tracker.snapshot().last_scan == stored_scan.last_scan
 
 
 def test_mark_completed_stores_the_thumbnail(tracker: ScanProgressTracker) -> None:
@@ -153,7 +154,7 @@ def test_thumbnail_survives_a_later_failure(tracker: ScanProgressTracker) -> Non
     assert tracker.last_thumbnail_jpeg() == SAMPLE_THUMBNAIL_JPEG
 
 
-def test_last_result_survives_a_later_failure(tracker: ScanProgressTracker) -> None:
+def test_the_last_scan_survives_a_later_failure(tracker: ScanProgressTracker) -> None:
     stored_scan = build_stored_scan()
     tracker.begin_scan(SCAN_REQUEST)
     tracker.mark_completed(stored_scan)
@@ -161,7 +162,7 @@ def test_last_result_survives_a_later_failure(tracker: ScanProgressTracker) -> N
 
     tracker.mark_failed("scan_failed")
 
-    assert tracker.snapshot().last_result == stored_scan.result
+    assert tracker.snapshot().last_scan == stored_scan.last_scan
 
 
 def test_a_new_thumbnail_replaces_the_previous_one(tracker: ScanProgressTracker) -> None:
@@ -257,7 +258,7 @@ def test_mark_page_added_counts_one_more_completed_scan(tracker: ScanProgressTra
     assert tracker.snapshot().scans_completed == 2
 
 
-def test_mark_page_added_keeps_the_last_result_of_the_quick_mode(tracker: ScanProgressTracker) -> None:
+def test_mark_page_added_keeps_the_last_scan_of_the_quick_mode(tracker: ScanProgressTracker) -> None:
     stored_scan = build_stored_scan()
     tracker.begin_scan(SCAN_REQUEST)
     tracker.mark_completed(stored_scan)
@@ -265,7 +266,7 @@ def test_mark_page_added_keeps_the_last_result_of_the_quick_mode(tracker: ScanPr
 
     tracker.mark_page_added()
 
-    assert tracker.snapshot().last_result == stored_scan.result
+    assert tracker.snapshot().last_scan == stored_scan.last_scan
 
 
 def test_mark_page_added_keeps_the_thumbnail_of_the_quick_mode(tracker: ScanProgressTracker) -> None:
@@ -311,9 +312,12 @@ def complete_a_scan(tracker: ScanProgressTracker) -> None:
     tracker.mark_completed(build_stored_scan())
 
 
+SCAN_IDENTIFIER = build_stored_scan().last_scan.scan_identifier
+
+
 def build_turned_scan() -> StoredScan:
     stored_scan = build_stored_scan()
-    return StoredScan(replace(stored_scan.result, size_in_bytes=999), b"turned-thumbnail")
+    return StoredScan(stored_scan.last_scan.with_framing(PageFraming().turned_clockwise()), b"turned-thumbnail")
 
 
 def test_a_new_tracker_has_revision_zero_of_the_last_result(tracker: ScanProgressTracker) -> None:
@@ -350,19 +354,19 @@ def test_a_document_page_keeps_the_revision(tracker: ScanProgressTracker) -> Non
     assert tracker.snapshot().last_result_revision == 1
 
 
-def test_replace_last_scan_swaps_the_result(tracker: ScanProgressTracker) -> None:
+def test_replace_last_scan_swaps_the_scan(tracker: ScanProgressTracker) -> None:
     complete_a_scan(tracker)
     turned_scan = build_turned_scan()
 
-    tracker.replace_last_scan(build_stored_scan().result, turned_scan)
+    tracker.replace_last_scan(SCAN_IDENTIFIER, turned_scan)
 
-    assert tracker.snapshot().last_result == turned_scan.result
+    assert tracker.snapshot().last_scan == turned_scan.last_scan
 
 
 def test_replace_last_scan_swaps_the_thumbnail(tracker: ScanProgressTracker) -> None:
     complete_a_scan(tracker)
 
-    tracker.replace_last_scan(build_stored_scan().result, build_turned_scan())
+    tracker.replace_last_scan(SCAN_IDENTIFIER, build_turned_scan())
 
     assert tracker.last_thumbnail_jpeg() == b"turned-thumbnail"
 
@@ -370,7 +374,7 @@ def test_replace_last_scan_swaps_the_thumbnail(tracker: ScanProgressTracker) -> 
 def test_replace_last_scan_raises_the_revision(tracker: ScanProgressTracker) -> None:
     complete_a_scan(tracker)
 
-    tracker.replace_last_scan(build_stored_scan().result, build_turned_scan())
+    tracker.replace_last_scan(SCAN_IDENTIFIER, build_turned_scan())
 
     assert tracker.snapshot().last_result_revision == 2
 
@@ -378,7 +382,7 @@ def test_replace_last_scan_raises_the_revision(tracker: ScanProgressTracker) -> 
 def test_replace_last_scan_does_not_count_a_new_scan(tracker: ScanProgressTracker) -> None:
     complete_a_scan(tracker)
 
-    tracker.replace_last_scan(build_stored_scan().result, build_turned_scan())
+    tracker.replace_last_scan(SCAN_IDENTIFIER, build_turned_scan())
 
     assert tracker.snapshot().scans_completed == 1
 
@@ -388,24 +392,87 @@ def test_replace_last_scan_keeps_the_phase_and_the_error(tracker: ScanProgressTr
     tracker.begin_scan(SCAN_REQUEST)
     tracker.mark_failed("scan_failed")
 
-    tracker.replace_last_scan(build_stored_scan().result, build_turned_scan())
+    tracker.replace_last_scan(SCAN_IDENTIFIER, build_turned_scan())
 
     assert (tracker.snapshot().phase, tracker.snapshot().last_error_code) == (ScanPhase.IDLE, "scan_failed")
 
 
 def test_replace_last_scan_does_nothing_when_a_newer_scan_took_its_place(tracker: ScanProgressTracker) -> None:
     complete_a_scan(tracker)
-    newer_scan = StoredScan(replace(build_stored_scan().result, size_in_bytes=777), b"newer-thumbnail")
+    newer_last_scan = replace(build_stored_scan().last_scan, scan_identifier="0000000000000002")
+    newer_scan = StoredScan(newer_last_scan, b"newer-thumbnail")
     tracker.begin_scan(SCAN_REQUEST)
     tracker.mark_completed(newer_scan)
     snapshot_before = tracker.snapshot()
 
-    tracker.replace_last_scan(build_stored_scan().result, build_turned_scan())
+    tracker.replace_last_scan(SCAN_IDENTIFIER, build_turned_scan())
 
     assert (tracker.snapshot(), tracker.last_thumbnail_jpeg()) == (snapshot_before, b"newer-thumbnail")
 
 
 def test_replace_last_scan_without_a_last_scan_does_nothing(tracker: ScanProgressTracker) -> None:
-    tracker.replace_last_scan(build_stored_scan().result, build_turned_scan())
+    tracker.replace_last_scan(SCAN_IDENTIFIER, build_turned_scan())
+
+    assert tracker.snapshot() == EMPTY_SNAPSHOT
+
+
+def test_restore_last_scan_gives_the_tracker_the_scan_of_the_previous_run(tracker: ScanProgressTracker) -> None:
+    stored_scan = build_stored_scan()
+
+    tracker.restore_last_scan(stored_scan)
+
+    assert (tracker.snapshot().last_scan, tracker.last_thumbnail_jpeg()) == (
+        stored_scan.last_scan,
+        SAMPLE_THUMBNAIL_JPEG,
+    )
+
+
+def test_restore_last_scan_does_not_count_a_scan(tracker: ScanProgressTracker) -> None:
+    tracker.restore_last_scan(build_stored_scan())
+
+    assert tracker.snapshot().scans_completed == 0
+
+
+def test_restore_last_scan_raises_the_revision(tracker: ScanProgressTracker) -> None:
+    tracker.restore_last_scan(build_stored_scan())
+
+    assert tracker.snapshot().last_result_revision == 1
+
+
+def test_begin_scan_raises_while_the_last_scan_is_being_adjusted(tracker: ScanProgressTracker) -> None:
+    tracker.mark_last_scan_edit_started()
+
+    with pytest.raises(LastScanBusyError):
+        tracker.begin_scan(SCAN_REQUEST)
+
+
+def test_a_refused_begin_scan_during_an_edit_leaves_the_tracker_idle(tracker: ScanProgressTracker) -> None:
+    tracker.mark_last_scan_edit_started()
+
+    with pytest.raises(LastScanBusyError):
+        tracker.begin_scan(SCAN_REQUEST)
+
+    assert tracker.snapshot() == EMPTY_SNAPSHOT
+
+
+def test_begin_scan_is_accepted_again_when_the_edit_ends(tracker: ScanProgressTracker) -> None:
+    tracker.mark_last_scan_edit_started()
+    tracker.mark_last_scan_edit_ended()
+
+    tracker.begin_scan(SCAN_REQUEST)
+
+    assert tracker.snapshot().phase is ScanPhase.PREPARING
+
+
+def test_a_scan_running_is_reported_before_an_edit_running(tracker: ScanProgressTracker) -> None:
+    tracker.begin_scan(SCAN_REQUEST)
+    tracker.mark_last_scan_edit_started()
+
+    with pytest.raises(ScanAlreadyRunningError):
+        tracker.ensure_scan_can_start()
+
+
+def test_ensure_scan_can_start_changes_nothing(tracker: ScanProgressTracker) -> None:
+    tracker.ensure_scan_can_start()
 
     assert tracker.snapshot() == EMPTY_SNAPSHOT

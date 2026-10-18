@@ -1,12 +1,14 @@
 import asyncio
 import logging
 import threading
+from dataclasses import replace
 
 import pytest
 
 from digitalizadora.domain.errors import (
     DigitalizadoraError,
     InsufficientStorageError,
+    LastScanBusyError,
     LocalNetworkBlockedError,
     OutputFolderUnavailableError,
     ScanAlreadyRunningError,
@@ -16,13 +18,13 @@ from digitalizadora.domain.errors import (
     ScanRejectedError,
     ScanTimedOutError,
 )
+from digitalizadora.domain.last_scan import LastScan, SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.ports import ScannerGateway
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scanned_image import ScannedImage
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_service import ScanService
@@ -30,16 +32,14 @@ from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.observing_scanner_gateway import ObservingScriptedScannerGateway
 from tests.fakes.recording_scan_destinations import RecordingScanOutputService
 from tests.fakes.scripted_scanner_gateway import FixedGatewayProvider, build_sample_capabilities
-from tests.fakes.stored_scans import STORED_SCAN_OUTPUT_PATH, STORED_SCAN_SCANNED_AT
+from tests.fakes.stored_scans import STORED_SCAN_OUTPUT_PATH, STORED_SCAN_SCANNED_AT, build_last_scan
 
 STARTED_AT = STORED_SCAN_SCANNED_AT
 SCAN_REQUEST = ScanRequest(settings=ScanPreset.DOCUMENT.settings, output_format=OutputFormat.PDF)
 SCANNED_IMAGE = ScannedImage(content=b"jpeg-bytes", media_type="image/jpeg")
-EXPECTED_RESULT = ScanResult(
-    output_path=STORED_SCAN_OUTPUT_PATH,
-    output_format=OutputFormat.PDF,
+EXPECTED_LAST_SCAN = replace(
+    build_last_scan((SavedScanFile(STORED_SCAN_OUTPUT_PATH.name, len(SCANNED_IMAGE.content), 1),)),
     scanned_at=STARTED_AT,
-    size_in_bytes=len(SCANNED_IMAGE.content),
 )
 CAPACITY_ERROR_TYPES = [InsufficientStorageError, OutputFolderUnavailableError]
 GATEWAY_ERROR_TYPES = [
@@ -56,7 +56,7 @@ PROVIDER_ERROR_TYPES = [ScannerUnreachableError, LocalNetworkBlockedError]
 
 def build_failed_snapshot(error_code: str) -> ScanProgressSnapshot:
     return ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=0, last_result=None, last_error_code=error_code
+        phase=ScanPhase.IDLE, scans_completed=0, last_scan=None, last_error_code=error_code
     )
 
 
@@ -125,13 +125,13 @@ def build_scan_service_with_outcomes(
 
 def start_held_scan(
     scan_service: ScanService, gateway: ObservingScriptedScannerGateway
-) -> "asyncio.Task[ScanResult]":
+) -> "asyncio.Task[LastScan]":
     gateway.hold_scans_open()
     return asyncio.create_task(scan_service.scan_one_file(SCAN_REQUEST))
 
 
-async def test_scan_one_file_returns_the_stored_result(scan_service: ScanService) -> None:
-    assert await scan_service.scan_one_file(SCAN_REQUEST) == EXPECTED_RESULT
+async def test_scan_one_file_returns_the_stored_scan(scan_service: ScanService) -> None:
+    assert await scan_service.scan_one_file(SCAN_REQUEST) == EXPECTED_LAST_SCAN
 
 
 async def test_a_successful_scan_ends_idle_with_its_result_and_no_error(
@@ -142,7 +142,7 @@ async def test_a_successful_scan_ends_idle_with_its_result_and_no_error(
     assert progress_tracker.snapshot() == ScanProgressSnapshot(
         phase=ScanPhase.IDLE,
         scans_completed=1,
-        last_result=EXPECTED_RESULT,
+        last_scan=EXPECTED_LAST_SCAN,
         last_error_code=None,
         last_result_revision=1,
     )
@@ -341,7 +341,7 @@ async def test_a_new_scan_succeeds_after_a_failure(
     result = await scan_service.scan_one_file(SCAN_REQUEST)
 
     assert progress_tracker.snapshot() == ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=1, last_result=result, last_error_code=None, last_result_revision=1
+        phase=ScanPhase.IDLE, scans_completed=1, last_scan=result, last_error_code=None, last_result_revision=1
     )
 
 
@@ -390,7 +390,7 @@ async def test_first_scan_completes_after_a_rejected_second_call(
     result = await first_scan
 
     assert progress_tracker.snapshot() == ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=1, last_result=result, last_error_code=None, last_result_revision=1
+        phase=ScanPhase.IDLE, scans_completed=1, last_scan=result, last_error_code=None, last_result_revision=1
     )
 
 
@@ -439,3 +439,38 @@ async def test_is_scan_in_progress_is_false_after_a_failure(
         await scan_service.scan_one_file(SCAN_REQUEST)
 
     assert scan_service.is_scan_in_progress() is False
+
+
+async def test_ensure_scan_can_start_accepts_an_idle_service(scan_service: ScanService) -> None:
+    scan_service.ensure_scan_can_start()
+
+
+async def test_ensure_scan_can_start_refuses_during_a_scan(
+    scan_service: ScanService, gateway: ObservingScriptedScannerGateway
+) -> None:
+    first_scan = start_held_scan(scan_service, gateway)
+    await gateway.scan_started.wait()
+
+    with pytest.raises(ScanAlreadyRunningError):
+        scan_service.ensure_scan_can_start()
+
+    gateway.release_scan.set()
+    await first_scan
+
+
+async def test_ensure_scan_can_start_refuses_while_the_last_scan_is_adjusted(
+    scan_service: ScanService, progress_tracker: ScanProgressTracker
+) -> None:
+    progress_tracker.mark_last_scan_edit_started()
+
+    with pytest.raises(LastScanBusyError):
+        scan_service.ensure_scan_can_start()
+
+
+async def test_a_scan_is_refused_while_the_last_scan_is_adjusted(
+    scan_service: ScanService, progress_tracker: ScanProgressTracker
+) -> None:
+    progress_tracker.mark_last_scan_edit_started()
+
+    with pytest.raises(LastScanBusyError):
+        await scan_service.scan_one_file(SCAN_REQUEST)

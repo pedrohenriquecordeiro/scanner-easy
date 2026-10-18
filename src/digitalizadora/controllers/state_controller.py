@@ -4,9 +4,9 @@ from fastapi import APIRouter
 
 from digitalizadora.controllers.document_body import build_document_summary_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
-from digitalizadora.controllers.scan_result_body import describe_scan_result
+from digitalizadora.controllers.last_scan_body import describe_last_scan
 from digitalizadora.controllers.settings_body import build_settings_body
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.last_scan import LastScan
 from digitalizadora.services.application_state_service import (
     ApplicationState,
     ApplicationStateService,
@@ -40,7 +40,7 @@ class StateController:
         return {
             "scan_phase": state.snapshot.phase.value,
             "scans_completed": state.snapshot.scans_completed,
-            "last_result": self._describe_last_result(state.snapshot.last_result),
+            "last_result": self._describe_last_result(state.snapshot.last_scan),
             "last_result_revision": state.snapshot.last_result_revision,
             "last_error": self._describe_last_error(state),
             "settings": build_settings_body(state.settings),
@@ -54,8 +54,8 @@ class StateController:
         return build_document_summary_body(self._document_draft_service.snapshot(), draft_storage)
 
     @staticmethod
-    def _describe_last_result(last_result: ScanResult | None) -> dict[str, Any] | None:
-        return None if last_result is None else describe_scan_result(last_result)
+    def _describe_last_result(last_scan: LastScan | None) -> dict[str, Any] | None:
+        return None if last_scan is None else describe_last_scan(last_scan)
 
     @staticmethod
     def _describe_storage(storage: StorageState) -> dict[str, Any]:

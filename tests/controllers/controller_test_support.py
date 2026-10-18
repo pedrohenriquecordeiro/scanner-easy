@@ -3,10 +3,11 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
+from digitalizadora.domain.errors import ScanAlreadyRunningError
+from digitalizadora.domain.last_scan import LastScan
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.services.printer_connection_service import PrinterConnectionState
-from tests.fakes.stored_scans import STORED_SCAN_SCANNED_AT
+from tests.fakes.stored_scans import STORED_SCAN_SCANNED_AT, build_last_scan
 
 TEST_BASE_ADDRESS = "http://127.0.0.1:8765"
 STATE_CHANGING_HEADERS = {"X-Requested-With": "digitalizadora"}
@@ -24,22 +25,24 @@ class StubScanService:
 
     def __init__(self) -> None:
         self.in_progress = False
+        self.start_refusal: Exception | None = None
         self.failure: Exception | None = None
         self.requests: list[ScanRequest] = []
 
     def is_scan_in_progress(self) -> bool:
         return self.in_progress
 
-    async def scan_one_file(self, request: ScanRequest) -> ScanResult:
+    def ensure_scan_can_start(self) -> None:
+        if self.start_refusal is not None:
+            raise self.start_refusal
+        if self.in_progress:
+            raise ScanAlreadyRunningError("A scan is already in progress")
+
+    async def scan_one_file(self, request: ScanRequest) -> LastScan:
         self.requests.append(request)
         if self.failure is not None:
             raise self.failure
-        return ScanResult(
-            output_path=Path("/Volumes/Scans/2026-10-13_00001.pdf"),
-            output_format=request.output_format,
-            scanned_at=SCANNED_AT,
-            size_in_bytes=1234,
-        )
+        return build_last_scan()
 
 
 class StubPrinterConnectionService:

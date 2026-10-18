@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
-from digitalizadora.domain.scan_result import ScanResult
+from digitalizadora.domain.last_scan import LastScan
 
 
 @dataclass(frozen=True)
 class StoredScan:
-    result: ScanResult
+    last_scan: LastScan
     thumbnail_jpeg: bytes

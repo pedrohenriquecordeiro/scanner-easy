@@ -1,3 +1,4 @@
+from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 
@@ -9,12 +10,13 @@ from digitalizadora.controllers.state_controller import StateController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.last_scan import SavedScanFile
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
-from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.services.application_state_service import ApplicationState, StorageState
 from tests.controllers.controller_test_support import SCANNED_AT, build_test_client
+from tests.fakes.stored_scans import build_last_scan
 from tests.fakes.stub_document_draft_service import (
     STUB_DRAFT_SESSION,
     StubDocumentDraftService,
@@ -34,20 +36,19 @@ AVAILABLE_STORAGE = StorageState(free_space_in_bytes=5_000_000_000, estimated_pa
 UNAVAILABLE_STORAGE = StorageState(
     free_space_in_bytes=0, estimated_pages_remaining=0, output_folder_available=False
 )
-LAST_RESULT = ScanResult(
-    output_path=Path("/Volumes/External/scans/2026-10-13_00007.pdf"),
-    output_format=OutputFormat.PDF,
+LAST_SCAN = replace(
+    build_last_scan((SavedScanFile("2026-10-13_00007.pdf", 734003, 1),)),
+    output_folder=Path("/Volumes/External/scans"),
     scanned_at=SCANNED_AT,
-    size_in_bytes=734003,
 )
 IDLE_SNAPSHOT = ScanProgressSnapshot(
-    phase=ScanPhase.IDLE, scans_completed=0, last_result=None, last_error_code=None
+    phase=ScanPhase.IDLE, scans_completed=0, last_scan=None, last_error_code=None
 )
 
 
 def build_failed_snapshot(error_code: str) -> ScanProgressSnapshot:
     return ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=0, last_result=None, last_error_code=error_code
+        phase=ScanPhase.IDLE, scans_completed=0, last_scan=None, last_error_code=error_code
     )
 
 
@@ -97,7 +98,7 @@ def test_state_reports_the_current_phase_and_counter(
     client: TestClient, state_service: StubApplicationStateService
 ) -> None:
     state_service.snapshot = ScanProgressSnapshot(
-        phase=ScanPhase.SCANNING, scans_completed=3, last_result=None, last_error_code=None
+        phase=ScanPhase.SCANNING, scans_completed=3, last_scan=None, last_error_code=None
     )
 
     body = client.get("/api/state").json()
@@ -109,17 +110,23 @@ def test_state_describes_the_last_result(
     client: TestClient, state_service: StubApplicationStateService
 ) -> None:
     state_service.snapshot = ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=7, last_result=LAST_RESULT, last_error_code=None
+        phase=ScanPhase.IDLE, scans_completed=7, last_scan=LAST_SCAN, last_error_code=None
     )
 
     body = client.get("/api/state").json()
 
     assert body["last_result"] == {
-        "file_name": "2026-10-13_00007.pdf",
+        "scan_identifier": "9f3c1a2b4d5e6f70",
+        "file_names": ["2026-10-13_00007.pdf"],
         "output_folder": "/Volumes/External/scans",
         "output_format": "pdf",
-        "size_in_bytes": 734003,
+        "total_size_in_bytes": 734003,
         "scanned_at": "2026-10-13T15:30:12-03:00",
+        "rotation_degrees": 0,
+        "crops": [],
+        "is_editable": True,
+        "file_name": "2026-10-13_00007.pdf",
+        "size_in_bytes": 734003,
     }
 
 
@@ -129,7 +136,7 @@ def test_state_reports_the_revision_of_the_last_result(
     state_service.snapshot = ScanProgressSnapshot(
         phase=ScanPhase.IDLE,
         scans_completed=7,
-        last_result=LAST_RESULT,
+        last_scan=LAST_SCAN,
         last_error_code=None,
         last_result_revision=9,
     )

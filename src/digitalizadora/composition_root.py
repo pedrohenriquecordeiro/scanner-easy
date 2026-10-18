@@ -1,5 +1,6 @@
 import functools
 import logging
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +31,7 @@ from digitalizadora.infrastructure.escl.escl_scanner_gateway import EsclGatewayT
 from digitalizadora.infrastructure.system_clock import SystemClock
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.file_system_document_draft_repository import FileSystemDocumentDraftRepository
+from digitalizadora.repositories.file_system_quick_scan_slot_repository import FileSystemQuickScanSlotRepository
 from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
 from digitalizadora.repositories.json_application_settings_repository import JsonApplicationSettingsRepository
 from digitalizadora.repositories.json_scanner_endpoint_repository import JsonScannerEndpointRepository
@@ -43,19 +45,18 @@ from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.document_page_crop_detector import DocumentPageCropDetector
 from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
-from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.image_pixel_limit import raise_decompression_limit_to_scanner_size
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.last_scan_rotation_service import LastScanRotationService, LastScanRotators
-from digitalizadora.services.master_jpeg_service import MasterJpegService
+from digitalizadora.services.last_scan_edit_service import LastScanEditParts, LastScanEditService
+from digitalizadora.services.last_scan_view_service import LastScanViewService
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
-from digitalizadora.services.scan_content_rotator import ScanContentRotator
+from digitalizadora.services.quick_scan_output_renderer import QuickScanOutputRenderer
 from digitalizadora.services.scan_encoder import ScanEncoder
-from digitalizadora.services.scan_output_service import ScanOutputService
+from digitalizadora.services.scan_output_service import ScanOutputParts, ScanOutputService
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_service import ScanService
 from digitalizadora.services.storage_guard_service import StorageGuardService, read_free_space_in_bytes
@@ -66,6 +67,8 @@ logger = logging.getLogger(__name__)
 SETTINGS_FILE_NAME = "settings.json"
 SCANNER_ENDPOINT_FILE_NAME = "scanner-endpoint.json"
 DRAFTS_FOLDER_NAME = "drafts"
+QUICK_SCAN_FOLDER_NAME = "quick-scan"
+SCAN_IDENTIFIER_SIZE_IN_BYTES = 8
 STATIC_DIRECTORY = Path(__file__).parent / "web" / "static"
 
 SCANNER_DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -97,6 +100,7 @@ class _Repositories:
     scanner_endpoint: JsonScannerEndpointRepository
     scan_output: FileSystemScanOutputRepository
     document_draft: FileSystemDocumentDraftRepository
+    quick_scan_slot: FileSystemQuickScanSlotRepository
 
 
 @dataclass(frozen=True)
@@ -108,14 +112,16 @@ class _ScannerAccess:
 
 @dataclass(frozen=True)
 class _SharedServices:
-    """A single clock, master JPEG service, scan encoder and storage guard for the whole container."""
+    """A single clock, scan encoder, renderers and storage guard for the whole container."""
 
     clock: Clock
     crop_detection: PageCropDetectionService
     image_view: PageImageViewService
-    master_jpeg_service: MasterJpegService
+    page_framing_renderer: PageFramingRenderer
     scan_encoder: ScanEncoder
+    output_renderer: QuickScanOutputRenderer
     storage_guard: StorageGuardService
+    thumbnail: ThumbnailService
 
 
 @dataclass(frozen=True)
@@ -126,7 +132,8 @@ class _Services:
     printer_connection: PrinterConnectionService
     progress_tracker: ScanProgressTracker
     document_draft: DocumentDraftService
-    last_scan_rotation: LastScanRotationService
+    last_scan_edit: LastScanEditService
+    last_scan_view: LastScanViewService
 
 
 def build_scanner_http_client(scanner_transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
@@ -162,6 +169,7 @@ def build_container(
     services = _build_services(repositories, scanner_access, shared_services)
     # Before the server answers (6.6.2); recover_draft never raises, so the server always starts.
     services.document_draft.recover_draft()
+    services.last_scan_edit.restore_after_start(repositories.settings.load().adjustment.jpeg_quality)
     _apply_scanner_address_override(configuration, services.printer_connection)
     error_message_catalog = ErrorMessageCatalog()
     return ApplicationContainer(
@@ -188,6 +196,9 @@ def _build_repositories(configuration: ApplicationConfiguration, clock: Clock) -
         scan_output=FileSystemScanOutputRepository(settings_repository, ScanFileNamingPolicy(), file_writer),
         document_draft=FileSystemDocumentDraftRepository(
             configuration.data_directory / DRAFTS_FOLDER_NAME, file_writer, clock
+        ),
+        quick_scan_slot=FileSystemQuickScanSlotRepository(
+            configuration.data_directory / QUICK_SCAN_FOLDER_NAME, file_writer, clock
         ),
     )
 
@@ -230,15 +241,18 @@ def _build_gateway_factory(scanner_access: _ScannerAccess) -> Callable[[ScannerE
 
 
 def _build_shared_services(clock: Clock, overrides: ContainerOverrides) -> _SharedServices:
-    crop_detection = PageCropDetectionService()
-    master_jpeg_service = MasterJpegService(ImageAdjustmentService(crop_detection), JpegResolutionService())
+    thumbnail_service = ThumbnailService()
+    page_framing_renderer = PageFramingRenderer()
+    scan_encoder = ScanEncoder(JpegResolutionService(), PdfAssemblyService(), thumbnail_service)
     return _SharedServices(
         clock=clock,
-        crop_detection=crop_detection,
+        crop_detection=PageCropDetectionService(),
         image_view=PageImageViewService(),
-        master_jpeg_service=master_jpeg_service,
-        scan_encoder=ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()),
+        page_framing_renderer=page_framing_renderer,
+        scan_encoder=scan_encoder,
+        output_renderer=QuickScanOutputRenderer(page_framing_renderer, scan_encoder),
         storage_guard=_build_storage_guard_service(overrides),
+        thumbnail=thumbnail_service,
     )
 
 
@@ -251,9 +265,14 @@ def _build_services(
         repositories.scanner_endpoint,
         _build_gateway_factory(scanner_access),
     )
-    scan_output_service = ScanOutputService(
-        shared_services.scan_encoder, repositories.scan_output, shared_services.storage_guard
+    scan_output_parts = ScanOutputParts(
+        scan_encoder=shared_services.scan_encoder,
+        output_renderer=shared_services.output_renderer,
+        crop_detection_service=shared_services.crop_detection,
+        storage_guard_service=shared_services.storage_guard,
+        scan_identifier_factory=functools.partial(secrets.token_hex, SCAN_IDENTIFIER_SIZE_IN_BYTES),
     )
+    scan_output_service = ScanOutputService(scan_output_parts, repositories.scan_output, repositories.quick_scan_slot)
     scan_service = ScanService(printer_connection_service, scan_output_service, progress_tracker)
     return _Services(
         scan=scan_service,
@@ -262,10 +281,18 @@ def _build_services(
         printer_connection=printer_connection_service,
         progress_tracker=progress_tracker,
         document_draft=_build_document_draft_service(repositories, shared_services, scan_service),
-        last_scan_rotation=LastScanRotationService(
+        last_scan_edit=LastScanEditService(
             progress_tracker,
-            repositories.scan_output,
-            LastScanRotators(ScanContentRotator(), shared_services.image_view),
+            LastScanEditParts(
+                slot_repository=repositories.quick_scan_slot,
+                scan_output_repository=repositories.scan_output,
+                output_renderer=shared_services.output_renderer,
+                crop_detection_service=shared_services.crop_detection,
+                thumbnail_service=shared_services.thumbnail,
+            ),
+        ),
+        last_scan_view=LastScanViewService(
+            progress_tracker, repositories.quick_scan_slot, shared_services.image_view
         ),
     )
 
@@ -302,9 +329,9 @@ def _build_controllers(services: _Services, error_message_catalog: ErrorMessageC
         state=StateController(services.state, services.document_draft, error_message_catalog),
         settings=SettingsController(services.settings, error_message_catalog),
         printer=PrinterController(services.printer_connection, error_message_catalog),
-        preview=PreviewController(services.progress_tracker),
+        preview=PreviewController(services.last_scan_view, error_message_catalog),
         document=DocumentController(services.document_draft, services.settings, error_message_catalog),
-        last_scan=LastScanController(services.last_scan_rotation, services.settings, error_message_catalog),
+        last_scan=LastScanController(services.last_scan_edit, services.settings, error_message_catalog),
     )
 
 

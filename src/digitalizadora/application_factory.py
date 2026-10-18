@@ -41,6 +41,8 @@ VALIDATION_ERROR_CODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"/api/document/name"), InvalidDocumentNameError.code),
     (re.compile(r"/api/document/pages/[^/]+/crops?(/detect)?"), InvalidCropError.code),
     (re.compile(r"/api/document/pages/[^/]+/(thumbnail|preview)"), InvalidPageRotationError.code),
+    (re.compile(r"/api/scans/last/crops"), InvalidCropError.code),
+    (re.compile(r"/api/scans/last/preview"), InvalidPageRotationError.code),
 )
 
 logger = logging.getLogger(__name__)

@@ -124,7 +124,7 @@ async def test_a_page_ends_idle_with_one_more_scan_and_no_quick_mode_result(
     await scan_service.scan_document_page(PAGE_REQUEST, page_destination)
 
     assert progress_tracker.snapshot() == ScanProgressSnapshot(
-        phase=ScanPhase.IDLE, scans_completed=1, last_result=None, last_error_code=None
+        phase=ScanPhase.IDLE, scans_completed=1, last_scan=None, last_error_code=None
     )
 
 
@@ -145,11 +145,11 @@ async def test_a_page_after_a_quick_scan_keeps_the_quick_mode_result(
     progress_tracker: ScanProgressTracker,
     page_destination: RecordingDocumentPageDestination,
 ) -> None:
-    quick_result = await scan_service.scan_one_file(PAGE_REQUEST)
+    quick_scan = await scan_service.scan_one_file(PAGE_REQUEST)
 
     await scan_service.scan_document_page(PAGE_REQUEST, page_destination)
 
-    assert progress_tracker.snapshot().last_result == quick_result
+    assert progress_tracker.snapshot().last_scan == quick_scan
 
 
 async def test_a_page_after_a_quick_scan_keeps_the_quick_mode_thumbnail(
@@ -203,7 +203,7 @@ async def test_destination_store_failure_is_recorded_with_its_code(
     assert progress_tracker.snapshot() == ScanProgressSnapshot(
         phase=ScanPhase.IDLE,
         scans_completed=0,
-        last_result=None,
+        last_scan=None,
         last_error_code="draft_storage_unavailable",
     )
 

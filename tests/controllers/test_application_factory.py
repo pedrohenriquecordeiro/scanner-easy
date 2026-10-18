@@ -27,12 +27,15 @@ from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scanner_route import ScannerRoute
 from digitalizadora.domain.scanner_status import ScannerState
 from digitalizadora.domain.stored_scan import StoredScan
+from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
+from digitalizadora.repositories.file_system_quick_scan_slot_repository import FileSystemQuickScanSlotRepository
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.application_state_service import ApplicationStateService
+from digitalizadora.services.last_scan_view_service import LastScanViewService
+from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.printer_connection_service import PrinterConnectionState
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.storage_guard_service import StorageGuardService
@@ -48,12 +51,13 @@ from tests.fakes.document_drafts import page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
 from tests.fakes.sample_images import build_sample_jpeg
+from tests.fakes.stored_scans import build_last_scan
 from tests.fakes.stub_document_draft_service import (
     STUB_DRAFT_SESSION,
     StubDocumentDraftService,
     build_stub_snapshot,
 )
-from tests.fakes.stub_last_scan_rotation_service import StubLastScanRotationService
+from tests.fakes.stub_last_scan_edit_service import StubLastScanEditService
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1:8765", "localhost:8765"})
 INDEX_HTML = "<!doctype html><title>Digitalizadora</title>"
@@ -99,7 +103,7 @@ class ApplicationParts:
     printer_service: StubPrinterConnectionService
     progress_tracker: ScanProgressTracker
     document_service: StubDocumentDraftService
-    last_scan_rotation_service: StubLastScanRotationService
+    last_scan_edit_service: StubLastScanEditService
 
 
 def build_application_parts() -> ApplicationParts:
@@ -109,8 +113,11 @@ def build_application_parts() -> ApplicationParts:
     scan_service = StubScanService()
     printer_service = StubPrinterConnectionService(CONNECTED_STATE)
     document_service = StubDocumentDraftService(build_stub_snapshot(2))
-    last_scan_rotation_service = StubLastScanRotationService()
+    last_scan_edit_service = StubLastScanEditService()
     storage_guard_service = StorageGuardService(lambda folder: FREE_SPACE_IN_BYTES)
+    # The routes of these tests never reach the master, so the slot folder is never touched.
+    slot_repository = FileSystemQuickScanSlotRepository(Path("/unused"), AtomicFileWriter(), FixedClock(SCANNED_AT))
+    last_scan_view_service = LastScanViewService(progress_tracker, slot_repository, PageImageViewService())
     controllers = ApplicationControllers(
         scan=ScanController(scan_service, settings_service, CATALOG),
         state=StateController(
@@ -120,12 +127,12 @@ def build_application_parts() -> ApplicationParts:
         ),
         settings=SettingsController(settings_service, CATALOG),
         printer=PrinterController(printer_service, CATALOG),
-        preview=PreviewController(progress_tracker),
+        preview=PreviewController(last_scan_view_service, CATALOG),
         document=DocumentController(document_service, settings_service, CATALOG),
-        last_scan=LastScanController(last_scan_rotation_service, settings_service, CATALOG),
+        last_scan=LastScanController(last_scan_edit_service, settings_service, CATALOG),
     )
     return ApplicationParts(
-        controllers, scan_service, printer_service, progress_tracker, document_service, last_scan_rotation_service
+        controllers, scan_service, printer_service, progress_tracker, document_service, last_scan_edit_service
     )
 
 
@@ -363,14 +370,8 @@ def test_thumbnail_is_served_after_a_stored_scan(
     client: TestClient, parts: ApplicationParts
 ) -> None:
     thumbnail_jpeg = build_sample_jpeg()
-    result = ScanResult(
-        output_path=Path("/Volumes/External/scans/2026-10-13_00001.jpg"),
-        output_format=OutputFormat.JPEG,
-        scanned_at=SCANNED_AT,
-        size_in_bytes=1234,
-    )
     parts.progress_tracker.begin_scan(ScanRequest(ScanPreset.PHOTO.settings, OutputFormat.JPEG))
-    parts.progress_tracker.mark_completed(StoredScan(result, thumbnail_jpeg))
+    parts.progress_tracker.mark_completed(StoredScan(build_last_scan(), thumbnail_jpeg))
 
     response = client.get("/api/scans/last/thumbnail")
 
@@ -527,12 +528,14 @@ def test_a_malformed_crop_does_not_reach_the_document_service(client: TestClient
     assert parts.document_service.calls == []
 
 
-def test_the_patterns_of_the_validation_codes_name_only_the_document_routes() -> None:
+def test_the_patterns_of_the_validation_codes_name_only_the_routes_with_a_body_or_a_query() -> None:
     assert [(pattern.pattern, code) for pattern, code in VALIDATION_ERROR_CODE_PATTERNS] == [
         ("/api/document/page-order", "invalid_page_order"),
         ("/api/document/name", "invalid_document_name"),
         ("/api/document/pages/[^/]+/crops?(/detect)?", "invalid_crop"),
         ("/api/document/pages/[^/]+/(thumbnail|preview)", "invalid_page_rotation"),
+        ("/api/scans/last/crops", "invalid_crop"),
+        ("/api/scans/last/preview", "invalid_page_rotation"),
     ]
 
 
@@ -552,7 +555,7 @@ def test_a_path_that_is_not_one_of_the_routes_keeps_the_settings_code(request_pa
 def test_the_last_scan_rotation_is_reachable_through_the_factory(client: TestClient, parts: ApplicationParts) -> None:
     response = client.post("/api/scans/last/rotation", headers=STATE_CHANGING_HEADERS)
 
-    assert (response.status_code, parts.last_scan_rotation_service.rotation_count) == (HTTPStatus.OK, 1)
+    assert (response.status_code, parts.last_scan_edit_service.calls) == (HTTPStatus.OK, ["rotate_clockwise"])
 
 
 def test_the_last_scan_rotation_without_the_required_header_is_rejected(
@@ -560,4 +563,46 @@ def test_the_last_scan_rotation_without_the_required_header_is_rejected(
 ) -> None:
     response = client.post("/api/scans/last/rotation")
 
-    assert (response.status_code, parts.last_scan_rotation_service.rotation_count) == (HTTPStatus.FORBIDDEN, 0)
+    assert (response.status_code, parts.last_scan_edit_service.calls) == (HTTPStatus.FORBIDDEN, [])
+
+
+def test_a_malformed_last_scan_crops_body_answers_the_code_of_the_route(client: TestClient) -> None:
+    response = client.put("/api/scans/last/crops", json={"crops": "whole"}, headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, response.json()["code"]) == (HTTPStatus.UNPROCESSABLE_ENTITY, "invalid_crop")
+
+
+def test_a_malformed_last_scan_crops_body_does_not_reach_the_service(
+    client: TestClient, parts: ApplicationParts
+) -> None:
+    client.put("/api/scans/last/crops", json={"crops": "whole"}, headers=STATE_CHANGING_HEADERS)
+
+    assert parts.last_scan_edit_service.calls == []
+
+
+def test_a_last_scan_preview_with_a_rotation_that_is_not_a_number_answers_the_code_of_the_route(
+    client: TestClient,
+) -> None:
+    response = client.get("/api/scans/last/preview?scan_identifier=9f3c1a2b4d5e6f70&rotation_degrees=abc")
+
+    assert (response.status_code, response.json()["code"]) == (HTTPStatus.UNPROCESSABLE_ENTITY, "invalid_page_rotation")
+
+
+def test_the_last_scan_crops_are_reachable_through_the_factory(client: TestClient, parts: ApplicationParts) -> None:
+    response = client.put("/api/scans/last/crops", json={"crops": []}, headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, parts.last_scan_edit_service.calls) == (HTTPStatus.OK, ["set_crops"])
+
+
+def test_the_last_scan_crops_without_the_required_header_are_rejected(
+    client: TestClient, parts: ApplicationParts
+) -> None:
+    response = client.put("/api/scans/last/crops", json={"crops": []})
+
+    assert (response.status_code, parts.last_scan_edit_service.calls) == (HTTPStatus.FORBIDDEN, [])
+
+
+def test_the_last_scan_detection_is_reachable_through_the_factory(client: TestClient, parts: ApplicationParts) -> None:
+    response = client.post("/api/scans/last/crops/detect", headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, parts.last_scan_edit_service.calls) == (HTTPStatus.OK, ["detect_crops"])

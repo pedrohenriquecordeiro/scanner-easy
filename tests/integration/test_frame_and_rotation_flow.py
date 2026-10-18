@@ -523,16 +523,33 @@ def test_a_quick_jpg_keeps_its_density_when_turned(configuration: ApplicationCon
     assert round(density[0]) == DOTS_PER_INCH
 
 
-def test_a_quick_pdf_only_gets_a_quarter_turn_on_its_page(configuration: ApplicationConfiguration) -> None:
+def read_pdf_page_size(pdf_path: Path) -> tuple[float, float]:
+    with pikepdf.open(pdf_path) as document:
+        return float(document.pages[0].mediabox[2]), float(document.pages[0].mediabox[3])
+
+
+def test_a_quick_pdf_is_written_again_turned_with_the_physical_size_swapped(
+    configuration: ApplicationConfiguration,
+) -> None:
+    with build_client(configuration, LidBackground.WHITE) as client:
+        scan_once(client, configuration, "pdf")
+        size_before = read_pdf_page_size(read_last_file(client))
+        response = rotate_last_scan(client)
+        size_after = read_pdf_page_size(read_last_file(client))
+    assert response.status_code == 200
+    assert size_after == pytest.approx(size_before[::-1], abs=1.0)
+
+
+def test_a_quick_pdf_turned_is_a_new_image_not_a_rotate_mark(configuration: ApplicationConfiguration) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         scan_once(client, configuration, "pdf")
         image_stream_before = read_pdf_image_stream(read_last_file(client))
-        response = rotate_last_scan(client)
+        rotate_last_scan(client)
         turned_file = read_last_file(client)
     with pikepdf.open(turned_file) as document:
         rotation = int(document.pages[0].obj.get("/Rotate", 0))
-    assert (response.status_code, rotation) == (200, 90)
-    assert read_pdf_image_stream(turned_file) == image_stream_before
+    assert rotation == 0
+    assert read_pdf_image_stream(turned_file) != image_stream_before
 
 
 def read_pdf_image_stream(pdf_path: Path) -> bytes:
@@ -540,14 +557,14 @@ def read_pdf_image_stream(pdf_path: Path) -> bytes:
         return next(iter(document.pages[0].get_images().values())).read_raw_bytes()
 
 
-def test_two_quick_turns_in_a_row_add_up_to_a_half_turn(configuration: ApplicationConfiguration) -> None:
+def test_two_quick_turns_in_a_row_bring_the_pdf_back_to_its_size(configuration: ApplicationConfiguration) -> None:
     with build_client(configuration, LidBackground.WHITE) as client:
         scan_once(client, configuration, "pdf")
+        size_before = read_pdf_page_size(read_last_file(client))
         rotate_last_scan(client)
         rotate_last_scan(client)
-        with pikepdf.open(read_last_file(client)) as document:
-            rotation = int(document.pages[0].obj.get("/Rotate", 0))
-    assert rotation == 180
+        size_after = read_pdf_page_size(read_last_file(client))
+    assert size_after == pytest.approx(size_before, abs=1.0)
 
 
 def test_turning_the_last_scan_raises_the_revision_and_turns_the_thumbnail(

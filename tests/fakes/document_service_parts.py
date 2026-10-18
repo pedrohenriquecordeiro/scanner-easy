@@ -26,9 +26,7 @@ from digitalizadora.services.document_page_capture import DocumentPageCapture
 from digitalizadora.services.document_page_crop_detector import DocumentPageCropDetector
 from digitalizadora.services.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.document_pdf_assembler import DocumentPdfAssembler
-from digitalizadora.services.image_adjustment_service import ImageAdjustmentService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.master_jpeg_service import MasterJpegService
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.page_image_view_service import PageImageViewService
@@ -189,9 +187,8 @@ def build_document_service_parts(
     )
     scan_service, gateway = _build_scan_service(clock, scanned_pages)
     crop_detection_service = PageCropDetectionService()
-    master_jpeg_service = MasterJpegService(ImageAdjustmentService(crop_detection_service), JpegResolutionService())
     page_capture = DocumentPageCapture(
-        ScanEncoder(master_jpeg_service, PdfAssemblyService(), ThumbnailService()),
+        ScanEncoder(JpegResolutionService(), PdfAssemblyService(), ThumbnailService()),
         draft_store,
         crop_detection_service,
     )

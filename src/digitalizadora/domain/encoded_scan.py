@@ -9,4 +9,3 @@ class EncodedScan:
     content: bytes
     output_format: OutputFormat
     created_at: datetime
-    thumbnail_jpeg: bytes

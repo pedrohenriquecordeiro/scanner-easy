@@ -1,9 +1,7 @@
 import logging
-from dataclasses import replace
 
 from digitalizadora.domain.document_draft import DocumentPage
 from digitalizadora.domain.errors import DigitalizadoraError
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_request import ScanRequest
@@ -38,16 +36,14 @@ class DocumentPageCapture:
         self._draft_store.ensure_capacity_for_page(request.settings)
 
     def store(self, scanned_image: ScannedImage, job: ScanJob) -> DocumentPage:
-        # DocumentDraftService always asks for JPEG: the encoded content is the normalised master JPEG.
-        unadjusted_job = replace(job, request=replace(job.request, adjustment=NO_ADJUSTMENT))
-        encoded_scan = self._scan_encoder.encode(scanned_image, unadjusted_job)
+        encoded_master = self._scan_encoder.encode_master(scanned_image, job)
         return self._draft_store.append_page(
             CapturedPage(
-                jpeg_content=encoded_scan.content,
-                thumbnail_jpeg=encoded_scan.thumbnail_jpeg,
+                jpeg_content=encoded_master.jpeg_content,
+                thumbnail_jpeg=encoded_master.thumbnail_jpeg,
                 scanned_at=job.started_at,
                 settings=job.request.settings,
-                framing=self._suggest_framing(encoded_scan.content, job),
+                framing=self._suggest_framing(encoded_master.jpeg_content, job),
             )
         )
 

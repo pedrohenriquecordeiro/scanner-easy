@@ -1,16 +1,13 @@
 from dataclasses import replace
 
-from digitalizadora.domain.errors import ScanAlreadyRunningError
+from digitalizadora.domain.errors import LastScanBusyError, ScanAlreadyRunningError
 from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.stored_scan import StoredScan
 
-INITIAL_SNAPSHOT = ScanProgressSnapshot(
-    phase=ScanPhase.IDLE, scans_completed=0, last_result=None, last_error_code=None
-)
+INITIAL_SNAPSHOT = ScanProgressSnapshot(phase=ScanPhase.IDLE, scans_completed=0, last_scan=None, last_error_code=None)
 
 
 class ScanProgressTracker:
@@ -25,10 +22,16 @@ class ScanProgressTracker:
         self._clock = clock
         self._snapshot = INITIAL_SNAPSHOT
         self._last_thumbnail_jpeg: bytes | None = None
+        self._is_last_scan_edit_running = False
 
-    def begin_scan(self, request: ScanRequest) -> ScanJob:
+    def ensure_scan_can_start(self) -> None:
         if self._snapshot.phase is not ScanPhase.IDLE:
             raise ScanAlreadyRunningError("A scan is already in progress")
+        if self._is_last_scan_edit_running:
+            raise LastScanBusyError("The last scan is being adjusted")
+
+    def begin_scan(self, request: ScanRequest) -> ScanJob:
+        self.ensure_scan_can_start()
         self._snapshot = replace(self._snapshot, phase=ScanPhase.PREPARING, last_error_code=None)
         return ScanJob(request=request, started_at=self._clock.now())
 
@@ -45,20 +48,36 @@ class ScanProgressTracker:
             self._snapshot,
             phase=ScanPhase.IDLE,
             scans_completed=self._snapshot.scans_completed + 1,
-            last_result=stored_scan.result,
+            last_scan=stored_scan.last_scan,
             last_result_revision=self._snapshot.last_result_revision + 1,
         )
 
-    def replace_last_scan(self, expected_result: ScanResult, replacement: StoredScan) -> None:
-        """Swaps the last scan for its turned version, unless a newer scan took its place meanwhile."""
-        if self._snapshot.last_result != expected_result:
+    def replace_last_scan(self, expected_scan_identifier: str, replacement: StoredScan) -> None:
+        """Swaps the last scan for its adjusted version, unless a newer scan took its place meanwhile."""
+        last_scan = self._snapshot.last_scan
+        if last_scan is None or last_scan.scan_identifier != expected_scan_identifier:
             return
         self._last_thumbnail_jpeg = replacement.thumbnail_jpeg
         self._snapshot = replace(
             self._snapshot,
-            last_result=replacement.result,
+            last_scan=replacement.last_scan,
             last_result_revision=self._snapshot.last_result_revision + 1,
         )
+
+    def restore_last_scan(self, stored_scan: StoredScan) -> None:
+        """Only at start-up: the last scan of a previous run comes back from its slot. It counts as no new scan."""
+        self._last_thumbnail_jpeg = stored_scan.thumbnail_jpeg
+        self._snapshot = replace(
+            self._snapshot,
+            last_scan=stored_scan.last_scan,
+            last_result_revision=self._snapshot.last_result_revision + 1,
+        )
+
+    def mark_last_scan_edit_started(self) -> None:
+        self._is_last_scan_edit_running = True
+
+    def mark_last_scan_edit_ended(self) -> None:
+        self._is_last_scan_edit_running = False
 
     def mark_failed(self, error_code: str) -> None:
         self._snapshot = replace(self._snapshot, phase=ScanPhase.IDLE, last_error_code=error_code)
@@ -71,7 +90,7 @@ class ScanProgressTracker:
 
     def mark_page_added(self) -> None:
         # A document page counts as a completed scan, but the quick-mode panel keeps its last file:
-        # last_result and the thumbnail stay, and begin_scan already cleared the error code.
+        # last_scan and the thumbnail stay, and begin_scan already cleared the error code.
         self._snapshot = replace(
             self._snapshot,
             phase=ScanPhase.IDLE,

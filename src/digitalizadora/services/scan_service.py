@@ -5,11 +5,11 @@ from contextlib import contextmanager
 
 from digitalizadora.domain.document_draft import DocumentPage
 from digitalizadora.domain.errors import DigitalizadoraError
+from digitalizadora.domain.last_scan import LastScan
 from digitalizadora.domain.ports import ScannerGatewayProvider
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_progress import ScanPhase
 from digitalizadora.domain.scan_request import ScanRequest
-from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.stored_scan import StoredScan
 from digitalizadora.services.scan_destination import ScanDestination
 from digitalizadora.services.scan_progress_tracker import ScanProgressTracker
@@ -33,13 +33,17 @@ class ScanService:
     def is_scan_in_progress(self) -> bool:
         return self._progress_tracker.snapshot().phase is not ScanPhase.IDLE
 
-    async def scan_one_file(self, request: ScanRequest) -> ScanResult:
+    def ensure_scan_can_start(self) -> None:
+        """ScanAlreadyRunningError during a scan, LastScanBusyError while the last scan is being adjusted."""
+        self._progress_tracker.ensure_scan_can_start()
+
+    async def scan_one_file(self, request: ScanRequest) -> LastScan:
         # Outside the with: a rejected second scan must not touch the state of the running one.
         job = self._progress_tracker.begin_scan(request)
         with self._recording_failures():
             stored_scan = await self._capture_and_store(job, self._scan_output_service)
             self._progress_tracker.mark_completed(stored_scan)
-        return stored_scan.result
+        return stored_scan.last_scan
 
     async def scan_document_page(
         self, request: ScanRequest, page_capture: ScanDestination[DocumentPage]

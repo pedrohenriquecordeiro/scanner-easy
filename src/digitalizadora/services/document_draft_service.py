@@ -80,7 +80,7 @@ class DocumentDraftService:
         return self._page_views.read_preview(page_identifier, rotation)
 
     def ensure_can_add_page(self) -> None:
-        self._ensure_no_scan_in_progress()
+        self._scan_service.ensure_scan_can_start()
         if self._lock.locked() or self._waiting_edit_count:
             raise DocumentBusyError("Another change to the document draft is in progress")
 
