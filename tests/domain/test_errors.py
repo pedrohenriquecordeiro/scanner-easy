@@ -35,6 +35,9 @@ from digitalizadora.domain import errors
         (errors.NoLastScanError, "no_last_scan"),
         (errors.LastScanFileMissingError, "last_scan_file_missing"),
         (errors.SavedScanUnreadableError, "saved_scan_unreadable"),
+        (errors.UnreadableQuickScanError, "saved_scan_unreadable"),
+        (errors.LastScanNotEditableError, "last_scan_not_editable"),
+        (errors.LastScanBusyError, "last_scan_busy"),
     ],
 )
 def test_error_class_exposes_its_code(

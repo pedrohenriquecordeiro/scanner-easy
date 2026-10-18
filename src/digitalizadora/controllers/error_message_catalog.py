@@ -76,16 +76,25 @@ ERROR_MESSAGES: Mapping[str, str] = MappingProxyType(
             "Feche outros programas e tente de novo."
         ),
         "image_adjustment_failed": (
-            "Não consegui cortar a imagem com a memória livre do Mac. "
-            "Escolha uma resolução menor, desligue o corte automático e tente de novo."
+            "Não consegui processar a imagem com a memória livre do Mac. "
+            "Escolha uma resolução menor e tente de novo."
         ),
-        "invalid_crop": "A moldura de corte é inválida. Ajuste e tente de novo.",
+        "invalid_crop": (
+            "A moldura de corte é inválida: ela precisa ser um quadrilátero sem pontas viradas, dentro da "
+            "página, e são no máximo 2 molduras. Ajuste e tente de novo."
+        ),
         "invalid_page_rotation": "Rotação inválida.",
-        "no_last_scan": "Ainda não há uma digitalização para girar.",
+        "no_last_scan": "Ainda não há uma digitalização para ajustar.",
         "last_scan_file_missing": "O arquivo da última digitalização não está mais na pasta de saída.",
         "saved_scan_unreadable": (
-            "Não consegui ler o arquivo da última digitalização para girá-lo. "
+            "Não consegui ler o original da última digitalização para ajustá-la. "
             "Veja o registro em ~/Library/Logs/Digitalizadora."
+        ),
+        "last_scan_busy": (
+            "A última digitalização está sendo ajustada. Aguarde um instante e tente de novo."
+        ),
+        "last_scan_not_editable": (
+            "O original desta digitalização não foi guardado, então ela não pode ser ajustada."
         ),
     }
 )

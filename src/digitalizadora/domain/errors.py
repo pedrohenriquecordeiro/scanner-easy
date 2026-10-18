@@ -123,6 +123,18 @@ class SavedScanUnreadableError(DigitalizadoraError):
     code = "saved_scan_unreadable"
 
 
+class UnreadableQuickScanError(SavedScanUnreadableError):
+    """The manifest or the master of the last quick scan cannot be used; the recovery sets the slot aside."""
+
+
+class LastScanNotEditableError(DigitalizadoraError):
+    code = "last_scan_not_editable"
+
+
+class LastScanBusyError(DigitalizadoraError):
+    code = "last_scan_busy"
+
+
 def as_draft_storage_error(error: DigitalizadoraError) -> DigitalizadoraError:
     """Translates a storage error raised for the draft folder, which lives on the internal disk."""
     if isinstance(error, InsufficientStorageError) and not isinstance(error, InsufficientDraftStorageError):

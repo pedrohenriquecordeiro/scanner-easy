@@ -30,6 +30,7 @@ DOCUMENT_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
     {
         "scan_already_running": HTTPStatus.CONFLICT,
         "document_busy": HTTPStatus.CONFLICT,
+        "last_scan_busy": HTTPStatus.CONFLICT,
         "damaged_document_page": HTTPStatus.CONFLICT,
         "no_open_document": HTTPStatus.NOT_FOUND,
         "page_not_found": HTTPStatus.NOT_FOUND,
