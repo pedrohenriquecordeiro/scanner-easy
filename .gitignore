@@ -1,7 +1,6 @@
 .venv/
 __pycache__/
-*.pyc
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
-*.egg-info/
 .DS_Store
