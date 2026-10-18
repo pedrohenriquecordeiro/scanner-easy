@@ -51,6 +51,7 @@ class StubDocumentDraftService:
         self.crop_detected = True
         self.thumbnails: dict[str, bytes] = {}
         self.previews: dict[str, bytes] = {}
+        self.read_thumbnail_failure: Exception | None = None
         self.calls: list[str] = []
         self.received_arguments: dict[str, object] = {}
 
@@ -68,6 +69,8 @@ class StubDocumentDraftService:
 
     def read_thumbnail(self, page_identifier: str, rotation: PageRotation) -> bytes | None:
         self.received_arguments["read_thumbnail"] = (page_identifier, rotation)
+        if self.read_thumbnail_failure is not None:
+            raise self.read_thumbnail_failure
         return self.thumbnails.get(page_identifier)
 
     def read_preview(self, page_identifier: str, rotation: PageRotation) -> bytes:

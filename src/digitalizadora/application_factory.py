@@ -1,10 +1,10 @@
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+import re
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
-from types import MappingProxyType
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -24,16 +24,22 @@ from digitalizadora.controllers.printer_controller import PrinterController
 from digitalizadora.controllers.scan_controller import ScanController
 from digitalizadora.controllers.settings_controller import SettingsController
 from digitalizadora.controllers.state_controller import StateController
-from digitalizadora.domain.errors import InvalidDocumentNameError, InvalidPageOrderError, InvalidSettingsError
+from digitalizadora.domain.errors import (
+    InvalidCropError,
+    InvalidDocumentNameError,
+    InvalidPageOrderError,
+    InvalidPageRotationError,
+    InvalidSettingsError,
+)
 
 INDEX_FILE_NAME = "index.html"
 STATIC_ROUTE = "/static"
-# R11: a malformed body on these routes answers the code of the route; any other path keeps invalid_settings.
-VALIDATION_ERROR_CODES_BY_PATH: Mapping[str, str] = MappingProxyType(
-    {
-        "/api/document/page-order": InvalidPageOrderError.code,
-        "/api/document/name": InvalidDocumentNameError.code,
-    }
+# R11: a malformed body or query on these routes answers the code of the route; any other path keeps invalid_settings.
+VALIDATION_ERROR_CODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"/api/document/page-order"), InvalidPageOrderError.code),
+    (re.compile(r"/api/document/name"), InvalidDocumentNameError.code),
+    (re.compile(r"/api/document/pages/[^/]+/crop"), InvalidCropError.code),
+    (re.compile(r"/api/document/pages/[^/]+/(thumbnail|preview)"), InvalidPageRotationError.code),
 )
 
 logger = logging.getLogger(__name__)
@@ -57,6 +63,13 @@ class WebInterfaceConfiguration:
     shutdown_callbacks: tuple[Callable[[], Awaitable[None]], ...] = ()
 
 
+def find_validation_error_code(request_path: str) -> str:
+    for path_pattern, error_code in VALIDATION_ERROR_CODE_PATTERNS:
+        if path_pattern.fullmatch(request_path):
+            return error_code
+    return InvalidSettingsError.code
+
+
 class ErrorResponses:
     """Exception handlers that keep every error answer in the {"code", "message"} shape."""
 
@@ -71,7 +84,7 @@ class ErrorResponses:
     async def respond_to_invalid_body(
         self, request: Request, error: RequestValidationError
     ) -> JSONResponse:
-        error_code = VALIDATION_ERROR_CODES_BY_PATH.get(request.url.path, InvalidSettingsError.code)
+        error_code = find_validation_error_code(request.url.path)
         return JSONResponse(
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
             content=build_error_body(self._error_message_catalog, error_code),

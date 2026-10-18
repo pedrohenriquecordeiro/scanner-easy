@@ -9,10 +9,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from digitalizadora.application_factory import (
-    VALIDATION_ERROR_CODES_BY_PATH,
+    VALIDATION_ERROR_CODE_PATTERNS,
     ApplicationControllers,
     WebInterfaceConfiguration,
     create_application,
+    find_validation_error_code,
 )
 from digitalizadora.controllers.document_controller import DocumentController
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
@@ -461,8 +462,73 @@ def test_malformed_body_does_not_reach_the_document_service(client: TestClient, 
     assert parts.document_service.calls == []
 
 
-def test_validation_codes_by_path_cover_only_the_two_document_bodies() -> None:
-    assert dict(VALIDATION_ERROR_CODES_BY_PATH) == {
-        "/api/document/page-order": "invalid_page_order",
-        "/api/document/name": "invalid_document_name",
-    }
+CROP_PATH = f"/api/document/pages/{page_identifier_at(1)}/crop"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"crop": {}},
+        {"crop": "whole"},
+        {"crop": {"left": 0, "top": 0, "right": 1}},
+        {"crop": {"left": "0", "top": 0, "right": 1, "bottom": 1}},
+        {"crop": {"left": True, "top": 0, "right": 1, "bottom": 1}},
+        {"crop": [0, 0, 1, 1]},
+    ],
+    ids=["empty", "empty-crop", "text", "missing-edge", "edge-as-text", "edge-as-boolean", "list"],
+)
+def test_malformed_crop_answers_the_code_of_the_route(client: TestClient, body: dict[str, object]) -> None:
+    response = client.put(CROP_PATH, json=body, headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        {"code": "invalid_crop", "message": CATALOG.message_for("invalid_crop")},
+    )
+
+
+def test_a_crop_body_that_is_not_json_answers_the_code_of_the_route(client: TestClient) -> None:
+    response = client.put(CROP_PATH, content=b"not json", headers=STATE_CHANGING_HEADERS)
+
+    assert (response.status_code, response.json()["code"]) == (HTTPStatus.UNPROCESSABLE_ENTITY, "invalid_crop")
+
+
+@pytest.mark.parametrize("view", ["thumbnail", "preview"])
+@pytest.mark.parametrize("rotation_degrees", ["abc", "", "9.5"])
+def test_a_rotation_that_is_not_a_number_answers_the_code_of_the_route(
+    client: TestClient, view: str, rotation_degrees: str
+) -> None:
+    response = client.get(f"/api/document/pages/{page_identifier_at(1)}/{view}?rotation_degrees={rotation_degrees}")
+
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        {"code": "invalid_page_rotation", "message": CATALOG.message_for("invalid_page_rotation")},
+    )
+
+
+def test_a_malformed_crop_does_not_reach_the_document_service(client: TestClient, parts: ApplicationParts) -> None:
+    client.put(CROP_PATH, json={"crop": "whole"}, headers=STATE_CHANGING_HEADERS)
+
+    assert parts.document_service.calls == []
+
+
+def test_the_patterns_of_the_validation_codes_name_only_the_document_routes() -> None:
+    assert [(pattern.pattern, code) for pattern, code in VALIDATION_ERROR_CODE_PATTERNS] == [
+        ("/api/document/page-order", "invalid_page_order"),
+        ("/api/document/name", "invalid_document_name"),
+        ("/api/document/pages/[^/]+/crop", "invalid_crop"),
+        ("/api/document/pages/[^/]+/(thumbnail|preview)", "invalid_page_rotation"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "request_path",
+    [
+        "/api/document/pages/last/crop/detect",
+        "/api/document/pages/a/b/crop",
+        "/api/document/pages//crop",
+        "/api/settings",
+    ],
+)
+def test_a_path_that_is_not_one_of_the_routes_keeps_the_settings_code(request_path: str) -> None:
+    assert find_validation_error_code(request_path) == "invalid_settings"

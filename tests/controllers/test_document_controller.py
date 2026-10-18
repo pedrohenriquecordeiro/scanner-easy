@@ -25,8 +25,10 @@ from digitalizadora.domain.errors import (
     ImageAdjustmentFailedError,
     InsufficientDraftStorageError,
     InsufficientStorageError,
+    InvalidCropError,
     InvalidDocumentNameError,
     InvalidPageOrderError,
+    InvalidPageRotationError,
     NoOpenDocumentError,
     OutputFolderUnavailableError,
     PageNotFoundError,
@@ -35,6 +37,8 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
+from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
@@ -72,6 +76,8 @@ EDIT_REQUESTS = [
     EditRequest("DELETE", "/api/document/pages/last"),
     EditRequest("DELETE", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}"),
     EditRequest("POST", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/rotation"),
+    EditRequest("PUT", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop", {"crop": None}),
+    EditRequest("POST", f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop/detect"),
     EditRequest("PUT", "/api/document/page-order", {"page_identifiers": REVERSED_PAGE_ORDER}),
     EditRequest("PUT", "/api/document/name", {"name": "Contrato"}),
     EditRequest("POST", "/api/document/finalize"),
@@ -462,6 +468,8 @@ def test_error_statuses_cover_the_documented_codes() -> None:
         "page_not_found": 404,
         "invalid_page_order": 422,
         "invalid_document_name": 422,
+        "invalid_crop": 422,
+        "invalid_page_rotation": 422,
         "empty_document": 422,
         "output_folder_unavailable": 503,
         "draft_storage_unavailable": 503,
@@ -520,15 +528,281 @@ def test_rotate_page_of_a_damaged_page_names_the_page(
     assert (response.status_code, response.json()["page_identifier"]) == (HTTPStatus.CONFLICT, SECOND_PAGE_IDENTIFIER)
 
 
-def test_rotation_failing_for_lack_of_memory_says_to_choose_a_lower_resolution(
+def test_rotation_is_a_post_only_route(client: TestClient) -> None:
+    assert client.get(ROTATION_PATH).status_code == HTTPStatus.METHOD_NOT_ALLOWED
+
+
+CROP_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop"
+DETECT_PATH = f"{CROP_PATH}/detect"
+SAMPLE_CROP_BODY = {"crop": {"left": 0.125, "top": 0.115, "right": 0.9, "bottom": 0.925}}
+CROP_FAILURES = [
+    ExpectedFailure(ScanAlreadyRunningError("scan running"), HTTPStatus.CONFLICT),
+    ExpectedFailure(DocumentBusyError("another change"), HTTPStatus.CONFLICT),
+    ExpectedFailure(NoOpenDocumentError("no draft"), HTTPStatus.NOT_FOUND),
+    ExpectedFailure(PageNotFoundError("not in the draft"), HTTPStatus.NOT_FOUND),
+    ExpectedFailure(DamagedDocumentPageError(SECOND_PAGE_IDENTIFIER, 2), HTTPStatus.CONFLICT),
+    ExpectedFailure(DraftStorageUnavailableError("disk unreadable"), HTTPStatus.SERVICE_UNAVAILABLE),
+    ExpectedFailure(InsufficientDraftStorageError("disk full"), HTTPStatus.INSUFFICIENT_STORAGE),
+]
+
+
+def test_set_page_crop_passes_the_identifier_and_the_crop(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.put(CROP_PATH, json=SAMPLE_CROP_BODY)
+
+    assert document_service.received_arguments["set_page_crop"] == (
+        SECOND_PAGE_IDENTIFIER,
+        PageCrop(0.125, 0.115, 0.9, 0.925),
+    )
+
+
+def test_set_page_crop_with_null_removes_the_crop(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.put(CROP_PATH, json={"crop": None})
+
+    assert document_service.received_arguments["set_page_crop"] == (SECOND_PAGE_IDENTIFIER, None)
+
+
+def test_set_page_crop_accepts_whole_numbers_as_edges(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.put(CROP_PATH, json={"crop": {"left": 0, "top": 0, "right": 1, "bottom": 1}})
+
+    assert document_service.received_arguments["set_page_crop"] == (
+        SECOND_PAGE_IDENTIFIER,
+        PageCrop(0.0, 0.0, 1.0, 1.0),
+    )
+
+
+def test_set_page_crop_rounds_the_edges_to_six_digits(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.put(CROP_PATH, json={"crop": {"left": 0.12345678, "top": 0, "right": 0.9, "bottom": 1}})
+
+    assert document_service.received_arguments["set_page_crop"][1].left == 0.123457
+
+
+def test_set_page_crop_answers_the_body_after_the_edit(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.snapshot_after_edit = build_stub_snapshot(3)
+
+    response = client.put(CROP_PATH, json=SAMPLE_CROP_BODY)
+
+    assert (response.status_code, response.json()) == (HTTPStatus.OK, build_document_body(build_stub_snapshot(3)))
+
+
+@pytest.mark.parametrize(
+    "invalid_crop",
+    [
+        {"left": -0.1, "top": 0, "right": 1, "bottom": 1},
+        {"left": 0, "top": 0, "right": 1.1, "bottom": 1},
+        {"left": 0.6, "top": 0, "right": 0.4, "bottom": 1},
+        {"left": 0.5, "top": 0, "right": 0.5, "bottom": 1},
+        {"left": 0, "top": 0, "right": 0.01, "bottom": 1},
+        {"left": 0, "top": 0.9, "right": 1, "bottom": 0.91},
+    ],
+    ids=["negative", "beyond-one", "reversed", "empty-width", "too-narrow", "too-short"],
+)
+def test_set_page_crop_with_an_invalid_rectangle_answers_422(
+    client: TestClient, document_service: StubDocumentDraftService, invalid_crop: dict[str, float]
+) -> None:
+    response = client.put(CROP_PATH, json={"crop": invalid_crop})
+
+    assert (response.status_code, response.json()) == build_error_answer(
+        InvalidCropError("x"), HTTPStatus.UNPROCESSABLE_ENTITY
+    )
+    assert document_service.calls == []
+
+
+def test_set_page_crop_with_an_edge_that_is_not_a_number_answers_422(client: TestClient) -> None:
+    response = client.put(
+        CROP_PATH,
+        content=b'{"crop": {"left": NaN, "top": 0, "right": 1, "bottom": 1}}',
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert (response.status_code, response.json()["code"]) == (HTTPStatus.UNPROCESSABLE_ENTITY, "invalid_crop")
+
+
+@pytest.mark.parametrize("expected_failure", CROP_FAILURES, ids=describe_expected_failure)
+def test_set_page_crop_answers_the_documented_errors(
+    client: TestClient, document_service: StubDocumentDraftService, expected_failure: ExpectedFailure
+) -> None:
+    document_service.failure = expected_failure.error
+
+    response = client.put(CROP_PATH, json=SAMPLE_CROP_BODY)
+
+    assert response.status_code == expected_failure.status
+    assert response.json()["code"] == expected_failure.error.code
+
+
+def test_set_page_crop_is_a_put_only_route(client: TestClient) -> None:
+    assert client.post(CROP_PATH, json=SAMPLE_CROP_BODY).status_code == HTTPStatus.METHOD_NOT_ALLOWED
+
+
+def test_detect_page_crop_passes_the_identifier_of_the_path(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.post(DETECT_PATH)
+
+    assert document_service.received_arguments["detect_page_crop"] == SECOND_PAGE_IDENTIFIER
+
+
+@pytest.mark.parametrize("crop_detected", [True, False])
+def test_detect_page_crop_says_whether_it_found_a_crop(
+    client: TestClient, document_service: StubDocumentDraftService, crop_detected: bool
+) -> None:
+    document_service.crop_detected = crop_detected
+
+    assert client.post(DETECT_PATH).json()["crop_detected"] is crop_detected
+
+
+def test_detect_page_crop_answers_the_document_body_with_the_flag(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.snapshot_after_edit = build_stub_snapshot(3)
+
+    response = client.post(DETECT_PATH)
+
+    assert (response.status_code, response.json()) == (
+        HTTPStatus.OK,
+        {**build_document_body(build_stub_snapshot(3)), "crop_detected": True},
+    )
+
+
+@pytest.mark.parametrize("expected_failure", CROP_FAILURES, ids=describe_expected_failure)
+def test_detect_page_crop_answers_the_documented_errors(
+    client: TestClient, document_service: StubDocumentDraftService, expected_failure: ExpectedFailure
+) -> None:
+    document_service.failure = expected_failure.error
+
+    response = client.post(DETECT_PATH)
+
+    assert response.status_code == expected_failure.status
+    assert response.json()["code"] == expected_failure.error.code
+
+
+def test_detect_page_crop_without_memory_answers_the_adjustment_failure(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
     document_service.failure = ImageAdjustmentFailedError("out of memory")
 
-    message = client.post(ROTATION_PATH).json()["message"]
+    response = client.post(DETECT_PATH)
 
-    assert "resolução menor" in message
+    assert (response.status_code, response.json()["code"]) == (
+        HTTPStatus.INTERNAL_SERVER_ERROR,
+        "image_adjustment_failed",
+    )
 
 
-def test_rotation_is_a_post_only_route(client: TestClient) -> None:
-    assert client.get(ROTATION_PATH).status_code == HTTPStatus.METHOD_NOT_ALLOWED
+def test_detect_page_crop_of_a_damaged_page_names_the_page(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.failure = DamagedDocumentPageError(SECOND_PAGE_IDENTIFIER, 2)
+
+    assert client.post(DETECT_PATH).json()["page_identifier"] == SECOND_PAGE_IDENTIFIER
+
+
+def test_detect_page_crop_is_a_post_only_route(client: TestClient) -> None:
+    assert client.get(DETECT_PATH).status_code == HTTPStatus.METHOD_NOT_ALLOWED
+
+
+THUMBNAIL_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/thumbnail"
+PREVIEW_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/preview"
+
+
+def test_thumbnail_without_a_rotation_asks_for_the_page_as_scanned(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.get(THUMBNAIL_PATH)
+
+    assert document_service.received_arguments["read_thumbnail"] == (SECOND_PAGE_IDENTIFIER, PageRotation.NONE)
+
+
+@pytest.mark.parametrize("rotation", list(PageRotation))
+def test_thumbnail_passes_the_rotation_of_the_query(
+    client: TestClient, document_service: StubDocumentDraftService, rotation: PageRotation
+) -> None:
+    client.get(f"{THUMBNAIL_PATH}?rotation_degrees={rotation.value}")
+
+    assert document_service.received_arguments["read_thumbnail"] == (SECOND_PAGE_IDENTIFIER, rotation)
+
+
+@pytest.mark.parametrize("rotation_degrees", [45, 360, -90, 91])
+@pytest.mark.parametrize("path", [THUMBNAIL_PATH, PREVIEW_PATH])
+def test_a_rotation_outside_the_four_quarters_answers_422(client: TestClient, path: str, rotation_degrees: int) -> None:
+    response = client.get(f"{path}?rotation_degrees={rotation_degrees}")
+
+    assert (response.status_code, response.json()) == build_error_answer(
+        InvalidPageRotationError("x"), HTTPStatus.UNPROCESSABLE_ENTITY
+    )
+
+
+def test_a_thumbnail_that_cannot_be_turned_answers_the_damaged_page(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.thumbnails[SECOND_PAGE_IDENTIFIER] = build_sample_jpeg()
+    document_service.read_thumbnail_failure = DamagedDocumentPageError(SECOND_PAGE_IDENTIFIER, 2)
+
+    response = client.get(f"{THUMBNAIL_PATH}?rotation_degrees=90")
+
+    assert (response.status_code, response.json()["page_identifier"]) == (HTTPStatus.CONFLICT, SECOND_PAGE_IDENTIFIER)
+
+
+def test_preview_is_served_as_jpeg(client: TestClient, document_service: StubDocumentDraftService) -> None:
+    preview_jpeg = build_sample_jpeg()
+    document_service.previews[SECOND_PAGE_IDENTIFIER] = preview_jpeg
+
+    response = client.get(PREVIEW_PATH)
+
+    assert (response.status_code, response.headers["content-type"], response.content) == (
+        HTTPStatus.OK,
+        "image/jpeg",
+        preview_jpeg,
+    )
+
+
+def test_preview_may_be_cached_forever(client: TestClient, document_service: StubDocumentDraftService) -> None:
+    document_service.previews[SECOND_PAGE_IDENTIFIER] = build_sample_jpeg()
+
+    response = client.get(PREVIEW_PATH)
+
+    assert response.headers["cache-control"] == "private, max-age=31536000, immutable"
+
+
+@pytest.mark.parametrize("rotation", list(PageRotation))
+def test_preview_passes_the_rotation_of_the_query(
+    client: TestClient, document_service: StubDocumentDraftService, rotation: PageRotation
+) -> None:
+    document_service.previews[SECOND_PAGE_IDENTIFIER] = build_sample_jpeg()
+
+    client.get(f"{PREVIEW_PATH}?rotation_degrees={rotation.value}")
+
+    assert document_service.received_arguments["read_preview"] == (SECOND_PAGE_IDENTIFIER, rotation)
+
+
+@pytest.mark.parametrize("expected_failure", CROP_FAILURES, ids=describe_expected_failure)
+def test_preview_answers_the_documented_errors(
+    client: TestClient, document_service: StubDocumentDraftService, expected_failure: ExpectedFailure
+) -> None:
+    document_service.failure = expected_failure.error
+
+    response = client.get(PREVIEW_PATH)
+
+    assert response.status_code == expected_failure.status
+    assert response.json()["code"] == expected_failure.error.code
+
+
+def test_preview_of_a_damaged_page_names_the_page(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.failure = DamagedDocumentPageError(SECOND_PAGE_IDENTIFIER, 2)
+
+    assert client.get(PREVIEW_PATH).json()["page_identifier"] == SECOND_PAGE_IDENTIFIER
+
+
+def test_preview_is_a_get_only_route(client: TestClient) -> None:
+    assert client.post(PREVIEW_PATH).status_code == HTTPStatus.METHOD_NOT_ALLOWED

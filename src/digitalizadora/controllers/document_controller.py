@@ -6,12 +6,18 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictFloat, StrictInt
 
 from digitalizadora.controllers.document_body import build_document_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
 from digitalizadora.domain.application_settings import ApplicationSettings
-from digitalizadora.domain.errors import DamagedDocumentPageError, DigitalizadoraError
+from digitalizadora.domain.errors import (
+    DamagedDocumentPageError,
+    DigitalizadoraError,
+    InvalidCropError,
+    InvalidPageRotationError,
+)
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.document_draft_service import DocumentDraftService
@@ -28,6 +34,8 @@ DOCUMENT_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
         "page_not_found": HTTPStatus.NOT_FOUND,
         "invalid_page_order": HTTPStatus.UNPROCESSABLE_ENTITY,
         "invalid_document_name": HTTPStatus.UNPROCESSABLE_ENTITY,
+        "invalid_crop": HTTPStatus.UNPROCESSABLE_ENTITY,
+        "invalid_page_rotation": HTTPStatus.UNPROCESSABLE_ENTITY,
         "empty_document": HTTPStatus.UNPROCESSABLE_ENTITY,
         "output_folder_unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
         "draft_storage_unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
@@ -35,10 +43,36 @@ DOCUMENT_ERROR_STATUSES: Mapping[str, HTTPStatus] = MappingProxyType(
         "insufficient_draft_storage": HTTPStatus.INSUFFICIENT_STORAGE,
     }
 )
-# A page identifier is never reused, so its thumbnail never changes.
+# A page identifier is never reused and a page file never changes, so the thumbnail and the enlarged view are a
+# pure function of the page and the rotation in the address.
 THUMBNAIL_CACHE_HEADERS: Mapping[str, str] = MappingProxyType(
     {"Cache-Control": "private, max-age=31536000, immutable"}
 )
+
+
+class PageCropEdgesRequestBody(BaseModel):
+    left: StrictInt | StrictFloat
+    top: StrictInt | StrictFloat
+    right: StrictInt | StrictFloat
+    bottom: StrictInt | StrictFloat
+
+
+class PageCropRequestBody(BaseModel):
+    """{"crop": null} removes the crop; the edges are fractions of the page as it is displayed."""
+
+    crop: PageCropEdgesRequestBody | None
+
+    def to_page_crop(self) -> PageCrop | None:
+        if self.crop is None:
+            return None
+        return PageCrop.rounded((self.crop.left, self.crop.top, self.crop.right, self.crop.bottom))
+
+
+def parse_page_rotation(rotation_degrees: int) -> PageRotation:
+    try:
+        return PageRotation(rotation_degrees)
+    except ValueError as error:
+        raise InvalidPageRotationError(f"Unsupported page rotation: {rotation_degrees!r}") from error
 
 
 class PageOrderRequestBody(BaseModel):
@@ -70,7 +104,12 @@ class DocumentController:
         router.add_api_route(
             "/api/document/pages/{page_identifier}/thumbnail", self.read_thumbnail, methods=["GET"]
         )
+        router.add_api_route("/api/document/pages/{page_identifier}/preview", self.read_preview, methods=["GET"])
         router.add_api_route("/api/document/pages/{page_identifier}/rotation", self.rotate_page, methods=["POST"])
+        router.add_api_route("/api/document/pages/{page_identifier}/crop", self.set_page_crop, methods=["PUT"])
+        router.add_api_route(
+            "/api/document/pages/{page_identifier}/crop/detect", self.detect_page_crop, methods=["POST"]
+        )
         router.add_api_route("/api/document/page-order", self.reorder_pages, methods=["PUT"])
         router.add_api_route("/api/document/name", self.rename_document, methods=["PUT"])
         router.add_api_route("/api/document/finalize", self.finalize_document, methods=["POST"])
@@ -98,11 +137,40 @@ class DocumentController:
     async def rotate_page(self, page_identifier: str) -> JSONResponse:
         return await self._respond_to_edit(self._document_draft_service.rotate_page(page_identifier))
 
-    def read_thumbnail(self, page_identifier: str) -> Response:
-        thumbnail_jpeg = self._document_draft_service.read_thumbnail(page_identifier, PageRotation.NONE)
+    async def set_page_crop(self, page_identifier: str, body: PageCropRequestBody) -> JSONResponse:
+        try:
+            crop = body.to_page_crop()
+        except InvalidCropError as error:
+            return self._respond_to_error(error)
+        return await self._respond_to_edit(self._document_draft_service.set_page_crop(page_identifier, crop))
+
+    async def detect_page_crop(self, page_identifier: str) -> JSONResponse:
+        try:
+            detection = await self._document_draft_service.detect_page_crop(page_identifier)
+        except DigitalizadoraError as error:
+            return self._respond_to_error(error)
+        body = build_document_body(self._document_draft_service.snapshot())
+        return JSONResponse(content={**body, "crop_detected": detection.crop_detected})
+
+    def read_thumbnail(self, page_identifier: str, rotation_degrees: int = 0) -> Response:
+        try:
+            thumbnail_jpeg = self._document_draft_service.read_thumbnail(
+                page_identifier, parse_page_rotation(rotation_degrees)
+            )
+        except DigitalizadoraError as error:
+            return self._respond_to_error(error)
         if thumbnail_jpeg is None:
             return Response(status_code=HTTPStatus.NOT_FOUND)
         return Response(content=thumbnail_jpeg, media_type=JPEG_MEDIA_TYPE, headers=dict(THUMBNAIL_CACHE_HEADERS))
+
+    def read_preview(self, page_identifier: str, rotation_degrees: int = 0) -> Response:
+        try:
+            preview_jpeg = self._document_draft_service.read_preview(
+                page_identifier, parse_page_rotation(rotation_degrees)
+            )
+        except DigitalizadoraError as error:
+            return self._respond_to_error(error)
+        return Response(content=preview_jpeg, media_type=JPEG_MEDIA_TYPE, headers=dict(THUMBNAIL_CACHE_HEADERS))
 
     async def reorder_pages(self, body: PageOrderRequestBody) -> JSONResponse:
         return await self._respond_to_edit(self._document_draft_service.reorder(body.page_identifiers))
