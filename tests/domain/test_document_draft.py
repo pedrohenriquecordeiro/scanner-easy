@@ -21,11 +21,11 @@ from digitalizadora.domain.document_draft import (
 )
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, build_document_page
+from tests.fakes.page_crops import rectangle
 
 FIRST = "0000000000000001"
 SECOND = "0000000000000002"
@@ -286,7 +286,7 @@ def test_generate_draft_session_returns_sixteen_lowercase_hexadecimal_digits() -
     assert re.fullmatch(r"[0-9a-f]{16}", generate_draft_session()) is not None
 
 
-FRAMING = PageFraming(rotation=PageRotation.CLOCKWISE_90, crop=RectangleCrop(0.1, 0.2, 0.5, 0.9))
+FRAMING = PageFraming(rotation=PageRotation.CLOCKWISE_90, crops=(rectangle(0.1, 0.2, 0.5, 0.9),))
 
 
 def test_a_page_starts_unframed() -> None:
@@ -324,6 +324,21 @@ def test_with_page_framing_keeps_the_name_and_creation_moment(draft: DocumentDra
     named_draft = draft.renamed("Contrato").with_page_framing(FIRST, FRAMING)
 
     assert (named_draft.name, named_draft.created_at) == ("Contrato", draft.created_at)
+
+
+TWO_PHOTOS = PageFraming(crops=(rectangle(0.05, 0.1, 0.45, 0.9), rectangle(0.55, 0.1, 0.95, 0.9)))
+
+
+def test_a_draft_without_crops_has_as_many_output_pages_as_pages(draft: DocumentDraft) -> None:
+    assert draft.output_page_count == 3
+
+
+def test_a_page_with_two_crops_gives_two_output_pages(draft: DocumentDraft) -> None:
+    assert draft.with_page_framing(SECOND, TWO_PHOTOS).output_page_count == 4
+
+
+def test_a_page_with_one_crop_gives_one_output_page(draft: DocumentDraft) -> None:
+    assert draft.with_page_framing(SECOND, FRAMING).output_page_count == 3
 
 
 def test_the_estimated_document_size_counts_a_page_without_framing_once() -> None:

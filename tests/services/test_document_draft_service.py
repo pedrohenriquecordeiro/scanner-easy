@@ -25,7 +25,6 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import WHOLE_PAGE, RectangleCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
@@ -40,9 +39,12 @@ from tests.fakes.document_service_parts import (
     DocumentServiceParts,
     build_document_service_parts,
 )
+from tests.fakes.page_crops import rectangle
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.synthetic_scans import read_jpeg_size
+
+WHOLE_PAGE_CROP = rectangle(0.0, 0.0, 1.0, 1.0)
 
 SETTINGS = ScanPreset.DOCUMENT.settings
 PHOTO_SETTINGS = ScanPreset.PHOTO.settings
@@ -615,51 +617,51 @@ async def test_rotate_page_without_a_draft_raises_no_open_document(service):
         await service.rotate_page(FIRST_PAGE_IDENTIFIER)
 
 
-SAMPLE_CROP = RectangleCrop(0.125, 0.115, 0.9, 0.925)
+SAMPLE_CROP = rectangle(0.125, 0.115, 0.9, 0.925)
 
 
 async def test_set_page_crop_stores_the_crop_in_the_page(service):
     await add_pages(service, 2)
 
-    draft = await service.set_page_crop(SECOND_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft = await service.set_page_crops(SECOND_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    assert [page.framing.crop for page in draft.pages] == [None, SAMPLE_CROP]
+    assert [page.framing.crops for page in draft.pages] == [(), (SAMPLE_CROP,)]
 
 
 async def test_set_page_crop_replaces_the_snapshot_and_raises_the_revision(service):
     await add_pages(service, 1)
     revision_before = service.snapshot().revision
 
-    draft = await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft = await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert (service.snapshot().draft, service.snapshot().revision) == (draft, revision_before + 1)
 
 
 async def test_set_page_crop_to_the_same_crop_keeps_the_revision(service):
     await add_pages(service, 1)
-    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
     revision_before = service.snapshot().revision
 
-    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert service.snapshot().revision == revision_before
 
 
 async def test_set_page_crop_to_the_whole_page_removes_the_crop(service):
     await add_pages(service, 1)
-    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    draft = await service.set_page_crop(FIRST_PAGE_IDENTIFIER, WHOLE_PAGE)
+    draft = await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [WHOLE_PAGE_CROP])
 
-    assert draft.pages[0].framing.crop is None
+    assert draft.pages[0].framing.crops == ()
 
 
 async def test_set_page_crop_is_saved_in_the_manifest_on_disk(service, parts):
     await add_pages(service, 1)
 
-    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    assert parts.read_manifest_on_disk().pages[0].framing.crop == SAMPLE_CROP
+    assert parts.read_manifest_on_disk().pages[0].framing.crops == (SAMPLE_CROP,)
 
 
 async def test_set_page_crop_leaves_the_stored_page_as_the_scanner_made_it(service, parts):
@@ -667,7 +669,7 @@ async def test_set_page_crop_leaves_the_stored_page_as_the_scanner_made_it(servi
     page_file = parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER)
     page_bytes_before = page_file.read_bytes()
 
-    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert page_file.read_bytes() == page_bytes_before
 
@@ -676,12 +678,12 @@ async def test_set_page_crop_of_an_unknown_page_raises_page_not_found(service):
     await add_pages(service, 1)
 
     with pytest.raises(PageNotFoundError):
-        await service.set_page_crop(UNKNOWN_PAGE_IDENTIFIER, SAMPLE_CROP)
+        await service.set_page_crops(UNKNOWN_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
 
 async def test_set_page_crop_without_a_draft_raises_no_open_document(service):
     with pytest.raises(NoOpenDocumentError):
-        await service.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+        await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
 
 async def test_an_edit_of_the_framing_removes_the_finalization_marks(service, parts):
@@ -712,7 +714,7 @@ async def test_a_rotated_page_goes_into_the_saved_pdf_with_its_new_orientation(s
 async def test_a_cropped_page_goes_into_the_saved_pdf_with_the_size_of_its_frame(service, parts):
     await add_pages(service, 1)
     page_width, page_height = read_page_size(parts.draft_folder / page_file_name(FIRST_PAGE_IDENTIFIER))
-    await service.set_page_crop(FIRST_PAGE_IDENTIFIER, RectangleCrop(0.0, 0.0, 0.5, 1.0))
+    await service.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle(0.0, 0.0, 0.5, 1.0)])
 
     finalization = await service.finalize()
 
@@ -724,18 +726,18 @@ async def test_detect_page_crop_on_a_white_page_finds_nothing_and_changes_nothin
     await add_pages(service, 1)
     revision_before = service.snapshot().revision
 
-    result = await service.detect_page_crop(FIRST_PAGE_IDENTIFIER)
+    result = await service.detect_page_crops(FIRST_PAGE_IDENTIFIER)
 
-    assert (result.crop_detected, service.snapshot().revision) == (False, revision_before)
+    assert (result.crops_detected, service.snapshot().revision) == (False, revision_before)
 
 
 async def test_detect_page_crop_of_an_unknown_page_raises_page_not_found(service):
     await add_pages(service, 1)
 
     with pytest.raises(PageNotFoundError):
-        await service.detect_page_crop(UNKNOWN_PAGE_IDENTIFIER)
+        await service.detect_page_crops(UNKNOWN_PAGE_IDENTIFIER)
 
 
 async def test_detect_page_crop_without_a_draft_raises_no_open_document(service):
     with pytest.raises(NoOpenDocumentError):
-        await service.detect_page_crop(FIRST_PAGE_IDENTIFIER)
+        await service.detect_page_crops(FIRST_PAGE_IDENTIFIER)

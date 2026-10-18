@@ -6,7 +6,7 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, ScanFailedError
-from digitalizadora.domain.page_crop import RectangleCrop
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.services import page_crop_detection_service
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.paper_edge_detection import PaperEdges
@@ -39,8 +39,13 @@ def book_on_glass() -> bytes:
     return build_book_on_glass_jpeg(BOOK)
 
 
-def edges_of(crop: RectangleCrop) -> tuple[float, float, float, float]:
-    return crop.left, crop.top, crop.right, crop.bottom
+def box_of(crop: PageCrop):
+    return crop.bounding_edges
+
+
+def edges_of(crop: PageCrop) -> tuple[float, float, float, float]:
+    edges = crop.bounding_edges
+    return edges.left, edges.top, edges.right, edges.bottom
 
 
 def test_the_crop_to_apply_frames_a_sheet_on_a_dark_lid(service, sheet_on_dark_lid):
@@ -53,7 +58,7 @@ def test_the_crop_to_apply_grows_the_sheet_by_a_margin_of_a_hundredth_of_the_lon
     crop = service.detect_crop_to_apply(sheet_on_dark_lid)
 
     margin_in_fractions = MARGIN_RATIO * max(LID_SIZE) / LID_SIZE[0]
-    assert crop.left == pytest.approx(SHEET_FRACTIONS[0] - margin_in_fractions, abs=0.02)
+    assert box_of(crop).left == pytest.approx(SHEET_FRACTIONS[0] - margin_in_fractions, abs=0.02)
 
 
 def test_the_crop_to_apply_of_a_white_page_is_none(service):
@@ -74,13 +79,14 @@ def test_the_crop_to_suggest_frames_a_book_the_strict_detection_cannot_see(servi
     crop = service.detect_crop_to_suggest(book_on_glass)
 
     assert crop is not None
-    assert crop.top == pytest.approx(BOOK.top - MARGIN_RATIO * 400 / 400, abs=FRACTION_TOLERANCE)
+    assert box_of(crop).top == pytest.approx(BOOK.top - MARGIN_RATIO * 400 / 400, abs=FRACTION_TOLERANCE)
 
 
 def test_the_crop_to_suggest_keeps_the_whole_book(service, book_on_glass):
     crop = service.detect_crop_to_suggest(book_on_glass)
 
-    assert (crop.left <= BOOK.left, crop.top <= BOOK.top, crop.right >= BOOK.right, crop.bottom >= BOOK.bottom) == (
+    edges = box_of(crop)
+    assert (edges.left <= BOOK.left, edges.top <= BOOK.top, edges.right >= BOOK.right, edges.bottom >= BOOK.bottom) == (
         True,
         True,
         True,
@@ -96,7 +102,7 @@ def test_the_crop_to_suggest_leaves_a_side_without_an_edge_at_the_glass(service,
 
     crop = service.detect_crop_to_suggest(build_scan_jpeg(LID_SIZE))
 
-    assert (crop.left, crop.bottom) == (0.0, 1.0)
+    assert (box_of(crop).left, box_of(crop).bottom) == (0.0, 1.0)
 
 
 def build_dark_cover_around_a_bright_picture() -> bytes:
@@ -198,11 +204,11 @@ def test_the_real_scans_of_the_book_get_a_frame_that_holds_the_whole_book(servic
     crop = service.detect_crop_to_suggest(scan)
 
     assert crop is not None
-    assert (crop.left, crop.top, crop.right, crop.bottom) == pytest.approx(
+    assert (box_of(crop).left, box_of(crop).top, box_of(crop).right, box_of(crop).bottom) == pytest.approx(
         (0.12, 0.115, 0.924, 0.925), abs=0.035
     )
-    assert (crop.left <= REAL_BOOK_EDGES[0], crop.top <= REAL_BOOK_EDGES[1]) == (True, True)
-    assert (crop.right >= REAL_BOOK_EDGES[2], crop.bottom >= REAL_BOOK_EDGES[3]) == (True, True)
+    assert (box_of(crop).left <= REAL_BOOK_EDGES[0], box_of(crop).top <= REAL_BOOK_EDGES[1]) == (True, True)
+    assert (box_of(crop).right >= REAL_BOOK_EDGES[2], box_of(crop).bottom >= REAL_BOOK_EDGES[3]) == (True, True)
 
 
 @pytest.mark.skipif(REAL_SCANS_FOLDER is None, reason=f"set {REAL_SCANS_VARIABLE} to the folder of the real scans")

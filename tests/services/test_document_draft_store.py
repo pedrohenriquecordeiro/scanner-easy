@@ -17,6 +17,7 @@ from digitalizadora.domain.errors import (
     DamagedDocumentPageError,
     DraftStorageUnavailableError,
     InsufficientDraftStorageError,
+    InvalidCropError,
     InvalidDocumentNameError,
     InvalidPageOrderError,
     NoOpenDocumentError,
@@ -24,7 +25,6 @@ from digitalizadora.domain.errors import (
     PageNotFoundError,
 )
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import WHOLE_PAGE, RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
@@ -47,9 +47,12 @@ from digitalizadora.services.storage_guard_service import (
 )
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
+from tests.fakes.page_crops import rectangle
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.scripted_file_writer import ScriptedFileWriter
 from tests.fakes.sequential_page_identifiers import SequentialPageIdentifiers
+
+WHOLE_PAGE_CROP = rectangle(0.0, 0.0, 1.0, 1.0)
 
 DRAFT_SESSION = "5c0f9a2e7b1d4c38"
 NOW = DRAFT_CREATED_AT + timedelta(minutes=15)
@@ -131,7 +134,7 @@ def draft_store(
 
 
 def test_a_captured_page_with_a_frame_joins_the_draft_framed(draft_store):
-    framing = PageFraming(PageRotation.NONE, SAMPLE_CROP)
+    framing = PageFraming(PageRotation.NONE, (SAMPLE_CROP,))
 
     page = draft_store.append_page(dataclasses.replace(build_captured_page(FIRST_PAGE_JPEG), framing=framing))
 
@@ -139,7 +142,7 @@ def test_a_captured_page_with_a_frame_joins_the_draft_framed(draft_store):
 
 
 def test_the_frame_of_a_captured_page_is_saved_in_the_manifest(draft_store, drafts_folder):
-    framing = PageFraming(PageRotation.NONE, SAMPLE_CROP)
+    framing = PageFraming(PageRotation.NONE, (SAMPLE_CROP,))
 
     draft_store.append_page(dataclasses.replace(build_captured_page(FIRST_PAGE_JPEG), framing=framing))
 
@@ -893,8 +896,8 @@ def test_read_page_content_of_a_file_with_another_size_raises_damaged_document_p
         draft_store.read_page_content(FIRST_PAGE_IDENTIFIER)
 
 
-SAMPLE_CROP = RectangleCrop(0.125, 0.115, 0.9, 0.925)
-TURNED_SAMPLE_CROP = RectangleCrop(0.075, 0.125, 0.885, 0.9)
+SAMPLE_CROP = rectangle(0.125, 0.115, 0.9, 0.925)
+TURNED_SAMPLE_CROP = rectangle(0.075, 0.125, 0.885, 0.9)
 
 
 def test_turning_a_page_adds_a_quarter_turn_to_its_rotation(draft_store):
@@ -910,11 +913,11 @@ def test_turning_a_page_adds_a_quarter_turn_to_its_rotation(draft_store):
 
 def test_turning_a_page_turns_its_crop_with_it(draft_store):
     add_pages(draft_store, 1)
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
-    assert draft_store.snapshot().draft.pages[0].framing.crop == TURNED_SAMPLE_CROP
+    assert draft_store.snapshot().draft.pages[0].framing.crops == (TURNED_SAMPLE_CROP,)
 
 
 def test_turning_a_page_keeps_its_identifier_and_position(draft_store):
@@ -996,21 +999,41 @@ def test_turning_a_page_manifest_failure_keeps_the_previous_snapshot(observed_st
 def test_setting_a_crop_stores_it_in_the_page(draft_store):
     add_pages(draft_store, 2)
 
-    draft_store.set_page_crop(SECOND_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(SECOND_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    assert [page.framing.crop for page in draft_store.snapshot().draft.pages] == [None, SAMPLE_CROP]
+    assert [page.framing.crops for page in draft_store.snapshot().draft.pages] == [(), (SAMPLE_CROP,)]
+
+
+def test_setting_two_crops_stores_them_in_reading_order(draft_store):
+    add_pages(draft_store, 1)
+    left_crop = rectangle(0.05, 0.1, 0.45, 0.9)
+    right_crop = rectangle(0.55, 0.1, 0.95, 0.9)
+
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [right_crop, left_crop])
+
+    assert draft_store.snapshot().draft.pages[0].framing.crops == (left_crop, right_crop)
+
+
+def test_setting_three_crops_is_refused_and_changes_nothing(draft_store):
+    add_pages(draft_store, 1)
+    snapshot_before = draft_store.snapshot()
+
+    with pytest.raises(InvalidCropError):
+        draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP, SAMPLE_CROP, SAMPLE_CROP])
+
+    assert draft_store.snapshot() == snapshot_before
 
 
 def test_setting_a_crop_returns_the_draft_of_the_new_snapshot(draft_store):
     add_pages(draft_store, 1)
 
-    assert draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP) == draft_store.snapshot().draft
+    assert draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP]) == draft_store.snapshot().draft
 
 
 def test_setting_a_crop_increases_the_revision_by_one(draft_store):
     add_pages(draft_store, 1)
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert draft_store.snapshot().revision == 2
 
@@ -1018,53 +1041,53 @@ def test_setting_a_crop_increases_the_revision_by_one(draft_store):
 def test_setting_a_crop_saves_it_in_the_manifest(draft_store, drafts_folder):
     add_pages(draft_store, 1)
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    assert reopen_manifest(drafts_folder).pages[0].framing.crop == SAMPLE_CROP
+    assert reopen_manifest(drafts_folder).pages[0].framing.crops == (SAMPLE_CROP,)
 
 
 def test_setting_a_crop_keeps_the_rotation_of_the_page(draft_store):
     add_pages(draft_store, 1)
     draft_store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert draft_store.snapshot().draft.pages[0].framing.rotation is PageRotation.CLOCKWISE_90
 
 
 def test_setting_no_crop_removes_the_crop(draft_store):
     add_pages(draft_store, 1)
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, None)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [])
 
-    assert draft_store.snapshot().draft.pages[0].framing.crop is None
+    assert draft_store.snapshot().draft.pages[0].framing.crops == ()
 
 
 def test_setting_a_crop_of_the_whole_page_removes_the_crop(draft_store):
     add_pages(draft_store, 1)
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, WHOLE_PAGE)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [WHOLE_PAGE_CROP])
 
-    assert draft_store.snapshot().draft.pages[0].framing.crop is None
+    assert draft_store.snapshot().draft.pages[0].framing.crops == ()
 
 
 def test_setting_the_same_crop_keeps_the_revision(draft_store):
     add_pages(draft_store, 1)
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert draft_store.snapshot().revision == 2
 
 
 def test_setting_the_same_crop_writes_nothing(draft_store, file_writer):
     add_pages(draft_store, 1)
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
     written_before = list(file_writer.written_file_names)
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert file_writer.written_file_names == written_before
 
@@ -1072,14 +1095,14 @@ def test_setting_the_same_crop_writes_nothing(draft_store, file_writer):
 def test_removing_a_crop_that_is_not_there_keeps_the_revision(draft_store):
     add_pages(draft_store, 1)
 
-    draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, None)
+    draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [])
 
     assert draft_store.snapshot().revision == 1
 
 
 def test_setting_a_crop_without_a_draft_raises_no_open_document(draft_store):
     with pytest.raises(NoOpenDocumentError):
-        draft_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+        draft_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
 
 @pytest.mark.parametrize("page_identifier", [UNKNOWN_PAGE_IDENTIFIER, "last", "../x"])
@@ -1087,7 +1110,7 @@ def test_setting_a_crop_outside_the_draft_raises_page_not_found(draft_store, pag
     add_pages(draft_store, 1)
 
     with pytest.raises(PageNotFoundError):
-        draft_store.set_page_crop(page_identifier, SAMPLE_CROP)
+        draft_store.set_page_crops(page_identifier, [SAMPLE_CROP])
 
 
 def test_setting_a_crop_manifest_failure_keeps_the_previous_snapshot(observed_store, observed_repository):
@@ -1096,6 +1119,6 @@ def test_setting_a_crop_manifest_failure_keeps_the_previous_snapshot(observed_st
     observed_repository.failures_by_method_name["save_manifest"] = DISK_FAILURE
 
     with pytest.raises(DraftStorageUnavailableError):
-        observed_store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+        observed_store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
 
     assert observed_store.snapshot() == snapshot_before

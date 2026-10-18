@@ -8,7 +8,7 @@ from digitalizadora.domain.errors import (
     NoOpenDocumentError,
     PageNotFoundError,
 )
-from digitalizadora.domain.page_crop import RectangleCrop
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_framing import UNFRAMED
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.repositories.file_system_document_draft_repository import (
@@ -22,6 +22,7 @@ from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, page_identifier_at, seed_draft_folder
 from tests.fakes.document_service_parts import InstantFileWriter
 from tests.fakes.fixed_clock import FixedClock
+from tests.fakes.page_crops import rectangle
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sequential_page_identifiers import SequentialPageIdentifiers
 from tests.fakes.synthetic_scans import build_scan_jpeg
@@ -35,15 +36,15 @@ WHITE_PAGE = build_scan_jpeg(LID_SIZE)
 FIRST_PAGE_IDENTIFIER = page_identifier_at(1)
 UNKNOWN_PAGE_IDENTIFIER = "00000000000000ff"
 ABUNDANT_FREE_SPACE = 100 * 1024**3
-SAMPLE_CROP = RectangleCrop(0.1, 0.1, 0.9, 0.9)
+SAMPLE_CROP = rectangle(0.1, 0.1, 0.9, 0.9)
 
 
 class StubCropDetectionService(PageCropDetectionService):
-    def __init__(self, crop: RectangleCrop | None = None, failure: Exception | None = None) -> None:
+    def __init__(self, crop: PageCrop | None = None, failure: Exception | None = None) -> None:
         self._crop = crop
         self._failure = failure
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> RectangleCrop | None:
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
         if self._failure is not None:
             raise self._failure
         return self._crop
@@ -76,14 +77,14 @@ def test_a_sheet_that_is_found_is_stored_as_the_frame_of_the_page(drafts_folder)
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
-    assert result.draft.pages[0].framing.crop is not None
+    assert result.draft.pages[0].framing.crops != ()
     assert store.snapshot().draft == result.draft
 
 
 def test_a_sheet_that_is_found_says_so(drafts_folder):
     _, detector = build_detector(drafts_folder, SHEET_ON_DARK_LID)
 
-    assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER).crop_detected is True
+    assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER).crops_detected is True
 
 
 def test_a_found_frame_raises_the_revision(drafts_folder):
@@ -98,12 +99,12 @@ def test_a_found_frame_raises_the_revision(drafts_folder):
 def test_nothing_found_says_so(drafts_folder):
     _, detector = build_detector(drafts_folder, WHITE_PAGE)
 
-    assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER).crop_detected is False
+    assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER).crops_detected is False
 
 
 def test_nothing_found_leaves_the_frame_and_the_revision_alone(drafts_folder):
     store, detector = build_detector(drafts_folder, WHITE_PAGE)
-    store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
     snapshot_before = store.snapshot()
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
@@ -113,13 +114,13 @@ def test_nothing_found_leaves_the_frame_and_the_revision_alone(drafts_folder):
 
 def test_a_frame_found_on_the_master_is_stored_in_the_displayed_orientation(drafts_folder):
     store, detector = build_detector(
-        drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=RectangleCrop(0.0, 0.0, 0.5, 1.0))
+        drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=rectangle(0.0, 0.0, 0.5, 1.0))
     )
     store.turn_page_clockwise(FIRST_PAGE_IDENTIFIER)
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
-    assert result.draft.pages[0].framing.crop == RectangleCrop(0.0, 0.0, 1.0, 0.5)
+    assert result.draft.pages[0].framing.crops == (rectangle(0.0, 0.0, 1.0, 0.5),)
 
 
 def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
@@ -133,21 +134,21 @@ def test_a_found_frame_keeps_the_rotation_of_the_page(drafts_folder):
 
 def test_a_found_frame_replaces_the_frame_of_before(drafts_folder):
     store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=SAMPLE_CROP))
-    store.set_page_crop(FIRST_PAGE_IDENTIFIER, RectangleCrop(0.3, 0.3, 0.6, 0.6))
+    store.set_page_crops(FIRST_PAGE_IDENTIFIER, [rectangle(0.3, 0.3, 0.6, 0.6)])
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
-    assert result.draft.pages[0].framing.crop == SAMPLE_CROP
+    assert result.draft.pages[0].framing.crops == (SAMPLE_CROP,)
 
 
 def test_the_same_frame_found_again_keeps_the_revision(drafts_folder):
     store, detector = build_detector(drafts_folder, WHITE_PAGE, StubCropDetectionService(crop=SAMPLE_CROP))
-    store.set_page_crop(FIRST_PAGE_IDENTIFIER, SAMPLE_CROP)
+    store.set_page_crops(FIRST_PAGE_IDENTIFIER, [SAMPLE_CROP])
     revision_before = store.snapshot().revision
 
     result = detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
-    assert (store.snapshot().revision, result.crop_detected) == (revision_before, True)
+    assert (store.snapshot().revision, result.crops_detected) == (revision_before, True)
 
 
 def test_the_detection_leaves_the_stored_page_as_it_was(drafts_folder):
@@ -199,10 +200,10 @@ def test_running_out_of_memory_raises_image_adjustment_failed(drafts_folder):
         detector.detect_for_page(FIRST_PAGE_IDENTIFIER)
 
 
-def test_a_result_is_a_draft_and_a_boolean(drafts_folder):
+def test_a_result_is_a_draft_a_boolean_and_a_count(drafts_folder):
     store, detector = build_detector(drafts_folder, WHITE_PAGE)
 
-    assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER) == CropDetectionResult(store.snapshot().draft, False)
+    assert detector.detect_for_page(FIRST_PAGE_IDENTIFIER) == CropDetectionResult(store.snapshot().draft, False, 0)
 
 
 def test_a_page_without_a_frame_stays_unframed_when_nothing_is_found(drafts_folder):

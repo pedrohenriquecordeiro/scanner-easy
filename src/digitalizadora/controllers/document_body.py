@@ -9,7 +9,8 @@ from digitalizadora.domain.document_draft import (
     DraftRecoveryReport,
     DraftSnapshot,
 )
-from digitalizadora.domain.page_crop import RectangleCrop
+from digitalizadora.domain.page_crop import CROP_CORNER_ROLES, PageCrop
+from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.document_draft_store import DraftStorageState
 
 EMPTY_PAGE_COUNT = 0
@@ -74,14 +75,25 @@ def _describe_page(page: DocumentPage) -> dict[str, Any]:
         "color_mode": page.color_mode.value,
         "size_in_bytes": page.size_in_bytes,
         "rotation_degrees": page.framing.rotation.value,
-        "crop": _describe_crop(page.framing.crop),
+        "crops": [describe_crop(crop) for crop in page.framing.crops],
+        "crop": _describe_provisional_crop(page.framing.crops),
     }
 
 
-def _describe_crop(crop: RectangleCrop | None) -> dict[str, float] | None:
-    if crop is None:
+def describe_crop(crop: PageCrop) -> dict[str, dict[str, float]]:
+    """The four corners as the manifest and the API write them: fractions of the page as it is displayed."""
+    return {
+        corner_key: {"x": corner.x, "y": corner.y}
+        for corner_key, corner in zip(CROP_CORNER_ROLES, crop.corners, strict=True)
+    }
+
+
+def _describe_provisional_crop(crops: tuple[PageCrop, ...]) -> dict[str, float] | None:
+    """Until the page learns the frames: the box of the only crop, when it is a plain rectangle."""
+    if len(crops) != 1 or not crops[0].is_rectangle or crops[0].rotation_to_upright is not PageRotation.NONE:
         return None
-    return {"left": crop.left, "top": crop.top, "right": crop.right, "bottom": crop.bottom}
+    edges = crops[0].bounding_edges
+    return {"left": edges.left, "top": edges.top, "right": edges.right, "bottom": edges.bottom}
 
 
 def _describe_recovery(recovery_report: DraftRecoveryReport | None) -> dict[str, Any] | None:

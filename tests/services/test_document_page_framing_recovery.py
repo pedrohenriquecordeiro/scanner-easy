@@ -8,7 +8,6 @@ import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft_reconciliation import page_file_name, thumbnail_file_name
-from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_settings import ScanSettings
@@ -18,6 +17,7 @@ from digitalizadora.services.document_draft_store import CapturedPage, DocumentD
 from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
+from tests.fakes.page_crops import rectangle
 from tests.fakes.recording_free_space_reader import RecordingFreeSpaceReader
 from tests.fakes.sequential_page_identifiers import SequentialPageIdentifiers
 
@@ -28,7 +28,7 @@ SETTINGS = ScanSettings(300, ColorMode.COLOR)
 PAGE_IDENTIFIER = page_identifier_at(1)
 PAGE_JPEG = b"first page jpeg"
 THUMBNAIL_JPEG = b"thumbnail jpeg"
-CROP = RectangleCrop(0.125, 0.115, 0.9, 0.925)
+CROP = rectangle(0.125, 0.115, 0.9, 0.925)
 CRASH = OSError("the power went out")
 
 
@@ -134,20 +134,20 @@ def test_a_crash_after_the_manifest_swap_resumes_the_turned_page(store_with_one_
 
 
 def test_a_crash_after_a_crop_resumes_the_page_with_the_crop(store_with_one_page, drafts_folder):
-    store_with_one_page.set_page_crop(PAGE_IDENTIFIER, CROP)
+    store_with_one_page.set_page_crops(PAGE_IDENTIFIER, [CROP])
 
     restarted_store = recover_in_a_new_process(drafts_folder)
 
-    assert restarted_store.snapshot().draft.pages[0].framing == PageFraming(crop=CROP)
+    assert restarted_store.snapshot().draft.pages[0].framing == PageFraming(crops=(CROP,))
 
 
 def test_a_crash_after_a_turn_and_a_crop_keeps_the_crop_turned(store_with_one_page, drafts_folder):
-    store_with_one_page.set_page_crop(PAGE_IDENTIFIER, CROP)
+    store_with_one_page.set_page_crops(PAGE_IDENTIFIER, [CROP])
     store_with_one_page.turn_page_clockwise(PAGE_IDENTIFIER)
 
     restarted_store = recover_in_a_new_process(drafts_folder)
 
-    assert restarted_store.snapshot().draft.pages[0].framing.crop == CROP.turned_clockwise()
+    assert restarted_store.snapshot().draft.pages[0].framing.crops == (CROP.turned_clockwise(),)
 
 
 def test_the_page_size_of_the_manifest_still_matches_the_file_after_the_restart(
@@ -165,7 +165,7 @@ def test_no_page_or_thumbnail_is_created_or_lost_by_an_edit_of_the_framing(
     store_with_one_page, drafts_folder, draft_folder
 ):
     store_with_one_page.turn_page_clockwise(PAGE_IDENTIFIER)
-    store_with_one_page.set_page_crop(PAGE_IDENTIFIER, CROP)
+    store_with_one_page.set_page_crops(PAGE_IDENTIFIER, [CROP])
 
     recover_in_a_new_process(drafts_folder)
 

@@ -12,7 +12,6 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.document_draft import DocumentDraft, DocumentPage
 from digitalizadora.domain.errors import UnreadableDraftError
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
@@ -22,8 +21,24 @@ from digitalizadora.repositories.document_manifest_codec import (
     encode_manifest,
 )
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft
+from tests.fakes.page_crops import quadrilateral, rectangle
 
-FRAMED = PageFraming(PageRotation.CLOCKWISE_90, RectangleCrop(0.125, 0.115, 0.924, 0.925))
+FRAMED = PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.125, 0.115, 0.924, 0.925),))
+TILTED_CROP = quadrilateral((0.039, 0.28), (0.65, 0.019), (0.894, 0.321), (0.282, 0.582))
+LOWER_CROP = quadrilateral((0.171, 0.604), (0.878, 0.584), (0.896, 0.931), (0.189, 0.951))
+TWO_CROPS = PageFraming(PageRotation.NONE, (TILTED_CROP, LOWER_CROP))
+TILTED_CROP_BODY = {
+    "top_left": {"x": 0.039, "y": 0.28},
+    "top_right": {"x": 0.65, "y": 0.019},
+    "bottom_right": {"x": 0.894, "y": 0.321},
+    "bottom_left": {"x": 0.282, "y": 0.582},
+}
+LOWER_CROP_BODY = {
+    "top_left": {"x": 0.171, "y": 0.604},
+    "top_right": {"x": 0.878, "y": 0.584},
+    "bottom_right": {"x": 0.896, "y": 0.931},
+    "bottom_left": {"x": 0.189, "y": 0.951},
+}
 FINALIZATION_STARTED_AT = DRAFT_CREATED_AT + timedelta(minutes=4)
 FINALIZED_AT = DRAFT_CREATED_AT + timedelta(minutes=5)
 FINISHED_DOCUMENT = ScanResult(
@@ -52,7 +67,7 @@ EXPECTED_MANIFEST_TEXT = """{
       "color_mode": "color",
       "size_in_bytes": 806123,
       "rotation_degrees": 0,
-      "crop": null
+      "crops": []
     }
   ],
   "finalization_started_at": null,
@@ -153,6 +168,14 @@ ROUND_TRIP_DRAFTS = [
     ),
     pytest.param(
         DocumentDraft(
+            name="Duas fotos",
+            created_at=DRAFT_CREATED_AT,
+            pages=(replace(SAMPLE_PAGE, framing=TWO_CROPS),),
+        ),
+        id="two-crops-on-a-page",
+    ),
+    pytest.param(
+        DocumentDraft(
             name="Foto",
             created_at=DRAFT_CREATED_AT,
             pages=(DocumentPage("0123456789abcdef", FINALIZED_AT, 200, ColorMode.GRAYSCALE, 1),),
@@ -183,19 +206,30 @@ def test_unknown_keys_are_ignored():
     assert decode_manifest(encode_document(document)) == NAMED_DRAFT
 
 
-def test_the_rotation_and_the_crop_are_encoded_on_the_page():
+def test_the_rotation_is_encoded_on_the_page():
     document = json.loads(encode_manifest(replace(NAMED_DRAFT, pages=(replace(SAMPLE_PAGE, framing=FRAMED),))))
 
-    assert (document["pages"][0]["rotation_degrees"], document["pages"][0]["crop"]) == (
-        90,
-        {"left": 0.125, "top": 0.115, "right": 0.924, "bottom": 0.925},
-    )
+    assert document["pages"][0]["rotation_degrees"] == 90
+
+
+def test_the_crops_are_encoded_on_the_page_with_their_four_corners():
+    document = json.loads(encode_manifest(replace(NAMED_DRAFT, pages=(replace(SAMPLE_PAGE, framing=TWO_CROPS),))))
+
+    assert document["pages"][0]["crops"] == [TILTED_CROP_BODY, LOWER_CROP_BODY]
+
+
+def test_a_page_without_crops_is_encoded_with_an_empty_list():
+    assert json.loads(encode_manifest(NAMED_DRAFT))["pages"][0]["crops"] == []
+
+
+def test_the_old_crop_key_is_not_written():
+    assert "crop" not in json.loads(encode_manifest(NAMED_DRAFT))["pages"][0]
 
 
 def test_a_manifest_from_before_the_framing_reads_pages_without_rotation_or_crop():
     document = json.loads(encode_manifest(NAMED_DRAFT))
     del document["pages"][0]["rotation_degrees"]
-    del document["pages"][0]["crop"]
+    del document["pages"][0]["crops"]
 
     assert decode_manifest(encode_document(document)).pages[0].framing == UNFRAMED
 
@@ -207,43 +241,96 @@ def test_an_invalid_rotation_is_read_as_no_rotation(rotation):
     assert draft.pages[0].framing.rotation is PageRotation.NONE
 
 
+def test_a_manifest_with_the_old_rectangle_reads_it_as_a_list_of_one_crop():
+    old_crop = {"left": 0.125, "top": 0.115, "right": 0.924, "bottom": 0.925}
+    document = json.loads(encode_manifest(NAMED_DRAFT))
+    del document["pages"][0]["crops"]
+    document["pages"][0]["crop"] = old_crop
+
+    framing = decode_manifest(encode_document(document)).pages[0].framing
+
+    assert framing.crops == (rectangle(0.125, 0.115, 0.924, 0.925),)
+
+
+def test_the_new_key_wins_over_the_old_one():
+    document = json.loads(encode_manifest(NAMED_DRAFT))
+    document["pages"][0]["crops"] = [TILTED_CROP_BODY]
+    document["pages"][0]["crop"] = {"left": 0.1, "top": 0.1, "right": 0.5, "bottom": 0.5}
+
+    assert decode_manifest(encode_document(document)).pages[0].framing.crops == (TILTED_CROP,)
+
+
+@pytest.mark.parametrize("old_crop", [{"left": 0, "top": 0, "right": 1, "bottom": 1}, None, "whole", {"left": 0.5}])
+def test_an_old_crop_that_is_the_whole_page_or_invalid_is_read_as_no_crop(old_crop):
+    document = json.loads(encode_manifest(NAMED_DRAFT))
+    del document["pages"][0]["crops"]
+    document["pages"][0]["crop"] = old_crop
+
+    assert decode_manifest(encode_document(document)).pages[0].framing.crops == ()
+
+
 INVALID_CROPS = [
-    pytest.param({"left": 0.5, "top": 0, "right": 0.4, "bottom": 1}, id="edges-reversed"),
-    pytest.param({"left": -0.1, "top": 0, "right": 1, "bottom": 1}, id="outside-the-page"),
-    pytest.param({"left": 0, "top": 0, "right": 1}, id="edge-missing"),
-    pytest.param({"left": "0", "top": 0, "right": 1, "bottom": 1}, id="edge-as-text"),
-    pytest.param({"left": 0, "top": 0, "right": 1, "bottom": 10**400}, id="integer-too-large-for-a-float"),
+    pytest.param({**TILTED_CROP_BODY, "top_left": {"x": 0.9, "y": 0.9}}, id="corners-out-of-order"),
+    pytest.param({**TILTED_CROP_BODY, "top_left": {"x": -0.1, "y": 0.28}}, id="outside-the-page"),
+    pytest.param({"top_left": {"x": 0, "y": 0}}, id="corners-missing"),
+    pytest.param({**TILTED_CROP_BODY, "top_left": {"x": "0", "y": 0}}, id="coordinate-as-text"),
+    pytest.param({**TILTED_CROP_BODY, "top_left": {"x": 10**400, "y": 0}}, id="integer-too-large-for-a-float"),
+    pytest.param({**TILTED_CROP_BODY, "top_left": [0, 0]}, id="corner-not-an-object"),
     pytest.param([0, 0, 1, 1], id="not-an-object"),
     pytest.param("whole", id="text"),
 ]
 
 
 @pytest.mark.parametrize("crop", INVALID_CROPS)
-def test_an_invalid_crop_is_read_as_no_crop(crop):
-    draft = decode_changed_manifest(set_page_value("crop", crop))
+def test_an_invalid_crop_is_dropped_and_the_other_one_is_kept(crop):
+    draft = decode_changed_manifest(set_page_value("crops", [crop, LOWER_CROP_BODY]))
 
-    assert draft.pages[0].framing.crop is None
+    assert draft.pages[0].framing.crops == (LOWER_CROP,)
+
+
+def test_crops_that_are_not_a_list_are_read_as_no_crops():
+    draft = decode_changed_manifest(set_page_value("crops", "whole"))
+
+    assert draft.pages[0].framing.crops == ()
 
 
 def test_an_invalid_crop_does_not_make_the_manifest_unreadable():
-    draft = decode_changed_manifest(set_page_value("crop", "whole"))
+    draft = decode_changed_manifest(set_page_value("crops", ["whole"]))
 
     assert draft.name == NAMED_DRAFT.name
 
 
-def test_an_invalid_rotation_keeps_the_crop_of_the_page():
+def test_a_third_crop_is_dropped_with_a_warning(caplog):
+    with caplog.at_level(logging.WARNING):
+        draft = decode_changed_manifest(set_page_value("crops", [TILTED_CROP_BODY, LOWER_CROP_BODY, TILTED_CROP_BODY]))
+
+    assert (draft.pages[0].framing.crops, "only the first 2" in caplog.text) == ((TILTED_CROP, LOWER_CROP), True)
+
+
+def test_crops_in_a_different_order_are_read_in_reading_order():
+    draft = decode_changed_manifest(set_page_value("crops", [LOWER_CROP_BODY, TILTED_CROP_BODY]))
+
+    assert draft.pages[0].framing.crops == (TILTED_CROP, LOWER_CROP)
+
+
+def test_an_invalid_rotation_keeps_the_crops_of_the_page():
     document = manifest_with_both_markers()
-    document["pages"][0].update({"rotation_degrees": 45, "crop": {"left": 0, "top": 0, "right": 0.5, "bottom": 0.5}})
+    document["pages"][0].update({"rotation_degrees": 45, "crops": [TILTED_CROP_BODY]})
 
     framing = decode_manifest(encode_document(document)).pages[0].framing
 
-    assert framing == PageFraming(PageRotation.NONE, RectangleCrop(0.0, 0.0, 0.5, 0.5))
+    assert framing == PageFraming(PageRotation.NONE, (TILTED_CROP,))
 
 
 def test_a_crop_of_the_whole_page_is_read_as_no_crop():
-    whole_page = {"left": 0, "top": 0, "right": 1, "bottom": 1}
+    whole_page = {
+        "top_left": {"x": 0, "y": 0},
+        "top_right": {"x": 1, "y": 0},
+        "bottom_right": {"x": 1, "y": 1},
+        "bottom_left": {"x": 0, "y": 1},
+    }
 
-    assert decode_changed_manifest(set_page_value("crop", whole_page)).pages[0].framing.crop is None
+    assert decode_changed_manifest(set_page_value("crops", [whole_page])).pages[0].framing.crops == ()
 
 
 def test_an_invalid_framing_value_is_reported_in_the_log(caplog):

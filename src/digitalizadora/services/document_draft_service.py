@@ -17,7 +17,7 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import RectangleCrop
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scan_request import ScanRequest
@@ -105,10 +105,10 @@ class DocumentDraftService:
     async def rotate_page(self, page_identifier: str) -> DocumentDraft:
         return await self._run_edit(functools.partial(self._draft_store.turn_page_clockwise, page_identifier))
 
-    async def set_page_crop(self, page_identifier: str, crop: RectangleCrop | None) -> DocumentDraft:
-        return await self._run_edit(functools.partial(self._draft_store.set_page_crop, page_identifier, crop))
+    async def set_page_crops(self, page_identifier: str, crops: Sequence[PageCrop]) -> DocumentDraft:
+        return await self._run_edit(functools.partial(self._draft_store.set_page_crops, page_identifier, crops))
 
-    async def detect_page_crop(self, page_identifier: str) -> CropDetectionResult:
+    async def detect_page_crops(self, page_identifier: str) -> CropDetectionResult:
         return await self._run_edit(functools.partial(self._page_cropper.detect_for_page, page_identifier))
 
     async def discard_last_page(self) -> DocumentDraft | None:

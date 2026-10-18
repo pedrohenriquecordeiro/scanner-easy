@@ -4,7 +4,7 @@ from PIL import Image
 
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
-from digitalizadora.domain.page_crop import RectangleCrop
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.services.jpeg_reencoding import read_encoding_options, replace_with
 from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
 
@@ -28,7 +28,7 @@ class ImageAdjustmentService:
         except (OSError, Image.DecompressionBombError, ValueError) as error:
             raise ScanFailedError("The scanned image could not be decoded for the adjustment") from error
 
-    def _crop(self, jpeg_content: bytes, crop: RectangleCrop) -> bytes:
+    def _crop(self, jpeg_content: bytes, crop: PageCrop) -> bytes:
         image = Image.open(io.BytesIO(jpeg_content))
         try:
             encoding_options = read_encoding_options(image)

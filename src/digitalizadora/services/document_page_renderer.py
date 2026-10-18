@@ -27,12 +27,17 @@ class DocumentPageRenderer:
         image = Image.open(page_file)
         try:
             encoding_options = read_encoding_options(image)
-            master_crop = framing.crop_on_master()
-            if master_crop is not None:
+            master_crops = framing.crops_on_master()
+            if master_crops:
                 # The smaller image first: the crop is made in the orientation of the stored JPEG.
+                master_crop = master_crops[0]
                 region = master_crop.to_pixel_region(image.size)
                 image = replace_with(image, lambda full_image: full_image.crop(region.as_box()))
-            if framing.rotation is not PageRotation.NONE:
+                upright_rotation = master_crop.rotation_to_upright if master_crop.is_rectangle else PageRotation.NONE
+                if upright_rotation is not PageRotation.NONE:
+                    transposition = TRANSPOSE_BY_ROTATION[upright_rotation]
+                    image = replace_with(image, lambda cut_image: cut_image.transpose(transposition))
+            elif framing.rotation is not PageRotation.NONE:
                 transposition = TRANSPOSE_BY_ROTATION[framing.rotation]
                 image = replace_with(image, lambda uncut_image: uncut_image.transpose(transposition))
             buffer = io.BytesIO()

@@ -39,7 +39,7 @@ STATIC_ROUTE = "/static"
 VALIDATION_ERROR_CODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"/api/document/page-order"), InvalidPageOrderError.code),
     (re.compile(r"/api/document/name"), InvalidDocumentNameError.code),
-    (re.compile(r"/api/document/pages/[^/]+/crop"), InvalidCropError.code),
+    (re.compile(r"/api/document/pages/[^/]+/crops?(/detect)?"), InvalidCropError.code),
     (re.compile(r"/api/document/pages/[^/]+/(thumbnail|preview)"), InvalidPageRotationError.code),
 )
 

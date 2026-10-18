@@ -469,21 +469,28 @@ def test_malformed_body_does_not_reach_the_document_service(client: TestClient, 
     assert parts.document_service.calls == []
 
 
-CROP_PATH = f"/api/document/pages/{page_identifier_at(1)}/crop"
+CROP_PATH = f"/api/document/pages/{page_identifier_at(1)}/crops"
+UNIT_SQUARE_CORNERS = {
+    "top_left": {"x": 0, "y": 0},
+    "top_right": {"x": 1, "y": 0},
+    "bottom_right": {"x": 1, "y": 1},
+    "bottom_left": {"x": 0, "y": 1},
+}
 
 
 @pytest.mark.parametrize(
     "body",
     [
         {},
-        {"crop": {}},
-        {"crop": "whole"},
-        {"crop": {"left": 0, "top": 0, "right": 1}},
-        {"crop": {"left": "0", "top": 0, "right": 1, "bottom": 1}},
-        {"crop": {"left": True, "top": 0, "right": 1, "bottom": 1}},
-        {"crop": [0, 0, 1, 1]},
+        {"crops": [{}]},
+        {"crops": "whole"},
+        {"crops": [{"top_left": {"x": 0, "y": 0}}]},
+        {"crops": [{**UNIT_SQUARE_CORNERS, "top_left": {"x": "0", "y": 0}}]},
+        {"crops": [{**UNIT_SQUARE_CORNERS, "top_left": {"x": True, "y": 0}}]},
+        {"crops": [[0, 0, 1, 1]]},
+        {"crops": [UNIT_SQUARE_CORNERS, UNIT_SQUARE_CORNERS, UNIT_SQUARE_CORNERS]},
     ],
-    ids=["empty", "empty-crop", "text", "missing-edge", "edge-as-text", "edge-as-boolean", "list"],
+    ids=["empty", "empty-crop", "text", "missing-corners", "text-coordinate", "boolean-coordinate", "list", "three"],
 )
 def test_malformed_crop_answers_the_code_of_the_route(client: TestClient, body: dict[str, object]) -> None:
     response = client.put(CROP_PATH, json=body, headers=STATE_CHANGING_HEADERS)
@@ -514,7 +521,7 @@ def test_a_rotation_that_is_not_a_number_answers_the_code_of_the_route(
 
 
 def test_a_malformed_crop_does_not_reach_the_document_service(client: TestClient, parts: ApplicationParts) -> None:
-    client.put(CROP_PATH, json={"crop": "whole"}, headers=STATE_CHANGING_HEADERS)
+    client.put(CROP_PATH, json={"crops": "whole"}, headers=STATE_CHANGING_HEADERS)
 
     assert parts.document_service.calls == []
 
@@ -523,7 +530,7 @@ def test_the_patterns_of_the_validation_codes_name_only_the_document_routes() ->
     assert [(pattern.pattern, code) for pattern, code in VALIDATION_ERROR_CODE_PATTERNS] == [
         ("/api/document/page-order", "invalid_page_order"),
         ("/api/document/name", "invalid_document_name"),
-        ("/api/document/pages/[^/]+/crop", "invalid_crop"),
+        ("/api/document/pages/[^/]+/crops?(/detect)?", "invalid_crop"),
         ("/api/document/pages/[^/]+/(thumbnail|preview)", "invalid_page_rotation"),
     ]
 
@@ -531,9 +538,9 @@ def test_the_patterns_of_the_validation_codes_name_only_the_document_routes() ->
 @pytest.mark.parametrize(
     "request_path",
     [
-        "/api/document/pages/last/crop/detect",
-        "/api/document/pages/a/b/crop",
-        "/api/document/pages//crop",
+        "/api/document/pages/a/b/crops/detect",
+        "/api/document/pages/a/b/crops",
+        "/api/document/pages//crops",
         "/api/settings",
     ],
 )

@@ -5,17 +5,17 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services import document_page_renderer
 from digitalizadora.services.document_page_renderer import DocumentPageRenderer
+from tests.fakes.page_crops import rectangle
 from tests.fakes.synthetic_scans import build_marked_scan_jpeg, find_marker_corner, read_jpeg_size
 
 PAGE_SIZE = (100, 200)
 DOTS_PER_INCH = 300
-TOP_RIGHT_QUADRANT = RectangleCrop(0.5, 0.0, 1.0, 0.5)
-TOP_LEFT_QUADRANT = RectangleCrop(0.0, 0.0, 0.5, 0.5)
+TOP_RIGHT_QUADRANT = rectangle(0.5, 0.0, 1.0, 0.5)
+TOP_LEFT_QUADRANT = rectangle(0.0, 0.0, 0.5, 0.5)
 MARKER_REDNESS_THRESHOLD = 30
 QUARTER_TURN = PageFraming(rotation=PageRotation.CLOCKWISE_90)
 
@@ -71,21 +71,21 @@ def test_the_rotation_turns_the_page_clockwise(page_file, rotation, expected_cor
 
 
 def test_a_crop_alone_has_the_size_of_the_region(page_file):
-    assert read_jpeg_size(render(page_file, PageFraming(crop=TOP_LEFT_QUADRANT))) == (50, 100)
+    assert read_jpeg_size(render(page_file, PageFraming(crops=(TOP_LEFT_QUADRANT,)))) == (50, 100)
 
 
 def test_a_crop_alone_keeps_what_is_inside_the_frame(page_file):
-    assert find_marker_corner(render(page_file, PageFraming(crop=TOP_LEFT_QUADRANT))) == "top-left"
+    assert find_marker_corner(render(page_file, PageFraming(crops=(TOP_LEFT_QUADRANT,)))) == "top-left"
 
 
 def test_a_crop_away_from_the_marker_leaves_the_marker_out(page_file):
-    cropped = render(page_file, PageFraming(crop=RectangleCrop(0.5, 0.5, 1.0, 1.0)))
+    cropped = render(page_file, PageFraming(crops=(rectangle(0.5, 0.5, 1.0, 1.0),)))
 
     assert read_redness(cropped, (8, 8)) < MARKER_REDNESS_THRESHOLD
 
 
 def test_a_rotation_and_a_crop_together_crop_in_the_displayed_orientation(page_file):
-    framing = PageFraming(PageRotation.CLOCKWISE_90, TOP_RIGHT_QUADRANT)
+    framing = PageFraming(PageRotation.CLOCKWISE_90, (TOP_RIGHT_QUADRANT,))
 
     rendered = render(page_file, framing)
 
@@ -94,7 +94,7 @@ def test_a_rotation_and_a_crop_together_crop_in_the_displayed_orientation(page_f
 
 def test_the_displayed_crop_that_misses_the_turned_marker_misses_it_in_the_result(page_file):
     # The marker is at the top-left of the stored page, so at the top-right once the page is turned.
-    framing = PageFraming(PageRotation.CLOCKWISE_90, RectangleCrop(0.0, 0.5, 0.5, 1.0))
+    framing = PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.0, 0.5, 0.5, 1.0),))
 
     rendered = render(page_file, framing)
 
@@ -102,7 +102,7 @@ def test_the_displayed_crop_that_misses_the_turned_marker_misses_it_in_the_resul
 
 
 def test_the_rendered_page_keeps_the_density_of_the_scanner(page_file):
-    assert read_density(render(page_file, PageFraming(PageRotation.CLOCKWISE_90, TOP_LEFT_QUADRANT))) == (
+    assert read_density(render(page_file, PageFraming(PageRotation.CLOCKWISE_90, (TOP_LEFT_QUADRANT,)))) == (
         pytest.approx(DOTS_PER_INCH, abs=1),
         pytest.approx(DOTS_PER_INCH, abs=1),
     )
@@ -116,7 +116,7 @@ def test_the_rendered_page_is_a_jpeg(page_file):
 def test_the_stored_page_is_not_touched(page_file):
     bytes_before = page_file.read_bytes()
 
-    render(page_file, PageFraming(PageRotation.CLOCKWISE_90, TOP_LEFT_QUADRANT))
+    render(page_file, PageFraming(PageRotation.CLOCKWISE_90, (TOP_LEFT_QUADRANT,)))
 
     assert page_file.read_bytes() == bytes_before
 

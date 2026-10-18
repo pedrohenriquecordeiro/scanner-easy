@@ -37,13 +37,13 @@ from digitalizadora.domain.errors import (
 )
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from tests.controllers.controller_test_support import StubFolderPreparer, build_test_client
 from tests.fakes.document_drafts import page_identifier_at
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository
+from tests.fakes.page_crops import quadrilateral, rectangle
 from tests.fakes.sample_images import build_sample_jpeg
 from tests.fakes.stub_document_draft_service import StubDocumentDraftService, build_stub_snapshot
 
@@ -532,9 +532,24 @@ def test_rotation_is_a_post_only_route(client: TestClient) -> None:
     assert client.get(ROTATION_PATH).status_code == HTTPStatus.METHOD_NOT_ALLOWED
 
 
-CROP_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop"
-DETECT_PATH = f"{CROP_PATH}/detect"
-SAMPLE_CROP_BODY = {"crop": {"left": 0.125, "top": 0.115, "right": 0.9, "bottom": 0.925}}
+CROPS_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crops"
+DETECT_PATH = f"{CROPS_PATH}/detect"
+PROVISIONAL_CROP_PATH = f"/api/document/pages/{SECOND_PAGE_IDENTIFIER}/crop"
+UPPER_CROP_BODY = {
+    "top_left": {"x": 0.039, "y": 0.28},
+    "top_right": {"x": 0.65, "y": 0.019},
+    "bottom_right": {"x": 0.894, "y": 0.321},
+    "bottom_left": {"x": 0.282, "y": 0.582},
+}
+LOWER_CROP_BODY = {
+    "top_left": {"x": 0.171, "y": 0.604},
+    "top_right": {"x": 0.878, "y": 0.584},
+    "bottom_right": {"x": 0.896, "y": 0.931},
+    "bottom_left": {"x": 0.189, "y": 0.951},
+}
+SAMPLE_CROPS_BODY = {"crops": [UPPER_CROP_BODY]}
+UPPER_CROP = quadrilateral((0.039, 0.28), (0.65, 0.019), (0.894, 0.321), (0.282, 0.582))
+LOWER_CROP = quadrilateral((0.171, 0.604), (0.878, 0.584), (0.896, 0.931), (0.189, 0.951))
 CROP_FAILURES = [
     ExpectedFailure(ScanAlreadyRunningError("scan running"), HTTPStatus.CONFLICT),
     ExpectedFailure(DocumentBusyError("another change"), HTTPStatus.CONFLICT),
@@ -546,70 +561,107 @@ CROP_FAILURES = [
 ]
 
 
-def test_set_page_crop_passes_the_identifier_and_the_crop(
+def test_set_page_crops_passes_the_identifier_and_the_crops(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
-    client.put(CROP_PATH, json=SAMPLE_CROP_BODY)
+    client.put(CROPS_PATH, json={"crops": [UPPER_CROP_BODY, LOWER_CROP_BODY]})
 
-    assert document_service.received_arguments["set_page_crop"] == (
+    assert document_service.received_arguments["set_page_crops"] == (
         SECOND_PAGE_IDENTIFIER,
-        RectangleCrop(0.125, 0.115, 0.9, 0.925),
+        [UPPER_CROP, LOWER_CROP],
     )
 
 
-def test_set_page_crop_with_null_removes_the_crop(
+def test_set_page_crops_with_an_empty_list_removes_the_crops(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
-    client.put(CROP_PATH, json={"crop": None})
+    client.put(CROPS_PATH, json={"crops": []})
 
-    assert document_service.received_arguments["set_page_crop"] == (SECOND_PAGE_IDENTIFIER, None)
+    assert document_service.received_arguments["set_page_crops"] == (SECOND_PAGE_IDENTIFIER, [])
 
 
-def test_set_page_crop_accepts_whole_numbers_as_edges(
+def test_set_page_crops_accepts_whole_numbers_as_coordinates(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
-    client.put(CROP_PATH, json={"crop": {"left": 0, "top": 0, "right": 1, "bottom": 1}})
+    whole_page = {
+        "top_left": {"x": 0, "y": 0},
+        "top_right": {"x": 1, "y": 0},
+        "bottom_right": {"x": 1, "y": 1},
+        "bottom_left": {"x": 0, "y": 1},
+    }
 
-    assert document_service.received_arguments["set_page_crop"] == (
-        SECOND_PAGE_IDENTIFIER,
-        RectangleCrop(0.0, 0.0, 1.0, 1.0),
-    )
+    client.put(CROPS_PATH, json={"crops": [whole_page]})
+
+    assert document_service.received_arguments["set_page_crops"] == (SECOND_PAGE_IDENTIFIER, [rectangle(0, 0, 1, 1)])
 
 
-def test_set_page_crop_rounds_the_edges_to_six_digits(
+def test_set_page_crops_rounds_the_coordinates_to_six_digits(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
-    client.put(CROP_PATH, json={"crop": {"left": 0.12345678, "top": 0, "right": 0.9, "bottom": 1}})
+    body = {"crops": [{**UPPER_CROP_BODY, "top_left": {"x": 0.12345678, "y": 0.28}}]}
 
-    assert document_service.received_arguments["set_page_crop"][1].left == 0.123457
+    client.put(CROPS_PATH, json=body)
+
+    assert document_service.received_arguments["set_page_crops"][1][0].top_left.x == 0.123457
 
 
-def test_set_page_crop_answers_the_body_after_the_edit(
+def test_set_page_crops_answers_the_body_after_the_edit(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
     document_service.snapshot_after_edit = build_stub_snapshot(3)
 
-    response = client.put(CROP_PATH, json=SAMPLE_CROP_BODY)
+    response = client.put(CROPS_PATH, json=SAMPLE_CROPS_BODY)
 
     assert (response.status_code, response.json()) == (HTTPStatus.OK, build_document_body(build_stub_snapshot(3)))
 
 
-@pytest.mark.parametrize(
-    "invalid_crop",
-    [
-        {"left": -0.1, "top": 0, "right": 1, "bottom": 1},
-        {"left": 0, "top": 0, "right": 1.1, "bottom": 1},
-        {"left": 0.6, "top": 0, "right": 0.4, "bottom": 1},
-        {"left": 0.5, "top": 0, "right": 0.5, "bottom": 1},
-        {"left": 0, "top": 0, "right": 0.01, "bottom": 1},
-        {"left": 0, "top": 0.9, "right": 1, "bottom": 0.91},
-    ],
-    ids=["negative", "beyond-one", "reversed", "empty-width", "too-narrow", "too-short"],
-)
-def test_set_page_crop_with_an_invalid_rectangle_answers_422(
-    client: TestClient, document_service: StubDocumentDraftService, invalid_crop: dict[str, float]
+INVALID_QUADRILATERALS = [
+    pytest.param({**UPPER_CROP_BODY, "top_left": {"x": -0.1, "y": 0.28}}, id="outside-the-page"),
+    pytest.param({**UPPER_CROP_BODY, "top_left": {"x": 1.1, "y": 0.28}}, id="beyond-one"),
+    pytest.param(
+        {
+            "top_left": {"x": 0.1, "y": 0.1},
+            "top_right": {"x": 0.1, "y": 0.9},
+            "bottom_right": {"x": 0.9, "y": 0.9},
+            "bottom_left": {"x": 0.9, "y": 0.1},
+        },
+        id="counterclockwise",
+    ),
+    pytest.param(
+        {
+            "top_left": {"x": 0.1, "y": 0.1},
+            "top_right": {"x": 0.8, "y": 0.8},
+            "bottom_right": {"x": 0.8, "y": 0.1},
+            "bottom_left": {"x": 0.1, "y": 0.8},
+        },
+        id="bow-tie",
+    ),
+    pytest.param(
+        {
+            "top_left": {"x": 0.1, "y": 0.1},
+            "top_right": {"x": 0.9, "y": 0.1},
+            "bottom_right": {"x": 0.9, "y": 0.9},
+            "bottom_left": {"x": 0.5, "y": 0.3},
+        },
+        id="reflex-corner",
+    ),
+    pytest.param(
+        {
+            "top_left": {"x": 0.1, "y": 0.1},
+            "top_right": {"x": 0.11, "y": 0.1},
+            "bottom_right": {"x": 0.11, "y": 0.9},
+            "bottom_left": {"x": 0.1, "y": 0.9},
+        },
+        id="too-narrow",
+    ),
+]
+
+
+@pytest.mark.parametrize("invalid_crop", INVALID_QUADRILATERALS)
+def test_set_page_crops_with_an_invalid_quadrilateral_answers_422(
+    client: TestClient, document_service: StubDocumentDraftService, invalid_crop: dict[str, object]
 ) -> None:
-    response = client.put(CROP_PATH, json={"crop": invalid_crop})
+    response = client.put(CROPS_PATH, json={"crops": [invalid_crop]})
 
     assert (response.status_code, response.json()) == build_error_answer(
         InvalidCropError("x"), HTTPStatus.UNPROCESSABLE_ENTITY
@@ -617,10 +669,21 @@ def test_set_page_crop_with_an_invalid_rectangle_answers_422(
     assert document_service.calls == []
 
 
-def test_set_page_crop_with_an_edge_that_is_not_a_number_answers_422(client: TestClient) -> None:
+def test_set_page_crops_with_three_crops_answers_422(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    response = client.put(CROPS_PATH, json={"crops": [UPPER_CROP_BODY, LOWER_CROP_BODY, UPPER_CROP_BODY]})
+
+    assert (response.status_code, document_service.calls) == (HTTPStatus.UNPROCESSABLE_ENTITY, [])
+
+
+def test_set_page_crops_with_a_coordinate_that_is_not_a_number_answers_422(client: TestClient) -> None:
     response = client.put(
-        CROP_PATH,
-        content=b'{"crop": {"left": NaN, "top": 0, "right": 1, "bottom": 1}}',
+        CROPS_PATH,
+        content=(
+            b'{"crops": [{"top_left": {"x": NaN, "y": 0}, "top_right": {"x": 1, "y": 0},'
+            b' "bottom_right": {"x": 1, "y": 1}, "bottom_left": {"x": 0, "y": 1}}]}'
+        ),
         headers={"Content-Type": "application/json"},
     )
 
@@ -628,39 +691,66 @@ def test_set_page_crop_with_an_edge_that_is_not_a_number_answers_422(client: Tes
 
 
 @pytest.mark.parametrize("expected_failure", CROP_FAILURES, ids=describe_expected_failure)
-def test_set_page_crop_answers_the_documented_errors(
+def test_set_page_crops_answers_the_documented_errors(
     client: TestClient, document_service: StubDocumentDraftService, expected_failure: ExpectedFailure
 ) -> None:
     document_service.failure = expected_failure.error
 
-    response = client.put(CROP_PATH, json=SAMPLE_CROP_BODY)
+    response = client.put(CROPS_PATH, json=SAMPLE_CROPS_BODY)
 
     assert response.status_code == expected_failure.status
     assert response.json()["code"] == expected_failure.error.code
 
 
-def test_set_page_crop_is_a_put_only_route(client: TestClient) -> None:
-    assert client.post(CROP_PATH, json=SAMPLE_CROP_BODY).status_code == HTTPStatus.METHOD_NOT_ALLOWED
+def test_set_page_crops_is_a_put_only_route(client: TestClient) -> None:
+    assert client.post(CROPS_PATH, json=SAMPLE_CROPS_BODY).status_code == HTTPStatus.METHOD_NOT_ALLOWED
 
 
-def test_detect_page_crop_passes_the_identifier_of_the_path(
+def test_the_provisional_crop_route_still_sets_one_rectangle(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.put(PROVISIONAL_CROP_PATH, json={"crop": {"left": 0.125, "top": 0.115, "right": 0.9, "bottom": 0.925}})
+
+    assert document_service.received_arguments["set_page_crops"] == (
+        SECOND_PAGE_IDENTIFIER,
+        [rectangle(0.125, 0.115, 0.9, 0.925)],
+    )
+
+
+def test_the_provisional_crop_route_removes_the_crops_with_null(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    client.put(PROVISIONAL_CROP_PATH, json={"crop": None})
+
+    assert document_service.received_arguments["set_page_crops"] == (SECOND_PAGE_IDENTIFIER, [])
+
+
+def test_detect_page_crops_passes_the_identifier_of_the_path(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
     client.post(DETECT_PATH)
 
-    assert document_service.received_arguments["detect_page_crop"] == SECOND_PAGE_IDENTIFIER
+    assert document_service.received_arguments["detect_page_crops"] == SECOND_PAGE_IDENTIFIER
 
 
-@pytest.mark.parametrize("crop_detected", [True, False])
-def test_detect_page_crop_says_whether_it_found_a_crop(
-    client: TestClient, document_service: StubDocumentDraftService, crop_detected: bool
+@pytest.mark.parametrize("crops_detected", [True, False])
+def test_detect_page_crops_says_whether_it_found_crops(
+    client: TestClient, document_service: StubDocumentDraftService, crops_detected: bool
 ) -> None:
-    document_service.crop_detected = crop_detected
+    document_service.crops_detected = crops_detected
 
-    assert client.post(DETECT_PATH).json()["crop_detected"] is crop_detected
+    assert client.post(DETECT_PATH).json()["crops_detected"] is crops_detected
 
 
-def test_detect_page_crop_answers_the_document_body_with_the_flag(
+def test_detect_page_crops_says_how_many_regions_were_ignored(
+    client: TestClient, document_service: StubDocumentDraftService
+) -> None:
+    document_service.ignored_region_count = 1
+
+    assert client.post(DETECT_PATH).json()["ignored_region_count"] == 1
+
+
+def test_detect_page_crops_answers_the_document_body_with_the_flags(
     client: TestClient, document_service: StubDocumentDraftService
 ) -> None:
     document_service.snapshot_after_edit = build_stub_snapshot(3)
@@ -669,12 +759,17 @@ def test_detect_page_crop_answers_the_document_body_with_the_flag(
 
     assert (response.status_code, response.json()) == (
         HTTPStatus.OK,
-        {**build_document_body(build_stub_snapshot(3)), "crop_detected": True},
+        {
+            **build_document_body(build_stub_snapshot(3)),
+            "crops_detected": True,
+            "ignored_region_count": 0,
+            "crop_detected": True,
+        },
     )
 
 
 @pytest.mark.parametrize("expected_failure", CROP_FAILURES, ids=describe_expected_failure)
-def test_detect_page_crop_answers_the_documented_errors(
+def test_detect_page_crops_answers_the_documented_errors(
     client: TestClient, document_service: StubDocumentDraftService, expected_failure: ExpectedFailure
 ) -> None:
     document_service.failure = expected_failure.error

@@ -10,7 +10,7 @@ from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, InsufficientDraftStorageError, ScanFailedError
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import RectangleCrop
+from digitalizadora.domain.page_crop import PageCrop
 from digitalizadora.domain.page_framing import UNFRAMED
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_job import ScanJob
@@ -175,8 +175,9 @@ def test_a_page_without_the_automatic_crop_has_no_frame(page_capture):
 def test_a_page_with_the_automatic_crop_gets_the_frame_of_the_sheet(page_capture):
     page = page_capture.store(SHEET_ON_DARK_LID, CROPPING_JOB)
 
-    assert page.framing.crop is not None
-    assert (page.framing.crop.left, page.framing.crop.right) == pytest.approx((0.18, 0.82), abs=0.05)
+    assert len(page.framing.crops) == 1
+    edges = page.framing.crops[0].bounding_edges
+    assert (edges.left, edges.right) == pytest.approx((0.18, 0.82), abs=0.05)
 
 
 def test_a_page_with_the_automatic_crop_has_no_rotation(page_capture):
@@ -219,7 +220,7 @@ class FailingCropDetectionService(PageCropDetectionService):
     def __init__(self, failure: Exception) -> None:
         self._failure = failure
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> RectangleCrop | None:
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
         raise self._failure
 
 
@@ -254,7 +255,7 @@ class CountingCropDetectionService(PageCropDetectionService):
     def __init__(self) -> None:
         self.detection_count = 0
 
-    def detect_crop_to_suggest(self, jpeg_content: bytes) -> RectangleCrop | None:
+    def detect_crop_to_suggest(self, jpeg_content: bytes) -> PageCrop | None:
         self.detection_count += 1
         return None
 

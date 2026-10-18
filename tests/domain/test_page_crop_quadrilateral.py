@@ -291,3 +291,15 @@ def test_the_diagonal_card_keeps_its_proportion_in_the_output() -> None:
     width, height = DIAGONAL_CARD.output_size_in_pixels((1000, 1000))
 
     assert (width, height) == (round(math.hypot(497, 228)), round(math.hypot(441, 557)))
+
+
+def test_from_pixel_region_divides_by_the_image_size() -> None:
+    assert PageCrop.from_pixel_region(PixelRegion(10, 40, 50, 180), (100, 200)) == rectangle(0.1, 0.2, 0.5, 0.9)
+
+
+def test_from_pixel_region_round_trips_through_to_pixel_region() -> None:
+    region = PixelRegion(13, 41, 52, 177)
+
+    crop = PageCrop.from_pixel_region(region, (100, 200))
+
+    assert crop.to_pixel_region((100, 200)) == region

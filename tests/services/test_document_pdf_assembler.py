@@ -7,7 +7,6 @@ import pytest
 
 from digitalizadora.domain.document_draft_reconciliation import page_file_name
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_crop import RectangleCrop
 from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.repositories.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
@@ -15,6 +14,7 @@ from digitalizadora.services.document_page_renderer import DocumentPageRenderer
 from digitalizadora.services.document_pdf_assembler import DocumentAssemblyInput, DocumentPdfAssembler
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService, PdfDocumentMetadata
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, seed_draft_folder
+from tests.fakes.page_crops import rectangle
 from tests.fakes.sample_images import build_sample_jpeg
 
 FINALIZED_AT = DRAFT_CREATED_AT + timedelta(minutes=5)
@@ -70,7 +70,7 @@ def test_a_rotated_page_has_the_turned_physical_size(tmp_path):
 
 
 def test_a_cropped_page_has_the_physical_size_of_the_region(tmp_path):
-    framing = PageFraming(crop=RectangleCrop(0.0, 0.0, 0.5, 1.0))
+    framing = PageFraming(crops=(rectangle(0.0, 0.0, 0.5, 1.0),))
 
     pdf_content = write_pdf(seed_input(tmp_path, [WIDE_PAGE], [framing]))
 
@@ -78,7 +78,7 @@ def test_a_cropped_page_has_the_physical_size_of_the_region(tmp_path):
 
 
 def test_a_cropped_and_rotated_page_has_the_size_of_the_turned_region(tmp_path):
-    framing = PageFraming(PageRotation.CLOCKWISE_90, RectangleCrop(0.0, 0.0, 0.5, 1.0))
+    framing = PageFraming(PageRotation.CLOCKWISE_90, (rectangle(0.0, 0.0, 0.5, 1.0),))
 
     pdf_content = write_pdf(seed_input(tmp_path, [WIDE_PAGE], [framing]))
 

@@ -9,13 +9,14 @@ from digitalizadora.services.page_crop_detection_service import PageCropDetectio
 @dataclass(frozen=True)
 class CropDetectionResult:
     draft: DocumentDraft
-    crop_detected: bool
+    crops_detected: bool
+    ignored_region_count: int
 
 
 class DocumentPageCropDetector:
     """Looks for the sheet again on a page of the draft; runs inside an edit of DocumentDraftService.
 
-    When nothing is found the frame stays as it was and the draft is not touched.
+    When nothing is found the frames stay as they were and the draft is not touched.
     """
 
     def __init__(
@@ -31,10 +32,11 @@ class DocumentPageCropDetector:
         except ScanFailedError as error:
             raise DamagedDocumentPageError(page_identifier, stored_page.position) from error
         if master_crop is None:
-            return CropDetectionResult(self._current_draft(), crop_detected=False)
+            return CropDetectionResult(self._current_draft(), crops_detected=False, ignored_region_count=0)
         # The detection ran on the stored JPEG; the frame is kept in the orientation the page is displayed in.
-        displayed_crop = stored_page.page.framing.crop_from_master(master_crop)
-        return CropDetectionResult(self._draft_store.set_page_crop(page_identifier, displayed_crop), crop_detected=True)
+        displayed_crops = stored_page.page.framing.crops_from_master([master_crop])
+        draft = self._draft_store.set_page_crops(page_identifier, displayed_crops)
+        return CropDetectionResult(draft, crops_detected=True, ignored_region_count=0)
 
     def _current_draft(self) -> DocumentDraft:
         return self._draft_store.snapshot().draft

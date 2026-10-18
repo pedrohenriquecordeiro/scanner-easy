@@ -78,6 +78,11 @@ class DocumentDraft:
         return len(self.pages)
 
     @property
+    def output_page_count(self) -> int:
+        """The pages of the PDF: a page with two crops gives two."""
+        return sum(page.framing.output_count for page in self.pages)
+
+    @property
     def page_identifiers(self) -> tuple[str, ...]:
         return tuple(page.page_identifier for page in self.pages)
 

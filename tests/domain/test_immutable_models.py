@@ -9,7 +9,7 @@ from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import CropCorner, RectangleCrop, RectangleEdges
+from digitalizadora.domain.page_crop import CropCorner, RectangleEdges
 from digitalizadora.domain.page_framing import PageFraming
 from digitalizadora.domain.pixel_region import PixelCorner, PixelRegion
 from digitalizadora.domain.scan_job import ScanJob
@@ -49,7 +49,7 @@ MODELS = [
     ApplicationSettings(Path("/tmp"), OutputFormat.PDF, ScanPreset.DOCUMENT.settings),
     ImageAdjustment(),
     PixelRegion(0, 0, 1, 1),
-    RectangleCrop(0.0, 0.0, 1.0, 1.0),
+    rectangle(0.0, 0.0, 1.0, 1.0),
     CropCorner(0.0, 0.0),
     RectangleEdges(0.0, 0.0, 1.0, 1.0),
     PixelCorner(0.0, 0.0),

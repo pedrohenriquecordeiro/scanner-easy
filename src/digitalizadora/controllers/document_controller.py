@@ -1,12 +1,12 @@
 import logging
-from collections.abc import Awaitable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from http import HTTPStatus
 from types import MappingProxyType
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, StrictFloat, StrictInt
+from pydantic import BaseModel, Field, StrictFloat, StrictInt
 
 from digitalizadora.controllers.document_body import build_document_body
 from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog, build_error_body
@@ -17,7 +17,8 @@ from digitalizadora.domain.errors import (
     InvalidCropError,
     InvalidPageRotationError,
 )
-from digitalizadora.domain.page_crop import RectangleCrop
+from digitalizadora.domain.page_crop import CROP_PRECISION_DIGITS, CropCorner, PageCrop, RectangleEdges
+from digitalizadora.domain.page_framing import MAXIMUM_CROPS_PER_PAGE
 from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.document_draft_service import DocumentDraftService
@@ -50,22 +51,59 @@ THUMBNAIL_CACHE_HEADERS: Mapping[str, str] = MappingProxyType(
 )
 
 
-class PageCropEdgesRequestBody(BaseModel):
+class CropCornerRequestBody(BaseModel):
+    x: StrictInt | StrictFloat
+    y: StrictInt | StrictFloat
+
+    def to_crop_corner(self) -> CropCorner:
+        return CropCorner(self.x, self.y)
+
+
+class PageCropRequestBody(BaseModel):
+    """One crop: four corners in fractions of the page as it is displayed, clockwise from the top left."""
+
+    top_left: CropCornerRequestBody
+    top_right: CropCornerRequestBody
+    bottom_right: CropCornerRequestBody
+    bottom_left: CropCornerRequestBody
+
+    def to_page_crop(self) -> PageCrop:
+        return PageCrop.rounded(
+            [
+                self.top_left.to_crop_corner(),
+                self.top_right.to_crop_corner(),
+                self.bottom_right.to_crop_corner(),
+                self.bottom_left.to_crop_corner(),
+            ]
+        )
+
+
+class PageCropsRequestBody(BaseModel):
+    """{"crops": []} removes the crops of the page."""
+
+    crops: list[PageCropRequestBody] = Field(max_length=MAXIMUM_CROPS_PER_PAGE)
+
+    def to_page_crops(self) -> list[PageCrop]:
+        return [crop.to_page_crop() for crop in self.crops]
+
+
+class ProvisionalCropEdgesRequestBody(BaseModel):
     left: StrictInt | StrictFloat
     top: StrictInt | StrictFloat
     right: StrictInt | StrictFloat
     bottom: StrictInt | StrictFloat
 
 
-class PageCropRequestBody(BaseModel):
-    """{"crop": null} removes the crop; the edges are fractions of the page as it is displayed."""
+class ProvisionalCropRequestBody(BaseModel):
+    """The old {"crop": {...} | null} of one rectangle, until the page sends the crops."""
 
-    crop: PageCropEdgesRequestBody | None
+    crop: ProvisionalCropEdgesRequestBody | None
 
-    def to_page_crop(self) -> RectangleCrop | None:
+    def to_page_crops(self) -> list[PageCrop]:
         if self.crop is None:
-            return None
-        return RectangleCrop.rounded((self.crop.left, self.crop.top, self.crop.right, self.crop.bottom))
+            return []
+        edges = (self.crop.left, self.crop.top, self.crop.right, self.crop.bottom)
+        return [PageCrop.from_rectangle(RectangleEdges(*(round(edge, CROP_PRECISION_DIGITS) for edge in edges)))]
 
 
 def parse_page_rotation(rotation_degrees: int) -> PageRotation:
@@ -106,9 +144,14 @@ class DocumentController:
         )
         router.add_api_route("/api/document/pages/{page_identifier}/preview", self.read_preview, methods=["GET"])
         router.add_api_route("/api/document/pages/{page_identifier}/rotation", self.rotate_page, methods=["POST"])
+        router.add_api_route("/api/document/pages/{page_identifier}/crops", self.set_page_crops, methods=["PUT"])
+        router.add_api_route(
+            "/api/document/pages/{page_identifier}/crops/detect", self.detect_page_crops, methods=["POST"]
+        )
+        # Provisional alias of the old route, until the page sends the crops.
         router.add_api_route("/api/document/pages/{page_identifier}/crop", self.set_page_crop, methods=["PUT"])
         router.add_api_route(
-            "/api/document/pages/{page_identifier}/crop/detect", self.detect_page_crop, methods=["POST"]
+            "/api/document/pages/{page_identifier}/crop/detect", self.detect_page_crops, methods=["POST"]
         )
         router.add_api_route("/api/document/page-order", self.reorder_pages, methods=["PUT"])
         router.add_api_route("/api/document/name", self.rename_document, methods=["PUT"])
@@ -137,20 +180,35 @@ class DocumentController:
     async def rotate_page(self, page_identifier: str) -> JSONResponse:
         return await self._respond_to_edit(self._document_draft_service.rotate_page(page_identifier))
 
-    async def set_page_crop(self, page_identifier: str, body: PageCropRequestBody) -> JSONResponse:
+    async def set_page_crops(self, page_identifier: str, body: PageCropsRequestBody) -> JSONResponse:
+        return await self._respond_to_crops_edit(page_identifier, body.to_page_crops)
+
+    async def set_page_crop(self, page_identifier: str, body: ProvisionalCropRequestBody) -> JSONResponse:
+        return await self._respond_to_crops_edit(page_identifier, body.to_page_crops)
+
+    async def _respond_to_crops_edit(
+        self, page_identifier: str, build_crops: Callable[[], list[PageCrop]]
+    ) -> JSONResponse:
         try:
-            crop = body.to_page_crop()
+            crops = build_crops()
         except InvalidCropError as error:
             return self._respond_to_error(error)
-        return await self._respond_to_edit(self._document_draft_service.set_page_crop(page_identifier, crop))
+        return await self._respond_to_edit(self._document_draft_service.set_page_crops(page_identifier, crops))
 
-    async def detect_page_crop(self, page_identifier: str) -> JSONResponse:
+    async def detect_page_crops(self, page_identifier: str) -> JSONResponse:
         try:
-            detection = await self._document_draft_service.detect_page_crop(page_identifier)
+            detection = await self._document_draft_service.detect_page_crops(page_identifier)
         except DigitalizadoraError as error:
             return self._respond_to_error(error)
         body = build_document_body(self._document_draft_service.snapshot())
-        return JSONResponse(content={**body, "crop_detected": detection.crop_detected})
+        return JSONResponse(
+            content={
+                **body,
+                "crops_detected": detection.crops_detected,
+                "ignored_region_count": detection.ignored_region_count,
+                "crop_detected": detection.crops_detected,
+            }
+        )
 
     def read_thumbnail(self, page_identifier: str, rotation_degrees: int = 0) -> Response:
         try:
