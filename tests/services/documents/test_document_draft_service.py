@@ -23,9 +23,9 @@ from digitalizadora.domain.errors import (
     OutputFolderUnavailableError,
     PageNotFoundError,
 )
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scanned_image import ScannedImage

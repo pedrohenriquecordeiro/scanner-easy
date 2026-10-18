@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from numbers import Real
 
 from digitalizadora.domain.errors import InvalidCropError
-from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.domain.pixel_region import PixelCorner, PixelRegion
+from digitalizadora.domain.imaging.page_rotation import PageRotation
+from digitalizadora.domain.imaging.pixel_region import PixelCorner, PixelRegion
 
 MINIMUM_CROP_EDGE_SHARE = 0.02
 MINIMUM_CORNER_TRIANGLE_SHARE = 0.05

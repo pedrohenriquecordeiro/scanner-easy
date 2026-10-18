@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import BinaryIO
 
 from digitalizadora.domain.encoded_scan import EncodedScan
-from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.services.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
+from digitalizadora.domain.imaging.page_framing import PageFraming
+from digitalizadora.services.imaging.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
 from digitalizadora.services.scan_encoder import OutputIdentity, ScanEncoder
 
 

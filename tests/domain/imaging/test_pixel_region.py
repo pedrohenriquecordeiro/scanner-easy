@@ -1,4 +1,4 @@
-from digitalizadora.domain.pixel_region import PixelRegion
+from digitalizadora.domain.imaging.pixel_region import PixelRegion
 
 REGION = PixelRegion(left=10, top=20, right=110, bottom=70)
 

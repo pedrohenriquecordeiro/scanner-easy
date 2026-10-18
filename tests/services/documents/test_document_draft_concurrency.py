@@ -10,8 +10,8 @@ from digitalizadora.domain.errors import (
     InsufficientStorageError,
     ScanAlreadyRunningError,
 )
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult

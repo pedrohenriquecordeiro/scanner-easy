@@ -7,10 +7,10 @@ from digitalizadora.domain.documents.document_draft import (
     DocumentPage,
     DraftSnapshot,
 )
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.documents.document_draft_store import DraftStorageState

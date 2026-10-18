@@ -16,7 +16,7 @@ from digitalizadora.domain.errors import (
     OutputFolderUnavailableError,
     ScanFailedError,
 )
-from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scan_job import ScanJob
@@ -28,9 +28,10 @@ from digitalizadora.repositories.file_system_scan_output_repository import FileS
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,
 )
+from digitalizadora.services.imaging.page_crop_detection_service import DetectedCrops, PageCropDetectionService
+from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
+from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.page_crop_detection_service import DetectedCrops, PageCropDetectionService
-from digitalizadora.services.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import QuickScanOutputRenderer
 from digitalizadora.services.quick_scan.scan_output_service import ScanOutputParts, ScanOutputService
@@ -41,7 +42,6 @@ from digitalizadora.services.storage_guard_service import (
     StorageGuardService,
     estimated_page_bytes,
 )
-from digitalizadora.services.thumbnail_service import ThumbnailService
 from tests.fakes.document_service_parts import InstantFileWriter
 from tests.fakes.fixed_clock import FixedClock, TickingClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository

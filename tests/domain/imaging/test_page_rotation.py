@@ -1,6 +1,6 @@
 import pytest
 
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 
 
 @pytest.mark.parametrize(

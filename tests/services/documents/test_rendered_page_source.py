@@ -4,10 +4,10 @@ from typing import BinaryIO
 import pytest
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.services.documents.rendered_page_source import RenderedPageSource
-from digitalizadora.services.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
+from digitalizadora.services.imaging.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
 from tests.fakes.synthetic_scans import build_marked_scan_jpeg, read_jpeg_size
 
 UNTOUCHED = FrameRenderRequest(UNFRAMED, 0)

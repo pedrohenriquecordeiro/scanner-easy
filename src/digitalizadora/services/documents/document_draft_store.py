@@ -30,8 +30,8 @@ from digitalizadora.domain.errors import (
     UnreadableDraftError,
     as_draft_storage_error,
 )
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.ports import DocumentDraftRepository
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import StorageGuardService

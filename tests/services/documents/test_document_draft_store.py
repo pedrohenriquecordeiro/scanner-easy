@@ -24,9 +24,9 @@ from digitalizadora.domain.errors import (
     OutputFolderUnavailableError,
     PageNotFoundError,
 )
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.domain.scan_settings import ScanSettings

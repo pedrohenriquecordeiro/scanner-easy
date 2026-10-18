@@ -24,7 +24,7 @@ from digitalizadora.infrastructure.bonjour_scanner_discovery import ServiceRecor
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.documents.file_system_document_draft_repository import OWNER_LOCK_FILE_NAME
 from digitalizadora.repositories.json_scanner_endpoint_repository import JsonScannerEndpointRepository
-from digitalizadora.services.image_pixel_limit import MAXIMUM_SCANNER_IMAGE_PIXELS
+from digitalizadora.services.imaging.image_pixel_limit import MAXIMUM_SCANNER_IMAGE_PIXELS
 from tests.fakes.configuration_builder import TEST_PORT, build_application_configuration
 from tests.fakes.quick_scan_parts import ONE_PHOTO, QuickScanFolders, build_job, build_quick_scan_parts_in
 

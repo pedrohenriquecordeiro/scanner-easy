@@ -8,8 +8,8 @@ from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
-from digitalizadora.domain.image_adjustment import RENDERED_SIZE_FACTOR
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.image_adjustment import RENDERED_SIZE_FACTOR
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.scan_result import ScanResult
 
 PAGE_IDENTIFIER_PATTERN = re.compile(r"[0-9a-f]{16}")

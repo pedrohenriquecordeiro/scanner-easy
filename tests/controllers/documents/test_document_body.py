@@ -9,9 +9,9 @@ from digitalizadora.domain.documents.document_draft import (
     DraftSnapshot,
     RecoveryOutcome,
 )
+from digitalizadora.domain.imaging.page_framing import PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from digitalizadora.services.documents.document_draft_store import UNAVAILABLE_DRAFT_STORAGE_STATE, DraftStorageState
 from tests.fakes.document_drafts import build_document_draft, page_identifier_at

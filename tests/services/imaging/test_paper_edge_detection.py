@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from PIL import Image, ImageDraw
 
-from digitalizadora.services.paper_edge_detection import PaperEdges, detect_paper_edges
+from digitalizadora.services.imaging.paper_edge_detection import PaperEdges, detect_paper_edges
 from tests.fakes.book_on_glass import BookOnGlass, build_book_on_glass_preview
 from tests.fakes.synthetic_previews import (
     PAPER_LEVEL,

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from digitalizadora.domain.documents.document_draft import DocumentDraft
 from digitalizadora.domain.errors import DamagedDocumentPageError, ScanFailedError
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
 
 
 @dataclass(frozen=True)

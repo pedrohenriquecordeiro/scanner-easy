@@ -18,8 +18,8 @@ from digitalizadora.domain.errors import (
     InvalidCropError,
     InvalidPageRotationError,
 )
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.services.application_settings_service import ApplicationSettingsService
 from digitalizadora.services.documents.document_draft_service import DocumentDraftService
 

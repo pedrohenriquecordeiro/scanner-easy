@@ -3,7 +3,7 @@ from pathlib import Path
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
 from digitalizadora.domain.color_mode import ColorMode
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_settings import ScanSettings

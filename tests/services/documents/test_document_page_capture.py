@@ -7,10 +7,10 @@ import pytest
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.documents.document_draft import DocumentPage
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, InsufficientDraftStorageError, ScanFailedError
-from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.page_framing import UNFRAMED
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_framing import UNFRAMED
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.domain.scan_request import ScanRequest
@@ -21,8 +21,9 @@ from digitalizadora.repositories.documents.file_system_document_draft_repository
 )
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.documents.document_page_capture import DocumentPageCapture
+from digitalizadora.services.imaging.page_crop_detection_service import DetectedCrops, PageCropDetectionService
+from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.page_crop_detection_service import DetectedCrops, PageCropDetectionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.scan_encoder import EncodedMaster, ScanEncoder
 from digitalizadora.services.storage_guard_service import (
@@ -31,7 +32,6 @@ from digitalizadora.services.storage_guard_service import (
     StorageGuardService,
     estimated_page_bytes,
 )
-from digitalizadora.services.thumbnail_service import ThumbnailService
 from tests.fakes.document_drafts import page_identifier_at
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg

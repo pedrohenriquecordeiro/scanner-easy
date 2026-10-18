@@ -3,8 +3,8 @@ from typing import Any
 
 from PIL import Image, JpegImagePlugin
 
-from digitalizadora.domain.image_adjustment import REENCODING_JPEG_QUALITY
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.image_adjustment import REENCODING_JPEG_QUALITY
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 
 NO_CHROMA_SUBSAMPLING = -1
 # Pillow turns counterclockwise, the page turns clockwise.

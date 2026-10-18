@@ -9,7 +9,7 @@ from digitalizadora.domain.documents.document_draft import (
     DraftRecoveryReport,
     DraftSnapshot,
 )
-from digitalizadora.domain.page_crop import CROP_CORNER_ROLES, PageCrop
+from digitalizadora.domain.imaging.page_crop import CROP_CORNER_ROLES, PageCrop
 from digitalizadora.services.documents.document_draft_store import DraftStorageState
 
 EMPTY_PAGE_COUNT = 0

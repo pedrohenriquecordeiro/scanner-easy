@@ -7,12 +7,12 @@ from dataclasses import dataclass
 from PIL import Image
 
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, InvalidCropError, ScanFailedError
-from digitalizadora.domain.page_crop import CropCorner, PageCrop
-from digitalizadora.domain.page_framing import put_in_reading_order
-from digitalizadora.domain.pixel_region import PixelRegion
-from digitalizadora.services.edge_refinement import refine_corners
-from digitalizadora.services.paper_edge_detection import PaperEdges, detect_paper_edges
-from digitalizadora.services.photo_region_detection import (
+from digitalizadora.domain.imaging.page_crop import CropCorner, PageCrop
+from digitalizadora.domain.imaging.page_framing import put_in_reading_order
+from digitalizadora.domain.imaging.pixel_region import PixelRegion
+from digitalizadora.services.imaging.edge_refinement import refine_corners
+from digitalizadora.services.imaging.paper_edge_detection import PaperEdges, detect_paper_edges
+from digitalizadora.services.imaging.photo_region_detection import (
     PREVIEW_MAXIMUM_EDGE_PIXELS,
     Corners,
     PhotoRegion,

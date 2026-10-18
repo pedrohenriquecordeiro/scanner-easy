@@ -1,6 +1,6 @@
 import pytest
 
-from digitalizadora.domain.image_adjustment import (
+from digitalizadora.domain.imaging.image_adjustment import (
     NO_ADJUSTMENT,
     REENCODING_JPEG_QUALITY,
     RENDERED_SIZE_FACTOR,

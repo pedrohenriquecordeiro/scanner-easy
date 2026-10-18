@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, StrictFloat, StrictInt
 
-from digitalizadora.domain.page_crop import CropCorner, PageCrop
-from digitalizadora.domain.page_framing import MAXIMUM_CROPS_PER_PAGE
+from digitalizadora.domain.imaging.page_crop import CropCorner, PageCrop
+from digitalizadora.domain.imaging.page_framing import MAXIMUM_CROPS_PER_PAGE
 
 
 class CropCornerRequestBody(BaseModel):

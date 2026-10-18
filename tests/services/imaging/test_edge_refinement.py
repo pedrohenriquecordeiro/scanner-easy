@@ -3,7 +3,7 @@ import math
 import pytest
 from PIL import Image, ImageDraw
 
-from digitalizadora.services.edge_refinement import refine_corners
+from digitalizadora.services.imaging.edge_refinement import refine_corners
 from tests.fakes.photo_scenes import rotated_rectangle_corners
 
 PAGE_SIZE = (600, 800)

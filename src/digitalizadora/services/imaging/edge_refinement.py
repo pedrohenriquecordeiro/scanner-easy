@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from PIL import Image
 
-from digitalizadora.services.photo_region_detection import Corners, Point
+from digitalizadora.services.imaging.photo_region_detection import Corners, Point
 
 PROFILE_POSITIONS = 9
 FIRST_PROFILE_SHARE = 0.1

@@ -5,17 +5,17 @@ from pathlib import Path
 import pytest
 
 from digitalizadora.domain.errors import InvalidCropError
-from digitalizadora.domain.page_crop import (
+from digitalizadora.domain.imaging.page_crop import (
     CropCorner,
     PageCrop,
     RectangleEdges,
     find_quadrilateral_problem,
 )
-from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.domain.pixel_region import PixelCorner, PixelRegion
+from digitalizadora.domain.imaging.page_rotation import PageRotation
+from digitalizadora.domain.imaging.pixel_region import PixelCorner, PixelRegion
 from tests.fakes.page_crops import quadrilateral, rectangle
 
-VECTORS_FILE = Path(__file__).parent.parent / "fixtures" / "page-crop-vectors.json"
+VECTORS_FILE = Path(__file__).resolve().parents[2] / "fixtures" / "page-crop-vectors.json"
 VECTOR_DOCUMENT = json.loads(VECTORS_FILE.read_text(encoding="utf-8"))
 TURN_VECTORS = VECTOR_DOCUMENT["vectors"]
 VALIDITY_CASES = VECTOR_DOCUMENT["validity"]

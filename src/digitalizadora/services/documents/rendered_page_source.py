@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.services.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
+from digitalizadora.services.imaging.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
 
 
 class RenderedPageSource:

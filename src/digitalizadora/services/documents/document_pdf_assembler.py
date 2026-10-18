@@ -6,7 +6,7 @@ from typing import BinaryIO
 
 from digitalizadora.domain.documents.document_draft import DocumentDraft
 from digitalizadora.services.documents.rendered_page_source import RenderedPageSource
-from digitalizadora.services.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
+from digitalizadora.services.imaging.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService, PdfDocumentMetadata
 
 

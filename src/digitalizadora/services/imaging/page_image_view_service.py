@@ -3,8 +3,8 @@ import io
 from PIL import Image
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.services.jpeg_reencoding import TRANSPOSE_BY_ROTATION
+from digitalizadora.domain.imaging.page_rotation import PageRotation
+from digitalizadora.services.imaging.jpeg_reencoding import TRANSPOSE_BY_ROTATION
 
 ENLARGED_VIEW_MAXIMUM_EDGE_PIXELS = 1600
 VIEW_JPEG_QUALITY = 85

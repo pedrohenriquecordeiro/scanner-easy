@@ -4,8 +4,8 @@ import pytest
 from PIL import Image, JpegImagePlugin
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.services.page_image_view_service import (
+from digitalizadora.domain.imaging.page_rotation import PageRotation
+from digitalizadora.services.imaging.page_image_view_service import (
     ENLARGED_VIEW_MAXIMUM_EDGE_PIXELS,
     VIEW_JPEG_QUALITY,
     PageImageViewService,

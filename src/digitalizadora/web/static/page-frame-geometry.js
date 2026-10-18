@@ -4,7 +4,7 @@
 // from 0 to 1 of the page as it is displayed (after the page rotation), {top_left, top_right, bottom_right,
 // bottom_left}, each one {x, y}, clockwise on the screen. It is exactly the crop the server stores and sends, and
 // an axis-aligned rectangle is just the special case. The rules of validity, the turns and the reading order are the
-// ones of the server (domain/page_crop.py, domain/page_framing.py); tests/fixtures/page-crop-vectors.json holds
+// ones of the server (domain/imaging/page_crop.py, domain/imaging/page_framing.py); tests/fixtures/page-crop-vectors.json holds
 // the shared test vectors both sides read. page-frame-editor.js, document-panel.js and last-scan-panel.js wire
 // these functions to the page; index.html loads this file before them.
 

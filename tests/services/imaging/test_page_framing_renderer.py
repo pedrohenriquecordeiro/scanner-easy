@@ -5,11 +5,11 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.image_adjustment import REENCODING_JPEG_QUALITY
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.services import page_framing_renderer
-from digitalizadora.services.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
+from digitalizadora.domain.imaging.image_adjustment import REENCODING_JPEG_QUALITY
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
+from digitalizadora.services.imaging import page_framing_renderer
+from digitalizadora.services.imaging.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
 from tests.fakes.page_crops import quadrilateral, rectangle
 from tests.fakes.photo_scenes import PlacedPhoto, build_photo_scene_jpeg, photo_corners
 from tests.fakes.synthetic_scans import build_marked_scan_jpeg, find_marker_corner, read_jpeg_size

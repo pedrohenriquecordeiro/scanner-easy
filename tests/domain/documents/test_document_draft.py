@@ -20,10 +20,10 @@ from digitalizadora.domain.documents.document_draft import (
     is_page_identifier,
 )
 from digitalizadora.domain.errors import EmptyDocumentError, InvalidPageOrderError, PageNotFoundError
-from digitalizadora.domain.image_adjustment import RENDERED_SIZE_FACTOR
+from digitalizadora.domain.imaging.image_adjustment import RENDERED_SIZE_FACTOR
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_result import ScanResult
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, build_document_draft, build_document_page
 from tests.fakes.page_crops import rectangle

@@ -9,7 +9,7 @@ from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.quick_scan.scan_controller import ScanController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.errors import ScanAlreadyRunningError, ScannerUnreachableError
-from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.services.application_settings_service import ApplicationSettingsService

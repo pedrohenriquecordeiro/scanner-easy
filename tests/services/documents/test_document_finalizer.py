@@ -16,9 +16,9 @@ from digitalizadora.domain.errors import (
     InsufficientStorageError,
     OutputFolderUnavailableError,
 )
+from digitalizadora.domain.imaging.page_framing import PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
 from digitalizadora.domain.scan_preset import ScanPreset
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
@@ -26,7 +26,7 @@ from digitalizadora.repositories.documents.file_system_document_draft_repository
 from digitalizadora.repositories.file_system_scan_output_repository import FileSystemScanOutputRepository
 from digitalizadora.services.documents.document_finalizer import DocumentFinalizer
 from digitalizadora.services.documents.document_pdf_assembler import DocumentAssemblyInput, DocumentPdfAssembler
-from digitalizadora.services.page_framing_renderer import PageFramingRenderer
+from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
 from digitalizadora.services.pdf_assembly_service import PageImageSource, PdfAssemblyService, PdfDocumentMetadata
 from digitalizadora.services.storage_guard_service import MINIMUM_FREE_SPACE_BYTES, StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, seed_draft_folder

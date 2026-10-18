@@ -6,13 +6,13 @@ from digitalizadora.domain.errors import ScanFailedError
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.services.imaging.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.pdf_assembly_service import (
     DEFAULT_PDF_TITLE_TEMPLATE,
     PdfAssemblyService,
     PdfDocumentSpecification,
 )
-from digitalizadora.services.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 
 EXPECTED_MEDIA_TYPE = "image/jpeg"
 

@@ -8,11 +8,11 @@ import pytest
 
 from digitalizadora.domain.documents.document_draft_reconciliation import page_file_name
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_framing import PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.repositories.documents.file_system_document_draft_repository import CURRENT_DRAFT_FOLDER_NAME
 from digitalizadora.services.documents.document_pdf_assembler import DocumentAssemblyInput, DocumentPdfAssembler
-from digitalizadora.services.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
+from digitalizadora.services.imaging.page_framing_renderer import FrameRenderRequest, PageFramingRenderer
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService, PdfDocumentMetadata
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, seed_draft_folder
 from tests.fakes.page_crops import rectangle

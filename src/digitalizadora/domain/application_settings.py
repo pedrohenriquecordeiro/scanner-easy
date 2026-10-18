@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from digitalizadora.domain.capture_mode import CaptureMode
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_settings import ScanSettings

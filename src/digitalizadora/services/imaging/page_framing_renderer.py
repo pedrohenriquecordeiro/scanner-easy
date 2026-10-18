@@ -5,10 +5,10 @@ from typing import BinaryIO
 from PIL import Image
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.services.jpeg_reencoding import TRANSPOSE_BY_ROTATION, read_encoding_options, replace_with
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_framing import PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
+from digitalizadora.services.imaging.jpeg_reencoding import TRANSPOSE_BY_ROTATION, read_encoding_options, replace_with
 
 
 @dataclass(frozen=True)

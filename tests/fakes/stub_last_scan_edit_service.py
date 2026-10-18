@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from digitalizadora.domain.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_crop import PageCrop
 from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditResult
 from tests.fakes.stored_scans import build_last_scan
 

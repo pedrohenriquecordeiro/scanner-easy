@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.quick_scan.last_scan import LastScan, SavedScanFile
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 

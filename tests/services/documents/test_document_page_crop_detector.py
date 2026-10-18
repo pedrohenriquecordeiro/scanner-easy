@@ -8,16 +8,16 @@ from digitalizadora.domain.errors import (
     NoOpenDocumentError,
     PageNotFoundError,
 )
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.domain.page_framing import UNFRAMED
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_framing import UNFRAMED
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (
     CURRENT_DRAFT_FOLDER_NAME,
     FileSystemDocumentDraftRepository,
 )
 from digitalizadora.services.documents.document_draft_store import DocumentDraftStore, DraftIdentitySource
 from digitalizadora.services.documents.document_page_crop_detector import CropDetectionResult, DocumentPageCropDetector
-from digitalizadora.services.page_crop_detection_service import DetectedCrops, PageCropDetectionService
+from digitalizadora.services.imaging.page_crop_detection_service import DetectedCrops, PageCropDetectionService
 from digitalizadora.services.storage_guard_service import StorageGuardService
 from tests.fakes.document_drafts import DRAFT_CREATED_AT, page_identifier_at, seed_draft_folder
 from tests.fakes.document_service_parts import InstantFileWriter

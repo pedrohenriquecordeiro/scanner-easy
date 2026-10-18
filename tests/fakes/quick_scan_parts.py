@@ -9,7 +9,7 @@ from PIL import Image
 
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.color_mode import ColorMode
-from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_file_naming_policy import ScanFileNamingPolicy
@@ -22,10 +22,11 @@ from digitalizadora.repositories.file_system_scan_output_repository import FileS
 from digitalizadora.repositories.quick_scan.file_system_quick_scan_slot_repository import (
     FileSystemQuickScanSlotRepository,
 )
+from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
+from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
+from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
-from digitalizadora.services.page_framing_renderer import PageFramingRenderer
-from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditParts, LastScanEditService
 from digitalizadora.services.quick_scan.last_scan_view_service import LastScanViewService
@@ -34,7 +35,6 @@ from digitalizadora.services.quick_scan.scan_output_service import ScanOutputPar
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.storage_guard_service import StorageGuardService
-from digitalizadora.services.thumbnail_service import ThumbnailService
 from tests.fakes.document_service_parts import InstantFileWriter
 from tests.fakes.fixed_clock import TickingClock
 from tests.fakes.in_memory_settings_repository import InMemoryApplicationSettingsRepository

@@ -2,12 +2,12 @@ import logging
 
 from digitalizadora.domain.documents.document_draft import DocumentPage
 from digitalizadora.domain.errors import DigitalizadoraError
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scanned_image import ScannedImage
 from digitalizadora.services.documents.document_draft_store import CapturedPage, DocumentDraftStore
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.scan_encoder import ScanEncoder
 
 LOGGER = logging.getLogger(__name__)

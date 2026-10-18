@@ -4,7 +4,7 @@ import pytest
 from PIL import Image, JpegImagePlugin
 
 from digitalizadora.domain.errors import ScanFailedError
-from digitalizadora.services.thumbnail_service import ThumbnailService
+from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
 from tests.fakes.jpeg_segments import declare_image_size
 from tests.fakes.sample_images import build_sample_jpeg
 

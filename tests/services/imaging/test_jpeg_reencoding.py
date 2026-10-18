@@ -3,9 +3,9 @@ import io
 import pytest
 from PIL import Image
 
-from digitalizadora.domain.image_adjustment import REENCODING_JPEG_QUALITY
-from digitalizadora.domain.page_rotation import PageRotation
-from digitalizadora.services.jpeg_reencoding import (
+from digitalizadora.domain.imaging.image_adjustment import REENCODING_JPEG_QUALITY
+from digitalizadora.domain.imaging.page_rotation import PageRotation
+from digitalizadora.services.imaging.jpeg_reencoding import (
     TRANSPOSE_BY_ROTATION,
     read_encoding_options,
     replace_with,

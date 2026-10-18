@@ -19,8 +19,8 @@ from digitalizadora.domain.errors import (
     SavedScanUnreadableError,
     ScanAlreadyRunningError,
 )
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scanned_image import ScannedImage

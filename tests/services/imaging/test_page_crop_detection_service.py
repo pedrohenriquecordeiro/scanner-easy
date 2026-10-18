@@ -9,10 +9,10 @@ import pytest
 from PIL import Image
 
 from digitalizadora.domain.errors import ImageAdjustmentFailedError, ScanFailedError
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.services import page_crop_detection_service
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
-from digitalizadora.services.paper_edge_detection import PaperEdges
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.services.imaging import page_crop_detection_service
+from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.imaging.paper_edge_detection import PaperEdges
 from tests.fakes.book_on_glass import BookOnGlass, build_book_on_glass_jpeg
 from tests.fakes.photo_scenes import (
     PlacedPhoto,

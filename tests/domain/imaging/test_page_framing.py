@@ -1,14 +1,14 @@
 import pytest
 
 from digitalizadora.domain.errors import InvalidCropError
-from digitalizadora.domain.page_crop import CropCorner
-from digitalizadora.domain.page_framing import (
+from digitalizadora.domain.imaging.page_crop import CropCorner
+from digitalizadora.domain.imaging.page_framing import (
     MAXIMUM_CROPS_PER_PAGE,
     UNFRAMED,
     PageFraming,
     put_in_reading_order,
 )
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from tests.fakes.page_crops import quadrilateral, rectangle
 
 SAMPLE_CROP = rectangle((0.1, 0.2, 0.5, 0.9))

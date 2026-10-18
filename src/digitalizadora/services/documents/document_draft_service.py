@@ -15,10 +15,10 @@ from digitalizadora.domain.errors import (
     NoOpenDocumentError,
     ScanAlreadyRunningError,
 )
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, ImageAdjustment
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.domain.page_rotation import PageRotation
 from digitalizadora.domain.ports import Clock
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_result import ScanResult

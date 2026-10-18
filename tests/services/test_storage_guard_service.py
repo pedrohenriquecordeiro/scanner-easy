@@ -6,7 +6,7 @@ import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, RENDERED_SIZE_FACTOR, ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, RENDERED_SIZE_FACTOR, ImageAdjustment
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.services.storage_guard_service import (
     MINIMUM_FREE_SPACE_BYTES,

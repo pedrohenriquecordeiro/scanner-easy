@@ -4,7 +4,7 @@ from pathlib import Path
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.errors import InsufficientStorageError, OutputFolderUnavailableError
-from digitalizadora.domain.image_adjustment import NO_ADJUSTMENT, RENDERED_SIZE_FACTOR, ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import NO_ADJUSTMENT, RENDERED_SIZE_FACTOR, ImageAdjustment
 from digitalizadora.domain.scan_quality import pixels_per_page
 from digitalizadora.domain.scan_settings import ScanSettings
 

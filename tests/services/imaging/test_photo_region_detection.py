@@ -5,8 +5,8 @@ import time
 import pytest
 from PIL import Image, ImageDraw
 
-from digitalizadora.domain.pixel_region import PixelRegion
-from digitalizadora.services.photo_region_detection import PhotoRegion, detect_photo_regions
+from digitalizadora.domain.imaging.pixel_region import PixelRegion
+from digitalizadora.services.imaging.photo_region_detection import PhotoRegion, detect_photo_regions
 from tests.fakes.book_on_glass import BookOnGlass, build_book_on_glass_jpeg
 from tests.fakes.photo_scenes import (
     PlacedPhoto,

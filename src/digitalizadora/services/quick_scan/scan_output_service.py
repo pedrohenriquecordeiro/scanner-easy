@@ -5,14 +5,14 @@ from dataclasses import dataclass, replace
 
 from digitalizadora.domain.encoded_scan import EncodedScan
 from digitalizadora.domain.errors import DigitalizadoraError, ImageAdjustmentFailedError
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
 from digitalizadora.domain.ports import QuickScanSlotRepository, ScanOutputRepository
 from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan
 from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scanned_image import ScannedImage
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
 from digitalizadora.services.quick_scan.quick_scan_output_renderer import OutputsRequest, QuickScanOutputRenderer
 from digitalizadora.services.scan_encoder import EncodedMaster, OutputIdentity, ScanEncoder
 from digitalizadora.services.storage_guard_service import StorageGuardService

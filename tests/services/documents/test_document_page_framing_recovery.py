@@ -8,8 +8,8 @@ import pytest
 
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.documents.document_draft_reconciliation import page_file_name, thumbnail_file_name
-from digitalizadora.domain.page_framing import UNFRAMED, PageFraming
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_framing import UNFRAMED, PageFraming
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.repositories.atomic_file_writer import AtomicFileWriter
 from digitalizadora.repositories.documents.file_system_document_draft_repository import (

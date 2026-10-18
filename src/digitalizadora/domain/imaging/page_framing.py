@@ -2,8 +2,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
 from digitalizadora.domain.errors import InvalidCropError
-from digitalizadora.domain.page_crop import PageCrop
-from digitalizadora.domain.page_rotation import DEGREES_IN_A_QUARTER_TURN, PageRotation
+from digitalizadora.domain.imaging.page_crop import PageCrop
+from digitalizadora.domain.imaging.page_rotation import DEGREES_IN_A_QUARTER_TURN, PageRotation
 
 MAXIMUM_CROPS_PER_PAGE = 2
 # Two crops share a row of the page when their vertical ranges overlap by more than this share of the shorter one.

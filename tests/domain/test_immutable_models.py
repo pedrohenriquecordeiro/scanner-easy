@@ -7,11 +7,11 @@ import pytest
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.color_mode import ColorMode
 from digitalizadora.domain.encoded_scan import EncodedScan
-from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.page_crop import CropCorner, RectangleEdges
+from digitalizadora.domain.imaging.page_framing import PageFraming
+from digitalizadora.domain.imaging.pixel_region import PixelCorner, PixelRegion
 from digitalizadora.domain.output_format import OutputFormat
-from digitalizadora.domain.page_crop import CropCorner, RectangleEdges
-from digitalizadora.domain.page_framing import PageFraming
-from digitalizadora.domain.pixel_region import PixelCorner, PixelRegion
 from digitalizadora.domain.quick_scan.last_scan import LastScan, QuickScanMasterFiles, QuickScanSlot, SavedScanFile
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot
 from digitalizadora.domain.quick_scan.stored_scan import StoredScan

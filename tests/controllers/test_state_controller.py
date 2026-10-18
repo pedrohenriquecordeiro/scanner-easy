@@ -9,7 +9,7 @@ from digitalizadora.controllers.error_message_catalog import ErrorMessageCatalog
 from digitalizadora.controllers.state_controller import StateController
 from digitalizadora.domain.application_settings import ApplicationSettings
 from digitalizadora.domain.capture_mode import CaptureMode
-from digitalizadora.domain.image_adjustment import ImageAdjustment
+from digitalizadora.domain.imaging.image_adjustment import ImageAdjustment
 from digitalizadora.domain.output_format import OutputFormat
 from digitalizadora.domain.quick_scan.last_scan import SavedScanFile
 from digitalizadora.domain.quick_scan.scan_progress import ScanPhase, ScanProgressSnapshot

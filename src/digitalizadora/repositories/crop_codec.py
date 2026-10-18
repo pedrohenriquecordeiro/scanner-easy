@@ -1,7 +1,7 @@
 """The JSON form of a crop, shared by the manifests: four corners named by their role, in fractions of the page."""
 
 from digitalizadora.domain.errors import InvalidCropError
-from digitalizadora.domain.page_crop import CROP_CORNER_ROLES, CropCorner, PageCrop, RectangleEdges
+from digitalizadora.domain.imaging.page_crop import CROP_CORNER_ROLES, CropCorner, PageCrop, RectangleEdges
 
 LEGACY_CROP_EDGE_KEYS = ("left", "top", "right", "bottom")
 

@@ -1,4 +1,4 @@
-from digitalizadora.domain.page_crop import CropCorner, PageCrop, RectangleEdges
+from digitalizadora.domain.imaging.page_crop import CropCorner, PageCrop, RectangleEdges
 
 
 def rectangle(edges: tuple[float, float, float, float]) -> PageCrop:

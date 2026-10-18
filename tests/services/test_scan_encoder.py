@@ -12,10 +12,10 @@ from digitalizadora.domain.scan_job import ScanJob
 from digitalizadora.domain.scan_request import ScanRequest
 from digitalizadora.domain.scan_settings import ScanSettings
 from digitalizadora.domain.scanned_image import ScannedImage
+from digitalizadora.services.imaging.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.scan_encoder import OutputIdentity, ScanEncoder
-from digitalizadora.services.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS, ThumbnailService
 from tests.fakes.fixed_clock import FixedClock
 from tests.fakes.jpeg_segments import declare_image_size, strip_jfif_segment
 from tests.fakes.sample_images import build_sample_jpeg

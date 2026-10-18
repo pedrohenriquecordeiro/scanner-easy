@@ -5,11 +5,14 @@ from digitalizadora.domain.errors import (
     SavedScanUnreadableError,
     ScanFailedError,
 )
-from digitalizadora.domain.page_rotation import PageRotation
+from digitalizadora.domain.imaging.page_rotation import PageRotation
 from digitalizadora.domain.ports import QuickScanSlotRepository
-from digitalizadora.services.page_image_view_service import ENLARGED_VIEW_MAXIMUM_EDGE_PIXELS, PageImageViewService
+from digitalizadora.services.imaging.page_image_view_service import (
+    ENLARGED_VIEW_MAXIMUM_EDGE_PIXELS,
+    PageImageViewService,
+)
+from digitalizadora.services.imaging.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS
 from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgressTracker
-from digitalizadora.services.thumbnail_service import THUMBNAIL_MAXIMUM_EDGE_PIXELS
 
 
 class LastScanViewService:

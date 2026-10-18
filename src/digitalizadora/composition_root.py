@@ -49,11 +49,12 @@ from digitalizadora.services.documents.document_page_capture import DocumentPage
 from digitalizadora.services.documents.document_page_crop_detector import DocumentPageCropDetector
 from digitalizadora.services.documents.document_page_view_service import DocumentPageViewService
 from digitalizadora.services.documents.document_pdf_assembler import DocumentPdfAssembler
-from digitalizadora.services.image_pixel_limit import raise_decompression_limit_to_scanner_size
+from digitalizadora.services.imaging.image_pixel_limit import raise_decompression_limit_to_scanner_size
+from digitalizadora.services.imaging.page_crop_detection_service import PageCropDetectionService
+from digitalizadora.services.imaging.page_framing_renderer import PageFramingRenderer
+from digitalizadora.services.imaging.page_image_view_service import PageImageViewService
+from digitalizadora.services.imaging.thumbnail_service import ThumbnailService
 from digitalizadora.services.jpeg_resolution_service import JpegResolutionService
-from digitalizadora.services.page_crop_detection_service import PageCropDetectionService
-from digitalizadora.services.page_framing_renderer import PageFramingRenderer
-from digitalizadora.services.page_image_view_service import PageImageViewService
 from digitalizadora.services.pdf_assembly_service import PdfAssemblyService
 from digitalizadora.services.printer_connection_service import PrinterConnectionService
 from digitalizadora.services.quick_scan.last_scan_edit_service import LastScanEditParts, LastScanEditService
@@ -64,7 +65,6 @@ from digitalizadora.services.quick_scan.scan_progress_tracker import ScanProgres
 from digitalizadora.services.scan_encoder import ScanEncoder
 from digitalizadora.services.scan_service import ScanService
 from digitalizadora.services.storage_guard_service import StorageGuardService, read_free_space_in_bytes
-from digitalizadora.services.thumbnail_service import ThumbnailService
 
 logger = logging.getLogger(__name__)
 
