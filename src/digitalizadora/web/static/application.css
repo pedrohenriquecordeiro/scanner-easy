@@ -337,6 +337,26 @@ button:disabled {
   margin: 0;
   color: var(--color-error-text);
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.field-confirmation {
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-success-background);
+  color: var(--color-success-text);
+  font-weight: 600;
+}
+
+/* A pressed button looks pressed at once, before the answer of the server. */
+button:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(0.9);
+}
+
+button[aria-busy="true"]:disabled {
+  cursor: progress;
 }
 
 .storage-line,

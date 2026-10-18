@@ -18,6 +18,7 @@
   <script src="/static/page-frame-editor.js" defer></script>
   <script src="/static/document-panel.js" defer></script>
   <script src="/static/last-scan-panel.js" defer></script>
+  <script src="/static/settings-feedback.js" defer></script>
   <script src="/static/application.js" defer></script>
 </head>
 <body>
@@ -174,9 +175,10 @@
         <label for="output-folder-input">Pasta de saída</label>
         <div class="folder-row">
           <input id="output-folder-input" type="text" name="output-folder" autocomplete="off" spellcheck="false">
-          <button id="output-folder-save-button" type="button" aria-label="Salvar pasta de saída">Salvar pasta</button>
+          <button id="output-folder-save-button" type="button" aria-label="Salvar pasta de saída">Salvar</button>
         </div>
-        <p id="output-folder-message" class="field-message" hidden></p>
+        <p id="output-folder-message" class="field-message" role="alert" hidden></p>
+        <p id="settings-confirmation" class="field-confirmation" role="status" aria-live="polite" hidden></p>
         <p id="storage-line" class="storage-line">Espaço livre: calculando…</p>
         <p id="storage-warning" class="storage-warning" hidden>
           <span aria-hidden="true">⚠</span>

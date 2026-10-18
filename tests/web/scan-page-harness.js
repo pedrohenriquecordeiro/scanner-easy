@@ -9,6 +9,8 @@ const ACTIVE_POLL_DELAY_MILLISECONDS = 500;
 const PRINTER_POLL_DELAY_MILLISECONDS = 15000;
 const POST_SCAN_PRINTER_DELAY_MILLISECONDS = 6000;
 const QUALITY_SAVE_DELAY_MILLISECONDS = 300;
+const CONFIRMATION_VISIBLE_MILLISECONDS = 4000;
+const FOLDER_REFUSED_BODY = { code: "output_folder_unavailable", message: "Não consigo usar essa pasta de saída." };
 const BYTE_COUNTS = [0, 999, 1000, 999949, 999950, 1234567, 5e9];
 const PAGE_COUNTS = [0, 1, 1234];
 
@@ -139,6 +141,39 @@ class PageUnderTest extends BrowserPage {
   async release_quality_slider() {
     this.dispatch_simple_event(this.element("jpeg-quality-input"), "change");
     this.timers.run_pending_with_delay(QUALITY_SAVE_DELAY_MILLISECONDS);
+    await this.flush();
+  }
+
+  async press_key_on(element, code) {
+    element.focus();
+    await this.press_key(code);
+  }
+
+  async save_folder(folder_path) {
+    this.element("output-folder-input").value = folder_path;
+    await this.click(this.element("output-folder-save-button"));
+  }
+
+  read_folder_feedback() {
+    const save_button = this.element("output-folder-save-button");
+    return {
+      button_label: save_button.textContent,
+      button_disabled: save_button.disabled,
+      button_busy: save_button.getAttribute("aria-busy"),
+      confirmation_text: this.element("settings-confirmation").textContent,
+      confirmation_hidden: this.element("settings-confirmation").hidden,
+      error_text: this.element("output-folder-message").textContent,
+      error_hidden: this.element("output-folder-message").hidden,
+      pending_confirmation_timers: this.count_pending_timers(CONFIRMATION_VISIBLE_MILLISECONDS),
+    };
+  }
+
+  count_pending_timers(delay_milliseconds) {
+    return [...this.timers.pending.values()].filter((timer) => timer.delay_milliseconds === delay_milliseconds).length;
+  }
+
+  async let_the_confirmation_end() {
+    this.timers.run_pending_with_delay(CONFIRMATION_VISIBLE_MILLISECONDS);
     await this.flush();
   }
 
@@ -306,6 +341,113 @@ const SCENARIOS = {
       "GET /api/state": build_json_response(200, build_state("scanning", AVAILABLE_STORAGE, SLOW_SETTINGS)),
     });
     return { status_text: page.element("status-line").textContent };
+  },
+  async folder_save_before_the_answer() {
+    const page = await load_page({ "PUT /api/settings": build_deferred_response() });
+    await page.save_folder("/Volumes/Arquivo");
+    return page.read_folder_feedback();
+  },
+  async folder_save_answered() {
+    const saved = { ...SETTINGS, output_folder: "/Volumes/Arquivo" };
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, saved) });
+    await page.save_folder("/Volumes/Arquivo");
+    return {
+      ...page.read_folder_feedback(),
+      scan_button_focused: page.is_focused("scan-button"),
+      settings_request_body: page.settings_request_body(),
+    };
+  },
+  async folder_confirmation_after_it_ends() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
+    await page.save_folder("/Volumes/Arquivo");
+    await page.let_the_confirmation_end();
+    return page.read_folder_feedback();
+  },
+  async folder_save_refused() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(422, FOLDER_REFUSED_BODY) });
+    await page.save_folder("/proibida");
+    return { ...page.read_folder_feedback(), input_focused: page.is_focused("output-folder-input") };
+  },
+  async folder_save_succeeds_after_a_refusal() {
+    const page = await load_page({
+      "PUT /api/settings": [build_json_response(422, FOLDER_REFUSED_BODY), build_json_response(200, SETTINGS)],
+    });
+    await page.save_folder("/proibida");
+    await page.save_folder("/Volumes/Arquivo");
+    return page.read_folder_feedback();
+  },
+  async folder_save_refused_after_a_success() {
+    const page = await load_page({
+      "PUT /api/settings": [build_json_response(200, SETTINGS), build_json_response(422, FOLDER_REFUSED_BODY)],
+    });
+    await page.save_folder("/Volumes/Arquivo");
+    await page.save_folder("/proibida");
+    return page.read_folder_feedback();
+  },
+  async folder_saved_twice() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
+    await page.save_folder("/Volumes/Arquivo");
+    await page.save_folder("/Volumes/Outro");
+    return page.read_folder_feedback();
+  },
+  async enter_twice_in_the_folder_field_while_saving() {
+    const page = await load_page({ "PUT /api/settings": build_deferred_response() });
+    const folder_field = page.element("output-folder-input");
+    folder_field.value = "/Volumes/Arquivo";
+    await page.press_key_on(folder_field, "Enter");
+    await page.press_key_on(folder_field, "Enter");
+    return { settings_requests: page.count_requests("PUT /api/settings") };
+  },
+  async adjustment_saved() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, dots_per_inch: 600 }) });
+    await page.choose_option("resolution-select", "600");
+    return page.read_folder_feedback();
+  },
+  async adjustment_confirmation_after_it_ends() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
+    await page.choose_option("color-mode-select", "grayscale");
+    await page.let_the_confirmation_end();
+    return page.read_folder_feedback();
+  },
+  async adjustment_refused() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(422, INVALID_SETTINGS_BODY) });
+    await page.choose_option("resolution-select", "600");
+    return page.read_folder_feedback();
+  },
+  async format_saved() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, output_format: "jpg" }) });
+    await page.click(page.element("output-format-jpg"));
+    page.dispatch_simple_event(page.element("output-format-jpg"), "change");
+    await page.flush();
+    return page.read_folder_feedback();
+  },
+  async crop_boxes_saved() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, auto_crop: true }) });
+    await page.set_auto_crop(true);
+    return page.read_folder_feedback();
+  },
+  async quality_saved() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, jpeg_quality: 75 }) });
+    await page.move_quality_slider("75");
+    await page.release_quality_slider();
+    return page.read_folder_feedback();
+  },
+  async capture_mode_saved() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, { ...SETTINGS, capture_mode: "document" }) });
+    page.element("capture-mode-document").checked = true;
+    page.dispatch_simple_event(page.element("capture-mode-document"), "change");
+    await page.flush();
+    return page.read_folder_feedback();
+  },
+  async two_adjustments_in_a_row() {
+    const page = await load_page({ "PUT /api/settings": build_json_response(200, SETTINGS) });
+    await page.choose_option("resolution-select", "600");
+    await page.choose_option("color-mode-select", "grayscale");
+    return page.read_folder_feedback();
+  },
+  async scan_button_while_scanning() {
+    const page = await load_page(SCAN_STATE_OVERRIDES);
+    return { button_label: page.element("scan-button-label").textContent };
   },
   async repeated_space_only() {
     const page = await load_page({});

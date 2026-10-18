@@ -3,8 +3,9 @@
 // Uses IDLE_PHASE, SPACE_KEY_ACTIONS, decide_space_key_action and can_start_capture from
 // scan-trigger-policy.js, the quality and duration rules from scan-quality-policy.js, ErrorBanner from error-banner.js,
 // CAPTURE_MODES, ENTER_KEY_CODE and the can_, should_ and describe_ rules from document-page-policy.js, the addresses
-// and texts of last-scan-policy.js, PageFrameEditor from page-frame-editor.js, DocumentPanel from document-panel.js
-// and LastScanPanel from last-scan-panel.js; index.html loads them first, in this order.
+// and texts of last-scan-policy.js, PageFrameEditor from page-frame-editor.js, DocumentPanel from document-panel.js,
+// LastScanPanel from last-scan-panel.js and SettingsFeedback from settings-feedback.js; index.html loads them first, in
+// this order.
 
 const REQUIRED_HEADER_NAME = "X-Requested-With";
 const REQUIRED_HEADER_VALUE = "digitalizadora";
@@ -253,6 +254,7 @@ function collect_elements() {
     output_folder_input: document.getElementById("output-folder-input"),
     output_folder_save_button: document.getElementById("output-folder-save-button"),
     output_folder_message: document.getElementById("output-folder-message"),
+    settings_confirmation: document.getElementById("settings-confirmation"),
     storage_line: document.getElementById("storage-line"),
     storage_warning: document.getElementById("storage-warning"),
     last_scan_panel: document.getElementById("last-scan-panel"),
@@ -328,7 +330,11 @@ function build_scan_page(elements) {
     refresh_page_controls: () => scan_page.render_activity(),
     request_state_refresh: () => scan_page.schedule_state_refresh(IMMEDIATE_REFRESH_MILLISECONDS),
   });
-  scan_page = new ScanPage(elements, { document_panel, last_scan_panel, error_banner });
+  const settings_feedback = new SettingsFeedback(elements, {
+    set_timeout: (callback, delay_milliseconds) => window.setTimeout(callback, delay_milliseconds),
+    clear_timeout: (handle) => window.clearTimeout(handle),
+  });
+  scan_page = new ScanPage(elements, { document_panel, last_scan_panel, error_banner, settings_feedback });
   return scan_page;
 }
 
@@ -338,8 +344,10 @@ class ScanPage {
     this.document_panel = page_parts.document_panel;
     this.last_scan_panel = page_parts.last_scan_panel;
     this.error_banner = page_parts.error_banner;
+    this.settings_feedback = page_parts.settings_feedback;
     this.scan_phase = IDLE_PHASE;
     this.is_start_request_pending = false;
+    this.is_output_folder_save_pending = false;
     this.saved_settings = null;
     this.quality_edit_count = 0;
     this.quality_edits_sent = 0;
@@ -365,7 +373,7 @@ class ScanPage {
     document.addEventListener("keyup", (event) => this.handle_key_up(event));
     Object.values(format_inputs).forEach((input) => {
       input.addEventListener("change", (event) =>
-        this.change_setting_then_focus_scan_button({ output_format: event.target.value }),
+        this.change_adjustment_then_focus_scan_button({ output_format: event.target.value }),
       );
     });
     Object.values(this.elements.capture_mode_inputs).forEach((input) => {
@@ -390,14 +398,14 @@ class ScanPage {
   bind_quality_events() {
     const { resolution_select, color_mode_select, auto_crop_checkbox } = this.elements;
     resolution_select.addEventListener("change", () =>
-      this.change_setting({ dots_per_inch: Number(resolution_select.value) }),
+      this.change_adjustment({ dots_per_inch: Number(resolution_select.value) }),
     );
-    color_mode_select.addEventListener("change", () => this.change_setting({ color_mode: color_mode_select.value }));
+    color_mode_select.addEventListener("change", () => this.change_adjustment({ color_mode: color_mode_select.value }));
     auto_crop_checkbox.addEventListener("change", () =>
-      this.change_setting_then_focus_scan_button({ auto_crop: auto_crop_checkbox.checked }),
+      this.change_adjustment_then_focus_scan_button({ auto_crop: auto_crop_checkbox.checked }),
     );
     this.elements.crop_margin_checkbox.addEventListener("change", () =>
-      this.change_setting({ crop_margin: this.elements.crop_margin_checkbox.checked }),
+      this.change_adjustment({ crop_margin: this.elements.crop_margin_checkbox.checked }),
     );
     const { jpeg_quality_input, jpeg_quality_value } = this.elements;
     // The number follows the slider while it moves (a screen reader reads it); the setting is saved a moment after
@@ -419,7 +427,7 @@ class ScanPage {
     this.quality_edits_sent = this.quality_edit_count;
     this.quality_requests_pending += 1;
     try {
-      await this.change_setting({ jpeg_quality: parse_jpeg_quality(this.elements.jpeg_quality_input.value) });
+      await this.change_adjustment({ jpeg_quality: parse_jpeg_quality(this.elements.jpeg_quality_input.value) });
     } finally {
       this.quality_requests_pending -= 1;
     }
@@ -768,14 +776,28 @@ class ScanPage {
     this.schedule_state_refresh(IMMEDIATE_REFRESH_MILLISECONDS);
   }
 
+  // True when the server took the change; a refusal shows in the banner and puts the controls back.
   async change_setting(changes) {
     try {
       await this.send_settings({ ...this.saved_settings, ...changes });
       this.error_banner.report_action_error(null);
+      return true;
     } catch (error) {
       this.error_banner.report_action_error(error.message);
       this.apply_saved_settings(this.saved_settings);
+      return false;
     }
+  }
+
+  async change_adjustment(changes) {
+    if (await this.change_setting(changes)) {
+      this.settings_feedback.confirm_adjustment_saved();
+    }
+  }
+
+  async change_adjustment_then_focus_scan_button(changes) {
+    await this.change_adjustment(changes);
+    this.elements.scan_button.focus();
   }
 
   async change_setting_then_focus_scan_button(changes) {
@@ -784,15 +806,22 @@ class ScanPage {
   }
 
   async save_output_folder() {
-    const { output_folder_input, output_folder_message, scan_button } = this.elements;
-    output_folder_message.hidden = true;
+    const { output_folder_input, scan_button } = this.elements;
+    if (this.is_output_folder_save_pending) {
+      return;
+    }
+    this.is_output_folder_save_pending = true;
+    this.settings_feedback.begin_folder_save();
     try {
       await this.send_settings({ ...this.saved_settings, output_folder: output_folder_input.value.trim() });
     } catch (error) {
-      output_folder_message.textContent = error.message;
-      output_folder_message.hidden = false;
+      this.settings_feedback.fail_folder_save(error.message);
+      output_folder_input.focus();
       return;
+    } finally {
+      this.is_output_folder_save_pending = false;
     }
+    this.settings_feedback.finish_folder_save();
     scan_button.focus();
   }
 }

@@ -21,6 +21,7 @@ SETTINGS_BODY = {
     "crop_margin": True,
     "jpeg_quality": 90,
 }
+FOLDER_REFUSED_MESSAGE = "Não consigo usar essa pasta de saída."
 OUTPUT_FOLDER_UNAVAILABLE_TEXT = "Pasta de saída indisponível. Se for um disco externo, confira se está conectado."
 
 pytestmark = pytest.mark.skipif(
@@ -342,3 +343,119 @@ def test_a_refused_quality_shows_the_server_message_and_puts_the_slider_back(sce
 
 def test_the_crop_checkbox_has_no_hint_any_more(scenario_results: dict) -> None:
     assert scenario_results["settings_without_the_crop_hint"] == {"has_hint": False, "checkbox_description": None}
+
+
+def test_folder_button_is_busy_and_disabled_while_the_server_has_not_answered(scenario_results: dict) -> None:
+    result = scenario_results["folder_save_before_the_answer"]
+    assert (result["button_label"], result["button_disabled"], result["button_busy"]) == ("Salvando…", True, "true")
+
+
+def test_folder_save_shows_no_confirmation_before_the_answer(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_before_the_answer"]["confirmation_text"] == ""
+
+
+def test_folder_button_returns_to_normal_after_the_answer(scenario_results: dict) -> None:
+    result = scenario_results["folder_save_answered"]
+    assert (result["button_label"], result["button_disabled"], result["button_busy"]) == ("Salvar", False, "false")
+
+
+def test_folder_save_confirms_with_the_saved_folder_message(scenario_results: dict) -> None:
+    result = scenario_results["folder_save_answered"]
+    assert (result["confirmation_text"], result["confirmation_hidden"]) == ("✔ Pasta salva", False)
+
+
+def test_folder_save_sends_the_typed_folder(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_answered"]["settings_request_body"]["output_folder"] == "/Volumes/Arquivo"
+
+
+def test_folder_save_hands_the_focus_to_the_scan_button(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_answered"]["scan_button_focused"] is True
+
+
+def test_folder_confirmation_waits_for_its_timer_to_end(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_answered"]["pending_confirmation_timers"] == 1
+
+
+def test_folder_confirmation_disappears_when_its_timer_ends(scenario_results: dict) -> None:
+    result = scenario_results["folder_confirmation_after_it_ends"]
+    assert (result["confirmation_text"], result["confirmation_hidden"]) == ("", True)
+
+
+def test_folder_confirmation_leaves_no_timer_behind(scenario_results: dict) -> None:
+    assert scenario_results["folder_confirmation_after_it_ends"]["pending_confirmation_timers"] == 0
+
+
+def test_refused_folder_shows_the_message_of_the_server(scenario_results: dict) -> None:
+    result = scenario_results["folder_save_refused"]
+    assert (result["error_text"], result["error_hidden"]) == (FOLDER_REFUSED_MESSAGE, False)
+
+
+def test_refused_folder_shows_no_confirmation(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_refused"]["confirmation_text"] == ""
+
+
+def test_refused_folder_returns_the_button_to_normal(scenario_results: dict) -> None:
+    result = scenario_results["folder_save_refused"]
+    assert (result["button_label"], result["button_disabled"], result["button_busy"]) == ("Salvar", False, "false")
+
+
+def test_refused_folder_keeps_the_focus_in_the_folder_field(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_refused"]["input_focused"] is True
+
+
+def test_a_save_after_a_refusal_clears_the_error(scenario_results: dict) -> None:
+    result = scenario_results["folder_save_succeeds_after_a_refusal"]
+    assert (result["error_text"], result["error_hidden"], result["confirmation_text"]) == ("", True, "✔ Pasta salva")
+
+
+def test_a_refusal_after_a_success_replaces_the_confirmation(scenario_results: dict) -> None:
+    result = scenario_results["folder_save_refused_after_a_success"]
+    assert (result["confirmation_hidden"], result["error_text"]) == (True, FOLDER_REFUSED_MESSAGE)
+
+
+def test_a_refusal_after_a_success_leaves_no_timer_behind(scenario_results: dict) -> None:
+    assert scenario_results["folder_save_refused_after_a_success"]["pending_confirmation_timers"] == 0
+
+
+def test_saving_the_folder_twice_keeps_a_single_confirmation_timer(scenario_results: dict) -> None:
+    assert scenario_results["folder_saved_twice"]["pending_confirmation_timers"] == 1
+
+
+def test_enter_in_the_folder_field_while_saving_sends_one_request(scenario_results: dict) -> None:
+    assert scenario_results["enter_twice_in_the_folder_field_while_saving"]["settings_requests"] == 1
+
+
+@pytest.mark.parametrize("scenario_name", ["adjustment_saved", "format_saved", "crop_boxes_saved", "quality_saved"])
+def test_an_adjustment_confirms_with_the_saved_adjustment_message(scenario_results: dict, scenario_name: str) -> None:
+    result = scenario_results[scenario_name]
+    assert (result["confirmation_text"], result["confirmation_hidden"]) == ("✔ Ajuste salvo", False)
+
+
+def test_an_adjustment_does_not_touch_the_folder_button(scenario_results: dict) -> None:
+    result = scenario_results["adjustment_saved"]
+    assert (result["button_busy"], result["button_disabled"]) == (None, False)
+
+
+def test_an_adjustment_confirmation_disappears_when_its_timer_ends(scenario_results: dict) -> None:
+    result = scenario_results["adjustment_confirmation_after_it_ends"]
+    assert (result["confirmation_hidden"], result["pending_confirmation_timers"]) == (True, 0)
+
+
+def test_a_refused_adjustment_shows_no_confirmation(scenario_results: dict) -> None:
+    assert scenario_results["adjustment_refused"]["confirmation_text"] == ""
+
+
+def test_a_refused_adjustment_leaves_no_timer_behind(scenario_results: dict) -> None:
+    assert scenario_results["adjustment_refused"]["pending_confirmation_timers"] == 0
+
+
+def test_changing_the_capture_mode_shows_no_adjustment_confirmation(scenario_results: dict) -> None:
+    assert scenario_results["capture_mode_saved"]["confirmation_text"] == ""
+
+
+def test_two_adjustments_in_a_row_keep_a_single_confirmation_timer(scenario_results: dict) -> None:
+    assert scenario_results["two_adjustments_in_a_row"]["pending_confirmation_timers"] == 1
+
+
+def test_scan_button_shows_the_state_while_a_scan_runs(scenario_results: dict) -> None:
+    assert scenario_results["scan_button_while_scanning"]["button_label"] == "Digitalizando…"

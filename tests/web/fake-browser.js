@@ -23,6 +23,7 @@ const PAGE_SCRIPT_FILE_NAMES = [
   "page-frame-editor.js",
   "document-panel.js",
   "last-scan-panel.js",
+  "settings-feedback.js",
   "application.js",
 ];
 const TAG_PATTERN = /<(\/?)([a-z][a-z0-9]*)\b([^>]*)>/g;

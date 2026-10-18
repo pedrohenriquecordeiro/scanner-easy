@@ -18,6 +18,7 @@ SCRIPT_FILE_NAMES = [
     "page-frame-editor.js",
     "document-panel.js",
     "last-scan-panel.js",
+    "settings-feedback.js",
     "application.js",
 ]
 STATIC_FILE_NAMES = ["index.html", "application.css", *SCRIPT_FILE_NAMES]
@@ -117,6 +118,9 @@ SETTINGS_ELEMENT_IDENTIFIERS = [
     "jpeg-quality-value",
     "jpeg-quality-hint",
     "output-folder-save-button",
+    "output-folder-message",
+    "settings-confirmation",
+    "status-line",
 ]
 REMOVED_ELEMENT_IDENTIFIERS = [
     "auto-crop-hint",
@@ -138,7 +142,7 @@ SAVE_DOCUMENT_BUTTON_PATTERN = (
     r'<button id="save-document-button"[^>]*aria-label="Salvar documento"[^>]*>\s*Salvar <kbd>Enter</kbd>'
 )
 SAVE_FOLDER_BUTTON_PATTERN = (
-    r'<button id="output-folder-save-button"[^>]*aria-label="Salvar pasta de saída"[^>]*>Salvar pasta</button>'
+    r'<button id="output-folder-save-button"[^>]*aria-label="Salvar pasta de saída"[^>]*>Salvar</button>'
 )
 SELECT_PATTERN = re.compile(r"""<select id="([^"]+)"[^>]*>(.*?)</select>""", re.DOTALL)
 
@@ -518,6 +522,39 @@ def test_save_document_button_has_the_accessible_name_and_the_enter_hint() -> No
 def test_folder_button_is_renamed_to_save_folder() -> None:
     page = read_static_file("index.html")
     assert re.search(SAVE_FOLDER_BUTTON_PATTERN, page)
+
+
+def test_folder_button_does_not_say_save_folder_any_more() -> None:
+    assert "Salvar pasta<" not in read_static_file("index.html")
+
+
+def test_the_two_save_buttons_keep_distinct_identifiers_and_labels() -> None:
+    page = read_static_file("index.html")
+    assert (page.count('id="output-folder-save-button"'), page.count('id="save-document-button"')) == (1, 1)
+
+
+def test_status_line_stays_a_polite_status_region() -> None:
+    assert re.search(r'<p id="status-line"[^>]*role="status"[^>]*aria-live="polite"', read_static_file("index.html"))
+
+
+def test_settings_confirmation_is_a_polite_status_region() -> None:
+    page = read_static_file("index.html")
+    assert re.search(r'<p id="settings-confirmation"[^>]*role="status"[^>]*aria-live="polite"', page)
+
+
+def test_folder_error_message_is_an_alert() -> None:
+    assert re.search(r'<p id="output-folder-message"[^>]*role="alert"', read_static_file("index.html"))
+
+
+def test_buttons_have_a_pressed_style() -> None:
+    assert "button:active:not(:disabled)" in read_static_file("application.css")
+
+
+def test_confirmation_uses_the_success_colours_of_the_theme() -> None:
+    stylesheet = " ".join(read_static_file("application.css").split())
+    assert "background: var(--color-success-background); color: var(--color-success-text);" in stylesheet.split(
+        ".field-confirmation {"
+    )[1].split("}")[0]
 
 
 def test_page_has_no_finalize_wording_left_for_the_user() -> None:
